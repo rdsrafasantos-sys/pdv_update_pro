@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV Updater</title>
+<style>
+  :root {
+    --bg:        #0f1117;
+    --surface:   #1a1d27;
+    --surface2:  #22263a;
+    --border:    #2e3248;
+    --accent:    #4f8ef7;
+    --accent2:   #3a6fd8;
+    --green:     #22c55e;
+    --red:       #ef4444;
+    --yellow:    #f59e0b;
+    --gray:      #6b7280;
+    --text:      #e2e8f0;
+    --text2:     #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  /* HEADER */
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 20px; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 10px; }
+  header h1 span { font-size: 22px; }
+  .header-info { font-size: 13px; color: var(--text2); }
+
+  /* LAYOUT */
+  .container { max-width: 1200px; margin: 0 auto; padding: 28px 24px; display: flex; flex-direction: column; gap: 24px; }
+
+  /* CARDS */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .card-title { font-size: 14px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+  /* UPLOAD */
+  .upload-area { border: 2px dashed var(--border); border-radius: 10px; padding: 32px; text-align: center; cursor: pointer; transition: all .2s; }
+  .upload-area:hover, .upload-area.drag { border-color: var(--accent); background: rgba(79,142,247,.06); }
+  .upload-area p { color: var(--text2); margin-top: 8px; font-size: 14px; }
+  .upload-area .icon { font-size: 36px; }
+  #fileInput { display: none; }
+  .upload-progress { margin-top: 12px; display: none; }
+  .bar-wrap { background: var(--surface2); border-radius: 99px; height: 6px; overflow: hidden; margin-top: 6px; }
+  .bar { height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s; width: 0%; }
+
+  /* ARQUIVOS DISPONÍVEIS */
+  .file-list { display: flex; flex-direction: column; gap: 8px; }
+  .file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all .15s; }
+  .file-item:hover { border-color: var(--accent); }
+  .file-item.selected { border-color: var(--accent); background: rgba(79,142,247,.1); }
+  .file-item .file-name { font-size: 14px; font-weight: 500; }
+  .file-item .file-meta { font-size: 12px; color: var(--text2); }
+
+  /* SELEÇÃO DE LOJA */
+  .loja-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .loja-tab { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s; }
+  .loja-tab:hover { border-color: var(--accent); color: var(--text); }
+  .loja-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* GRID DE PDVs */
+  .pdv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .pdv-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; cursor: pointer; transition: all .15s; position: relative; user-select: none; }
+  .pdv-card:hover { border-color: var(--accent); }
+  .pdv-card.selected { border-color: var(--accent); background: rgba(79,142,247,.1); }
+  .pdv-card .pdv-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .pdv-card .pdv-ip { font-size: 11px; color: var(--text2); margin-bottom: 10px; }
+  .pdv-check { position: absolute; top: 10px; right: 10px; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); background: transparent; transition: all .15s; }
+  .pdv-card.selected .pdv-check { background: var(--accent); border-color: var(--accent); display: flex; align-items: center; justify-content: center; }
+  .pdv-card.selected .pdv-check::after { content: '✓'; font-size: 10px; color: #fff; font-weight: 700; }
+
+  /* STATUS BADGE */
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .badge.online    { background: rgba(34,197,94,.15);  color: var(--green);  }
+  .badge.offline   { background: rgba(239,68,68,.15);  color: var(--red);    }
+  .badge.checking  { background: rgba(107,114,128,.15); color: var(--gray);  }
+  .badge.success   { background: rgba(34,197,94,.15);  color: var(--green);  }
+  .badge.error     { background: rgba(239,68,68,.15);  color: var(--red);    }
+  .badge.updating  { background: rgba(79,142,247,.15); color: var(--accent); }
+  .badge.enviando  { background: rgba(245,158,11,.15); color: var(--yellow); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .dot.pulse { animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* PROGRESS BAR DO PDV */
+  .pdv-progress { margin-top: 8px; }
+  .pdv-progress .bar-wrap { height: 4px; }
+  .pdv-etapa { font-size: 11px; color: var(--text2); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* BOTÕES */
+  .btn { padding: 10px 22px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 8px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent2); }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+  .btn-ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+  .btn-sm { padding: 6px 14px; font-size: 13px; }
+
+  .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .select-all { font-size: 13px; color: var(--accent); cursor: pointer; text-decoration: underline; }
+
+  /* TOAST */
+  #toast { position: fixed; bottom: 28px; right: 28px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; font-size: 14px; box-shadow: 0 8px 32px rgba(0,0,0,.4); transform: translateY(20px); opacity: 0; transition: all .25s; z-index: 999; max-width: 360px; }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { border-color: var(--green); }
+  #toast.error   { border-color: var(--red); }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; color: var(--text2); padding: 32px; font-size: 14px; }
+
+  .divider { height: 1px; background: var(--border); margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>⚡</span> PDV Updater</h1>
+  <div class="header-info" id="headerInfo">Selecione uma loja para começar</div>
+</header>
+
+<div class="container">
+
+  <!-- UPLOAD -->
+  <div class="card">
+    <div class="card-title">📦 Arquivo de Atualização</div>
+    <div class="upload-area" id="uploadArea">
+      <div class="icon">☁️</div>
+      <strong>Clique para selecionar ou arraste o .zip aqui</strong>
+      <p>Arquivo .zip de atualização do PDV</p>
+      <input type="file" id="fileInput" accept=".zip">
+    </div>
+    <div class="upload-progress" id="uploadProgress">
+      <span id="uploadStatus" style="font-size:13px;color:var(--text2)">Enviando...</span>
+      <div class="bar-wrap"><div class="bar" id="uploadBar"></div></div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="card-title">🗂 Arquivos Disponíveis</div>
+      <div class="file-list" id="fileList">
+        <div class="empty">Nenhum arquivo disponível</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOJAS E PDVs -->
+  <div class="card">
+    <div class="card-title">🏪 Lojas & PDVs</div>
+    <div class="loja-tabs" id="lojaTabs"></div>
+    <div class="divider" style="margin-bottom:16px"></div>
+
+    <div class="actions" style="margin-bottom:16px">
+      <button class="btn btn-ghost btn-sm" onclick="verificarOnline()">🔍 Verificar Online</button>
+      <span class="select-all" onclick="toggleSelecionarTodos()">Selecionar todos</span>
+    </div>
+
+    <div class="pdv-grid" id="pdvGrid">
+      <div class="empty">Selecione uma loja acima</div>
+    </div>
+  </div>
+
+  <!-- AÇÃO -->
+  <div class="actions">
+    <button class="btn btn-primary" id="btnAtualizar" onclick="iniciarAtualizacao()" disabled>
+      ⚡ Atualizar PDVs Selecionados
+    </button>
+    <span id="selInfo" style="font-size:13px;color:var(--text2)"></span>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ──────────────────────────────────────────────
+// ESTADO
+// ──────────────────────────────────────────────
+let lojas          = [];
+let lojaAtiva      = null;
+let pdvsSelecionados = new Set();
+let arquivoSelecionado = null;
+let eventSource    = null;
+let statusPDVs     = {};
+
+// ──────────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────────
+async function init() {
+  const r = await fetch("/api/lojas");
+  lojas = await r.json();
+  renderLojaTabs();
+  if (lojas.length > 0) selecionarLoja(lojas[0].id);
+  carregarArquivos();
+}
+
+// ──────────────────────────────────────────────
+// LOJAS
+// ──────────────────────────────────────────────
+function renderLojaTabs() {
+  const el = document.getElementById("lojaTabs");
+  el.innerHTML = lojas.map(l =>
+    `<div class="loja-tab" id="tab-${l.id}" onclick="selecionarLoja('${l.id}')">${l.nome}</div>`
+  ).join("");
+}
+
+function selecionarLoja(lojaId) {
+  lojaAtiva = lojaId;
+  pdvsSelecionados.clear();
+  document.querySelectorAll(".loja-tab").forEach(t => t.classList.remove("active"));
+  document.getElementById(`tab-${lojaId}`)?.classList.add("active");
+
+  const loja = lojas.find(l => l.id === lojaId);
+  document.getElementById("headerInfo").textContent = loja ? loja.nome : "";
+
+  renderPDVs();
+  iniciarStream();
+  atualizarBotao();
+
+  // Para stream anterior e inicia novo
+  if (eventSource) eventSource.close();
+  eventSource = new EventSource(`/api/status_stream/${lojaId}`);
+  eventSource.onmessage = e => {
+    statusPDVs = JSON.parse(e.data);
+    atualizarStatusPDVs();
+  };
+}
+
+// ──────────────────────────────────────────────
+// PDVs
+// ──────────────────────────────────────────────
+function renderPDVs() {
+  const loja = lojas.find(l => l.id === lojaAtiva);
+  if (!loja) return;
+  const grid = document.getElementById("pdvGrid");
+  grid.innerHTML = loja.pdvs.map(p => `
+    <div class="pdv-card" id="pdv-${p.id}" onclick="togglePDV('${p.id}')">
+      <div class="pdv-check"></div>
+      <div class="pdv-name">${p.id}</div>
+      <div class="pdv-ip">${p.ip}</div>
+      <div id="badge-${p.id}"><span class="badge checking"><span class="dot"></span>—</span></div>
+      <div class="pdv-progress" id="progress-${p.id}" style="display:none">
+        <div class="bar-wrap"><div class="bar" id="bar-${p.id}" style="width:0%"></div></div>
+        <div class="pdv-etapa" id="etapa-${p.id}"></div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function togglePDV(pdvId) {
+  if (pdvsSelecionados.has(pdvId)) {
+    pdvsSelecionados.delete(pdvId);
+    document.getElementById(`pdv-${pdvId}`)?.classList.remove("selected");
+  } else {
+    pdvsSelecionados.add(pdvId);
+    document.getElementById(`pdv-${pdvId}`)?.classList.add("selected");
+  }
+  atualizarBotao();
+}
+
+function toggleSelecionarTodos() {
+  const loja = lojas.find(l => l.id === lojaAtiva);
+  if (!loja) return;
+  const todos = loja.pdvs.every(p => pdvsSelecionados.has(p.id));
+  if (todos) {
+    pdvsSelecionados.clear();
+    document.querySelectorAll(".pdv-card").forEach(c => c.classList.remove("selected"));
+  } else {
+    loja.pdvs.forEach(p => {
+      pdvsSelecionados.add(p.id);
+      document.getElementById(`pdv-${p.id}`)?.classList.add("selected");
+    });
+  }
+  atualizarBotao();
+}
+
+function atualizarBotao() {
+  const btn = document.getElementById("btnAtualizar");
+  const info = document.getElementById("selInfo");
+  const ok = pdvsSelecionados.size > 0 && arquivoSelecionado;
+  btn.disabled = !ok;
+  info.textContent = pdvsSelecionados.size > 0
+    ? `${pdvsSelecionados.size} PDV(s) selecionado(s)${arquivoSelecionado ? "" : " — selecione um arquivo"}`
+    : "Selecione ao menos um PDV";
+}
+
+// ──────────────────────────────────────────────
+// STATUS EM TEMPO REAL
+// ──────────────────────────────────────────────
+function atualizarStatusPDVs() {
+  for (const [pdvId, dados] of Object.entries(statusPDVs)) {
+    const badge   = document.getElementById(`badge-${pdvId}`);
+    const progEl  = document.getElementById(`progress-${pdvId}`);
+    const barEl   = document.getElementById(`bar-${pdvId}`);
+    const etapaEl = document.getElementById(`etapa-${pdvId}`);
+    if (!badge) continue;
+
+    const { status, progresso, etapa, erro } = dados;
+
+    let badgeHtml = "";
+    if (status === "success")  badgeHtml = `<span class="badge success"><span class="dot"></span>Concluído</span>`;
+    else if (status === "error") badgeHtml = `<span class="badge error"><span class="dot"></span>Erro</span>`;
+    else if (status === "updating") badgeHtml = `<span class="badge updating"><span class="dot pulse"></span>Atualizando</span>`;
+    else if (status === "enviando")  badgeHtml = `<span class="badge enviando"><span class="dot pulse"></span>Enviando</span>`;
+
+    if (badgeHtml) badge.innerHTML = badgeHtml;
+
+    if (["updating","enviando","success","error"].includes(status)) {
+      progEl.style.display = "block";
+      barEl.style.width = `${progresso}%`;
+      barEl.style.background = status === "error" ? "var(--red)" : status === "success" ? "var(--green)" : "var(--accent)";
+      etapaEl.textContent = erro || etapa;
+    }
+  }
+}
+
+function iniciarStream() {} // stream já iniciado em selecionarLoja
+
+// ──────────────────────────────────────────────
+// VERIFICAR ONLINE
+// ──────────────────────────────────────────────
+async function verificarOnline() {
+  if (!lojaAtiva) return;
+  const loja = lojas.find(l => l.id === lojaAtiva);
+  // Mostra "verificando" em todos
+  loja.pdvs.forEach(p => {
+    const el = document.getElementById(`badge-${p.id}`);
+    if (el) el.innerHTML = `<span class="badge checking"><span class="dot pulse"></span>Verificando</span>`;
+  });
+
+  const r = await fetch(`/api/ping_loja/${lojaAtiva}`);
+  const dados = await r.json();
+  for (const [pdvId, info] of Object.entries(dados)) {
+    const el = document.getElementById(`badge-${pdvId}`);
+    if (!el) continue;
+    el.innerHTML = info.online
+      ? `<span class="badge online"><span class="dot"></span>Online</span>`
+      : `<span class="badge offline"><span class="dot"></span>Offline</span>`;
+  }
+}
+
+// ──────────────────────────────────────────────
+// UPLOAD
+// ──────────────────────────────────────────────
+const uploadArea = document.getElementById("uploadArea");
+const fileInput  = document.getElementById("fileInput");
+
+uploadArea.addEventListener("click", () => fileInput.click());
+uploadArea.addEventListener("dragover", e => { e.preventDefault(); uploadArea.classList.add("drag"); });
+uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("drag"));
+uploadArea.addEventListener("drop", e => {
+  e.preventDefault();
+  uploadArea.classList.remove("drag");
+  const f = e.dataTransfer.files[0];
+  if (f) fazerUpload(f);
+});
+fileInput.addEventListener("change", () => {
+  if (fileInput.files[0]) fazerUpload(fileInput.files[0]);
+});
+
+async function fazerUpload(file) {
+  if (!file.name.endsWith(".zip")) { mostrarToast("Apenas arquivos .zip são aceitos", "error"); return; }
+  const prog = document.getElementById("uploadProgress");
+  const bar  = document.getElementById("uploadBar");
+  const stat = document.getElementById("uploadStatus");
+  prog.style.display = "block"; bar.style.width = "0%";
+  stat.textContent = `Enviando ${file.name}...`;
+
+  // Simula progresso visual
+  let p = 0;
+  const iv = setInterval(() => { p = Math.min(p + 5, 85); bar.style.width = p + "%"; }, 200);
+
+  const fd = new FormData();
+  fd.append("arquivo", file);
+  try {
+    const r  = await fetch("/api/upload", { method: "POST", body: fd });
+    const d  = await r.json();
+    clearInterval(iv); bar.style.width = "100%";
+    if (r.ok) {
+      stat.textContent = `✓ ${d.arquivo} (${d.tamanho_mb} MB)`;
+      mostrarToast(`Upload concluído: ${d.arquivo}`, "success");
+      carregarArquivos();
+    } else {
+      stat.textContent = `Erro: ${d.erro}`;
+      mostrarToast(d.erro, "error");
+    }
+  } catch(e) {
+    clearInterval(iv);
+    stat.textContent = "Erro no upload";
+    mostrarToast("Erro ao enviar arquivo", "error");
+  }
+}
+
+async function carregarArquivos() {
+  const r = await fetch("/api/arquivos");
+  const arquivos = await r.json();
+  const el = document.getElementById("fileList");
+  if (arquivos.length === 0) {
+    el.innerHTML = `<div class="empty">Nenhum arquivo disponível — faça upload de um .zip</div>`;
+    return;
+  }
+  el.innerHTML = arquivos.map(a => `
+    <div class="file-item ${arquivoSelecionado === a.nome ? 'selected' : ''}"
+         id="file-${a.nome.replace(/\./g,'_')}"
+         onclick="selecionarArquivo('${a.nome}')">
+      <div>
+        <div class="file-name">📦 ${a.nome}</div>
+        <div class="file-meta">${a.tamanho_mb} MB — ${a.data}</div>
+      </div>
+      <span style="font-size:18px">${arquivoSelecionado === a.nome ? '✅' : ''}</span>
+    </div>
+  `).join("");
+}
+
+function selecionarArquivo(nome) {
+  arquivoSelecionado = nome;
+  carregarArquivos();
+  atualizarBotao();
+}
+
+// ──────────────────────────────────────────────
+// ATUALIZAR
+// ──────────────────────────────────────────────
+async function iniciarAtualizacao() {
+  if (!lojaAtiva || pdvsSelecionados.size === 0 || !arquivoSelecionado) return;
+
+  const btn = document.getElementById("btnAtualizar");
+  btn.disabled = true;
+  btn.textContent = "⏳ Iniciando...";
+
+  const r = await fetch("/api/atualizar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      loja_id: lojaAtiva,
+      pdv_ids: [...pdvsSelecionados],
+      arquivo: arquivoSelecionado
+    })
+  });
+  const d = await r.json();
+
+  if (r.ok) {
+    mostrarToast(`✓ ${d.mensagem}`, "success");
+    btn.textContent = "⚡ Atualizar PDVs Selecionados";
+  } else {
+    mostrarToast(d.erro, "error");
+    btn.disabled = false;
+    btn.textContent = "⚡ Atualizar PDVs Selecionados";
+  }
+}
+
+// ──────────────────────────────────────────────
+// TOAST
+// ──────────────────────────────────────────────
+let toastTimer;
+function mostrarToast(msg, tipo = "info") {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = `show ${tipo}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 4000);
+}
+
+init();
+</script>
+</body>
+</html>
