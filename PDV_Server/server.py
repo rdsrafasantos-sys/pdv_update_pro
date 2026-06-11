@@ -196,9 +196,14 @@ def api_ping(loja_id, pdv_id):
         return jsonify({"erro": "PDV não encontrado"}), 404
     try:
         r = requests.get(f"http://{pdv['ip']}:5000/ping", timeout=3)
-        return jsonify({"online": r.status_code == 200, "ip": pdv["ip"]})
+        dados = r.json() if r.status_code == 200 else {}
+        return jsonify({
+            "online": r.status_code == 200,
+            "ip": pdv["ip"],
+            "versao_agente": dados.get("versao", "—")
+        })
     except Exception:
-        return jsonify({"online": False, "ip": pdv["ip"]})
+        return jsonify({"online": False, "ip": pdv["ip"], "versao_agente": "—"})
 
 @app.route("/api/ping_loja/<loja_id>", methods=["GET"])
 def api_ping_loja(loja_id):
@@ -212,9 +217,13 @@ def api_ping_loja(loja_id):
     def checar(pdv):
         try:
             r = requests.get(f"http://{pdv['ip']}:5000/ping", timeout=3)
-            resultados[pdv["id"]] = {"online": r.status_code == 200}
+            dados = r.json() if r.status_code == 200 else {}
+            resultados[pdv["id"]] = {
+                "online": r.status_code == 200,
+                "versao_agente": dados.get("versao", "—")
+            }
         except Exception:
-            resultados[pdv["id"]] = {"online": False}
+            resultados[pdv["id"]] = {"online": False, "versao_agente": "—"}
 
     for pdv in loja["pdvs"]:
         t = threading.Thread(target=checar, args=(pdv,))
@@ -274,6 +283,78 @@ def api_limpar_arquivos():
             os.remove(os.path.join(UPLOAD_DIR, f))
             removidos += 1
     return jsonify({"mensagem": f"{removidos} arquivo(s) removido(s)"})
+
+@app.route("/api/upload_agente", methods=["POST"])
+def api_upload_agente():
+    """Recebe o novo agente.exe e salva no servidor."""
+    if "arquivo" not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado"}), 400
+    arquivo = request.files["arquivo"]
+    if not arquivo.filename.endswith(".exe"):
+        return jsonify({"erro": "Apenas arquivos .exe sao aceitos"}), 400
+    caminho = os.path.join(UPLOAD_DIR, "agente.exe")
+    arquivo.save(caminho)
+    tamanho = os.path.getsize(caminho)
+    return jsonify({
+        "mensagem": "Upload do agente concluido",
+        "tamanho_mb": round(tamanho / 1024 / 1024, 2)
+    })
+
+@app.route("/api/versao_agente", methods=["GET"])
+def api_versao_agente():
+    """Verifica se existe agente.exe disponivel para distribuicao."""
+    caminho = os.path.join(UPLOAD_DIR, "agente.exe")
+    if os.path.exists(caminho):
+        return jsonify({
+            "disponivel": True,
+            "tamanho_mb": round(os.path.getsize(caminho) / 1024 / 1024, 2),
+            "data": time.strftime("%d/%m/%Y %H:%M",
+                     time.localtime(os.path.getmtime(caminho)))
+        })
+    return jsonify({"disponivel": False})
+
+@app.route("/api/atualizar_agente", methods=["POST"])
+def api_atualizar_agente():
+    """Envia novo agente.exe para PDVs selecionados."""
+    dados   = request.json
+    loja_id = dados.get("loja_id")
+    pdv_ids = dados.get("pdv_ids", [])
+
+    caminho_exe = os.path.join(UPLOAD_DIR, "agente.exe")
+    if not os.path.exists(caminho_exe):
+        return jsonify({"erro": "Nenhum agente.exe disponivel. Faca upload primeiro."}), 404
+
+    loja = next((l for l in get_lojas() if l["id"] == loja_id), None)
+    if not loja:
+        return jsonify({"erro": "Loja nao encontrada"}), 404
+
+    pdvs_alvo = loja["pdvs"] if pdv_ids == "todos" else                 [p for p in loja["pdvs"] if p["id"] in pdv_ids]
+
+    if not pdvs_alvo:
+        return jsonify({"erro": "Nenhum PDV selecionado"}), 400
+
+    resultados = {}
+    def enviar(pdv):
+        try:
+            with open(caminho_exe, "rb") as f:
+                r = requests.post(
+                    f"http://{pdv['ip']}:5000/atualizar_agente",
+                    files={"arquivo": ("agente.exe", f, "application/octet-stream")},
+                    headers={"X-Agent-Token": TOKEN_SEGURANCA},
+                    timeout=60
+                )
+            resultados[pdv["id"]] = {
+                "ok": r.status_code == 200,
+                "msg": r.json().get("mensagem", r.text)
+            }
+        except Exception as e:
+            resultados[pdv["id"]] = {"ok": False, "msg": str(e)}
+
+    threads = [threading.Thread(target=enviar, args=(p,), daemon=True) for p in pdvs_alvo]
+    for t in threads: t.start()
+    for t in threads: t.join(timeout=70)
+
+    return jsonify({"resultados": resultados})
 
 @app.route("/api/atualizar", methods=["POST"])
 def api_atualizar():

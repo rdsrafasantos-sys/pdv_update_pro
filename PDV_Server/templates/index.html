@@ -125,6 +125,18 @@ input:checked + .slider:before { transform: translateX(18px); }
 .btn-update:disabled { opacity: .45; cursor: not-allowed; }
 .sel-all { font-size: 12px; color: var(--vr-orange); cursor: pointer; text-decoration: underline; }
 .divider { height: 1px; margin: 4px 0; }
+.agente-info { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-radius:8px; margin-bottom:8px; }
+.app.dark .agente-info { background:#22263a; border:1px solid #2e3248; }
+.app.light .agente-info { background:#f9f9f9; border:1px solid #e5e5e5; }
+.agente-badge { font-size:11px; padding:3px 9px; border-radius:99px; font-weight:600; }
+.agente-badge.disponivel { background:rgba(34,197,94,.15); color:#16a34a; }
+.agente-badge.indisponivel { background:rgba(107,114,128,.15); color:#6b7280; }
+.btn-atualizar-agente { background:transparent; padding:7px 14px; border-radius:8px; font-size:12px; cursor:pointer; font-weight:600; font-family:inherit; transition:all .15s; }
+.app.dark .btn-atualizar-agente { border:1.5px solid var(--vr-orange); color:var(--vr-orange); }
+.app.dark .btn-atualizar-agente:hover { background:var(--vr-orange); color:#fff; }
+.app.light .btn-atualizar-agente { background:#1a1a2e; color:#fff; border:none; }
+.app.light .btn-atualizar-agente:hover { background:#111; }
+.pdv-versao-agente { font-size:10px; color:#4f8ef7; margin-top:1px; }
 
 .top-actions { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .empty { text-align: center; color: #64748b; padding: 24px; font-size: 13px; }
@@ -177,6 +189,30 @@ input:checked + .slider:before { transform: translateX(18px); }
       </div>
     </div>
 
+    <!-- AGENTE -->
+    <div class="card" id="cardAgente">
+      <div class="section-title">🤖 Atualização do Agente PDV</div>
+      <div class="agente-info">
+        <div>
+          <div style="font-size:13px;font-weight:600">agente.exe</div>
+          <div class="text-muted" style="font-size:11px" id="agenteInfo">Verificando...</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="agente-badge" id="agenteBadge">—</span>
+          <label style="cursor:pointer">
+            <input type="file" id="agenteInput" accept=".exe" style="display:none" onchange="uploadAgente(this)">
+            <span class="btn-verify" onclick="document.getElementById('agenteInput').click()" style="cursor:pointer">📤 Upload novo</span>
+          </label>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn-atualizar-agente" id="btnAtualizarAgente" onclick="iniciarAtualizacaoAgente()" disabled>
+          🤖 Atualizar Agente nos PDVs Selecionados
+        </button>
+        <span id="agenteUploadStatus" class="text-muted" style="font-size:12px"></span>
+      </div>
+    </div>
+
     <!-- LOJAS E PDVs -->
     <div class="card">
       <div class="top-actions">
@@ -222,6 +258,81 @@ let statusPDVs = {};
 async function init() {
   await carregarLojas();
   await carregarArquivos();
+  await verificarAgenteDisponivel();
+}
+
+// ──────────────────────────────────────────────
+// AGENTE
+// ──────────────────────────────────────────────
+async function verificarAgenteDisponivel() {
+  const r = await fetch("/api/versao_agente");
+  const d = await r.json();
+  const badge = document.getElementById("agenteBadge");
+  const info  = document.getElementById("agenteInfo");
+  const btn   = document.getElementById("btnAtualizarAgente");
+  if (d.disponivel) {
+    badge.className = "agente-badge disponivel";
+    badge.textContent = "Disponível";
+    info.textContent  = `agente.exe — ${d.tamanho_mb} MB — ${d.data}`;
+    btn.disabled = pdvsSelecionados.size === 0;
+  } else {
+    badge.className = "agente-badge indisponivel";
+    badge.textContent = "Nenhum disponível";
+    info.textContent  = "Faça upload do agente.exe para distribuir";
+    btn.disabled = true;
+  }
+}
+
+async function uploadAgente(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const stat = document.getElementById("agenteUploadStatus");
+  stat.textContent = "Enviando agente.exe...";
+  const fd = new FormData();
+  fd.append("arquivo", file);
+  try {
+    const r = await fetch("/api/upload_agente", { method: "POST", body: fd });
+    const d = await r.json();
+    if (r.ok) {
+      stat.textContent = `✓ ${d.tamanho_mb} MB enviado`;
+      await verificarAgenteDisponivel();
+    } else {
+      stat.textContent = `Erro: ${d.erro}`;
+    }
+  } catch(e) {
+    stat.textContent = "Erro no upload";
+  }
+}
+
+async function iniciarAtualizacaoAgente() {
+  if (!lojaAtiva || pdvsSelecionados.size === 0) return;
+  if (!confirm(`Atualizar o agente em ${pdvsSelecionados.size} PDV(s)?
+O serviço será reiniciado em cada PDV.`)) return;
+
+  const btn  = document.getElementById("btnAtualizarAgente");
+  const stat = document.getElementById("agenteUploadStatus");
+  btn.disabled = true;
+  btn.textContent = "⏳ Enviando...";
+  stat.textContent = "";
+
+  const r = await fetch("/api/atualizar_agente", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ loja_id: lojaAtiva, pdv_ids: [...pdvsSelecionados] })
+  });
+  const d = await r.json();
+
+  btn.textContent = "🤖 Atualizar Agente nos PDVs Selecionados";
+
+  if (r.ok) {
+    const resultados = d.resultados;
+    const ok    = Object.values(resultados).filter(r => r.ok).length;
+    const total = Object.keys(resultados).length;
+    stat.textContent = `✓ ${ok}/${total} PDVs atualizados com sucesso`;
+  } else {
+    stat.textContent = `Erro: ${d.erro}`;
+    btn.disabled = false;
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -295,6 +406,7 @@ function renderPDVs() {
       <div class="pdv-ip text-muted">${p.ip}</div>
       ${p.versao ? `<div class="pdv-versao">v${p.versao}</div>` : ''}
       <div id="badge-${p.id}"><span class="badge checking"><span class="dot"></span>—</span></div>
+      <div class="pdv-versao-agente" id="vagente-${p.id}">agente v—</div>
       <div class="pdv-progress" id="progress-${p.id}" style="display:none">
         <div class="bar-wrap"><div class="bar" id="bar-${p.id}" style="width:0%"></div></div>
         <div class="pdv-etapa" id="etapa-${p.id}"></div>
@@ -340,6 +452,8 @@ function atualizarBotao() {
   } else {
     info.textContent = "Selecione ao menos um PDV";
   }
+  // Atualiza botão do agente também
+  verificarAgenteDisponivel();
 }
 
 // ──────────────────────────────────────────────
@@ -386,6 +500,11 @@ async function verificarOnline() {
     el.innerHTML = info.online
       ? `<span class="badge online"><span class="dot"></span>Online</span>`
       : `<span class="badge offline"><span class="dot"></span>Offline</span>`;
+    // Mostra versão do agente
+    const vel = document.getElementById(`vagente-${pdvId}`);
+    if (vel) {
+      vel.textContent = info.versao_agente ? `agente v${info.versao_agente}` : "agente v—";
+    }
   }
 }
 

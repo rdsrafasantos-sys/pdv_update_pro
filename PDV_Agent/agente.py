@@ -160,6 +160,52 @@ def status():
     with lock:
         return jsonify(dict(estado))
 
+@app.route("/atualizar_agente", methods=["POST"])
+def atualizar_agente():
+    """Recebe novo agente.exe e executa auto-atualização via PowerShell."""
+    if not verificar_token(request):
+        return jsonify({"erro": "Token invalido"}), 403
+    if "arquivo" not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado"}), 400
+    arq = request.files["arquivo"]
+    if not arq.filename.endswith(".exe"):
+        return jsonify({"erro": "Apenas arquivos .exe sao aceitos"}), 400
+    try:
+        pasta_agente  = r"C:\PDVAgent"
+        novo_exe      = os.path.join(pasta_agente, "agente_novo.exe")
+        exe_atual     = os.path.join(pasta_agente, "agente.exe")
+        script_ps1    = os.path.join(pasta_agente, "atualizar_agente.ps1")
+
+        # Salva novo exe
+        arq.save(novo_exe)
+        log.info(f"Novo agente recebido: {novo_exe}")
+
+        # Cria script PowerShell que faz a substituição fora do processo
+        script = f"""
+Start-Sleep -Seconds 3
+Stop-Service -Name PDVAgent -Force
+Start-Sleep -Seconds 2
+Copy-Item -Path '{novo_exe}' -Destination '{exe_atual}' -Force
+Remove-Item -Path '{novo_exe}' -Force
+Start-Service -Name PDVAgent
+Remove-Item -Path '{script_ps1}' -Force
+"""
+        with open(script_ps1, "w", encoding="utf-8") as f:
+            f.write(script)
+
+        # Dispara o script em processo separado e retorna imediatamente
+        subprocess.Popen(
+            ["powershell.exe", "-ExecutionPolicy", "Bypass",
+             "-WindowStyle", "Hidden", "-File", script_ps1],
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+        log.info("Script de atualizacao do agente disparado.")
+        return jsonify({"mensagem": "Atualizacao do agente iniciada. Servico sera reiniciado em instantes."}), 200
+
+    except Exception as e:
+        log.error(f"Erro ao atualizar agente: {e}")
+        return jsonify({"erro": str(e)}), 500
+
 @app.route("/atualizar", methods=["POST"])
 def atualizar():
     if not verificar_token(request):
