@@ -1,5 +1,5 @@
 """
-PDV Agent v1.2 - Agente de Atualização
+PDV Agent v1.3 - Agente de Atualização
 Roda como serviço Windows em cada PDV.
 """
 
@@ -29,7 +29,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.FileHandler(LOG_FILE, encoding="utf-8"),
-        logging.StreamHandler(sys.stdout)
+        logging.StreamHandler(open(sys.stdout.fileno(), mode="w", encoding="utf-8", errors="replace", closefd=False))
     ]
 )
 log = logging.getLogger(__name__)
@@ -149,7 +149,7 @@ def verificar_token(req):
 
 @app.route("/ping")
 def ping():
-    return jsonify({"online": True, "versao": "1.2.0"})
+    return jsonify({"online": True, "versao": "1.3.0"})
 
 @app.route("/info")
 def info():
@@ -238,11 +238,29 @@ def abrir_tela_status():
     except Exception as e:
         log.warning(f"Tela de status: {e}")
 
+def processo_rodando(nome):
+    """Verifica se um processo está rodando pelo nome."""
+    r = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {nome}.exe"],
+                       capture_output=True, text=True)
+    return f"{nome}.exe" in r.stdout
+
 def encerrar_processos():
     set_estado("updating", "Encerrando processos", 10)
     for proc in PROCESSOS:
-        r = subprocess.run(["taskkill", "/F", "/IM", f"{proc}.exe"], capture_output=True)
-        log.info(f"{proc}: {'encerrado' if r.returncode == 0 else 'nao rodava'}")
+        if processo_rodando(proc):
+            subprocess.run(["taskkill", "/F", "/IM", f"{proc}.exe"], capture_output=True)
+            # Aguarda até o processo realmente encerrar (máx 10s)
+            for _ in range(10):
+                time.sleep(1)
+                if not processo_rodando(proc):
+                    log.info(f"{proc} encerrado.")
+                    break
+            else:
+                log.warning(f"{proc} pode nao ter encerrado completamente.")
+        else:
+            log.info(f"{proc} nao estava rodando.")
+    # Pausa extra para garantir que os arquivos foram liberados
+    time.sleep(2)
 
 def parar_servicos(servicos):
     set_estado("updating", "Parando servicos", 20)
@@ -251,22 +269,34 @@ def parar_servicos(servicos):
         if st in ("disabled", "nao_existe", "stopped"):
             continue
         subprocess.run(["sc", "stop", svc], capture_output=True)
-        log.info(f"{svc} parado.")
-        time.sleep(2)
+        # Aguarda até o serviço realmente parar (máx 15s)
+        for _ in range(15):
+            time.sleep(1)
+            if get_status_servico(svc) == "stopped":
+                log.info(f"{svc} parado.")
+                break
+        else:
+            log.warning(f"{svc} pode nao ter parado completamente.")
+    # Pausa extra para liberar arquivos
+    time.sleep(2)
 
 def fazer_backup():
     set_estado("updating", "Realizando backup", 35)
     if os.path.exists(VRPDV_OLD_DIR):
         shutil.rmtree(VRPDV_OLD_DIR)
     if os.path.exists(VRPDV_DIR):
+        # Ignora pasta db (banco local do PDV) e o zip temporario
         shutil.copytree(VRPDV_DIR, VRPDV_OLD_DIR,
-                        ignore=shutil.ignore_patterns("_update.zip"))
+                        ignore=shutil.ignore_patterns("_update.zip", "db"))
     log.info("Backup OK.")
 
 def descompactar():
     set_estado("updating", "Descompactando", 55)
     with zipfile.ZipFile(TEMP_ZIP, "r") as z:
-        z.extractall(VRPDV_DIR)
+        # Extrai tudo exceto a pasta db (banco local do PDV)
+        membros = [m for m in z.namelist()
+                   if not m.startswith("db/") and not m.startswith("db\\")]
+        z.extractall(VRPDV_DIR, members=membros)
     os.remove(TEMP_ZIP)
     global _info_pdv_cache
     _info_pdv_cache = None
@@ -311,7 +341,7 @@ def executar_atualizacao():
 # ──────────────────────────────────────────────
 if __name__ == "__main__":
     log.info("=" * 50)
-    log.info("PDV Agent v1.2 iniciando...")
+    log.info("PDV Agent v1.3 iniciando...")
     log.info(f"Porta: {PORTA}")
     threading.Thread(target=get_info_pdv, daemon=True).start()
     log.info("=" * 50)
