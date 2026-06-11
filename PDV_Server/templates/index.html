@@ -3,220 +3,273 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PDV Updater</title>
+<title>VRPdvUpdatePro</title>
 <style>
-  :root {
-    --bg:        #0f1117;
-    --surface:   #1a1d27;
-    --surface2:  #22263a;
-    --border:    #2e3248;
-    --accent:    #4f8ef7;
-    --accent2:   #3a6fd8;
-    --green:     #22c55e;
-    --red:       #ef4444;
-    --yellow:    #f59e0b;
-    --gray:      #6b7280;
-    --text:      #e2e8f0;
-    --text2:     #94a3b8;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+:root {
+  --vr-orange: #E8530A;
+  --vr-orange-light: #FF6B2B;
+  --vr-orange-dark: #C44208;
+  --vr-orange-bg: #FFF3EE;
+  --vr-orange-border: #F9C4A8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.app { font-family: 'Segoe UI', sans-serif; font-size: 14px; min-height: 100vh; }
 
-  /* HEADER */
-  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
-  header h1 { font-size: 20px; font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 10px; }
-  header h1 span { font-size: 22px; }
-  .header-info { font-size: 13px; color: var(--text2); }
+/* ── LIGHT ── */
+.app.light { background: #F5F5F5; color: #1a1a1a; }
+.app.light .topbar { background: #fff; border-bottom: 1px solid #e5e5e5; }
+.app.light .card { background: #fff; border: 1px solid #e5e5e5; }
+.app.light .upload-area { background: #FFF8F5; border: 2px dashed var(--vr-orange-border); }
+.app.light .file-item { background: #f9f9f9; border: 1px solid #e5e5e5; }
+.app.light .file-item.selected { background: #FFF3EE; border-color: var(--vr-orange); }
+.app.light .pdv-card { background: #f9f9f9; border: 1px solid #e5e5e5; }
+.app.light .pdv-card.selected { background: #FFF3EE; border-color: var(--vr-orange); }
+.app.light .tab { background: #f0f0f0; color: #666; border: 1px solid #e0e0e0; font-weight: 600; }
+.app.light .tab.active { background: var(--vr-orange); color: #fff; border-color: var(--vr-orange); }
+.app.light .section-title { color: #888; }
+.app.light .text-muted { color: #888; }
+.app.light .divider { background: #e5e5e5; }
+.app.light .btn-verify,
+.app.light .btn-clear,
+.app.light .btn-update { background: #1a1a2e; color: #fff; border: none; font-weight: 700; }
+.app.light .btn-verify:hover,
+.app.light .btn-clear:hover,
+.app.light .btn-update:hover { background: #111; }
+.app.light .btn-del { color: #ef4444; background: none; border: none; }
+.app.light .btn-del:hover { background: rgba(239,68,68,0.1); }
+.app.light .btn-refresh { background: #1a1a2e; color: #fff; border: none; font-weight: 700; }
+.app.light .btn-refresh:hover { background: #111; }
 
-  /* LAYOUT */
-  .container { max-width: 1200px; margin: 0 auto; padding: 28px 24px; display: flex; flex-direction: column; gap: 24px; }
+/* ── DARK ── */
+.app.dark { background: #0a0e1a; color: #e2e8f0; }
+.app.dark .topbar { background: #1a1d27; border-bottom: 1px solid #2e3248; }
+.app.dark .card { background: #1a1d27; border: 1px solid #2e3248; }
+.app.dark .upload-area { background: rgba(232,83,10,0.06); border: 2px dashed rgba(232,83,10,0.3); }
+.app.dark .file-item { background: #22263a; border: 1px solid #2e3248; }
+.app.dark .file-item.selected { background: rgba(232,83,10,0.12); border-color: var(--vr-orange); }
+.app.dark .pdv-card { background: #22263a; border: 1px solid #2e3248; }
+.app.dark .pdv-card.selected { background: rgba(232,83,10,0.12); border-color: var(--vr-orange); }
+.app.dark .tab { background: #22263a; color: #94a3b8; border: 1px solid #2e3248; font-weight: 600; }
+.app.dark .tab.active { background: var(--vr-orange); color: #fff; border-color: var(--vr-orange); }
+.app.dark .section-title { color: #64748b; }
+.app.dark .text-muted { color: #64748b; }
+.app.dark .divider { background: #2e3248; }
+.app.dark .btn-verify { border: 1px solid #4a5080; color: #94a3b8; background: none; }
+.app.dark .btn-del { color: #ef4444; background: none; border: none; }
+.app.dark .btn-clear { border: 1px solid #ef4444; color: #ef4444; background: transparent; }
+.app.dark .btn-update { background: var(--vr-orange); color: #fff; border: none; }
+.app.dark .btn-update:hover { background: var(--vr-orange-dark); }
+.app.dark .btn-refresh { border: 1px solid var(--vr-orange); color: var(--vr-orange); background: transparent; }
+.app.dark .btn-refresh:hover { background: var(--vr-orange); color: #fff; }
 
-  /* CARDS */
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
-  .card-title { font-size: 14px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+/* ESTRUTURA */
+.topbar { padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; }
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 32px; height: 32px; background: var(--vr-orange); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.logo-icon svg { width: 18px; height: 18px; fill: #fff; }
+.logo-name { font-size: 16px; font-weight: 700; color: var(--vr-orange); }
+.logo-name span { font-weight: 400; color: inherit; opacity: 0.7; }
+.toggle-wrap { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.toggle { position: relative; width: 38px; height: 20px; cursor: pointer; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; inset: 0; background: #ccc; border-radius: 99px; transition: .2s; }
+.slider:before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: .2s; }
+input:checked + .slider { background: var(--vr-orange); }
+input:checked + .slider:before { transform: translateX(18px); }
 
-  /* UPLOAD */
-  .upload-area { border: 2px dashed var(--border); border-radius: 10px; padding: 32px; text-align: center; cursor: pointer; transition: all .2s; }
-  .upload-area:hover, .upload-area.drag { border-color: var(--accent); background: rgba(79,142,247,.06); }
-  .upload-area p { color: var(--text2); margin-top: 8px; font-size: 14px; }
-  .upload-area .icon { font-size: 36px; }
-  #fileInput { display: none; }
-  .upload-progress { margin-top: 12px; display: none; }
-  .bar-wrap { background: var(--surface2); border-radius: 99px; height: 6px; overflow: hidden; margin-top: 6px; }
-  .bar { height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s; width: 0%; }
+.body { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; max-width: 960px; margin: 0 auto; }
+.card { border-radius: 12px; padding: 16px; }
+.section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
+.upload-area { border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; }
+.upload-area p { font-size: 13px; margin-top: 4px; }
+.upload-area strong { font-size: 14px; color: var(--vr-orange); }
+#fileInput { display: none; }
 
-  /* ARQUIVOS DISPONÍVEIS */
-  .file-list { display: flex; flex-direction: column; gap: 8px; }
-  .file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all .15s; }
-  .file-item:hover { border-color: var(--accent); }
-  .file-item.selected { border-color: var(--accent); background: rgba(79,142,247,.1); }
-  .file-item .file-name { font-size: 14px; font-weight: 500; }
-  .file-item .file-meta { font-size: 12px; color: var(--text2); }
+.file-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.file-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: all .15s; }
+.file-name { font-size: 13px; font-weight: 500; }
+.file-meta { font-size: 11px; }
+.file-actions { display: flex; align-items: center; gap: 6px; }
+.btn-del { cursor: pointer; font-size: 14px; padding: 4px 8px; border-radius: 6px; font-family: inherit; }
+.btn-del:hover { background: rgba(239,68,68,0.15) !important; }
+.btn-clear { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
 
-  /* SELEÇÃO DE LOJA */
-  .loja-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
-  .loja-tab { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s; }
-  .loja-tab:hover { border-color: var(--accent); color: var(--text); }
-  .loja-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.loja-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.tab { padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; transition: all .15s; }
 
-  /* GRID DE PDVs */
-  .pdv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
-  .pdv-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; cursor: pointer; transition: all .15s; position: relative; user-select: none; }
-  .pdv-card:hover { border-color: var(--accent); }
-  .pdv-card.selected { border-color: var(--accent); background: rgba(79,142,247,.1); }
-  .pdv-card .pdv-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-  .pdv-card .pdv-ip { font-size: 11px; color: var(--text2); margin-bottom: 10px; }
-  .pdv-check { position: absolute; top: 10px; right: 10px; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); background: transparent; transition: all .15s; }
-  .pdv-card.selected .pdv-check { background: var(--accent); border-color: var(--accent); display: flex; align-items: center; justify-content: center; }
-  .pdv-card.selected .pdv-check::after { content: '✓'; font-size: 10px; color: #fff; font-weight: 700; }
+.pdv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.pdv-card { border-radius: 10px; padding: 10px 12px; cursor: pointer; transition: all .15s; position: relative; }
+.pdv-card:hover { opacity: .85; }
+.pdv-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.pdv-ip { font-size: 11px; }
+.pdv-versao { font-size: 10px; margin-top: 2px; color: var(--vr-orange); }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 99px; font-size: 10px; font-weight: 600; margin-top: 6px; }
+.badge.online    { background: rgba(34,197,94,.15);  color: #16a34a; }
+.badge.offline   { background: rgba(239,68,68,.15);  color: #dc2626; }
+.badge.checking  { background: rgba(107,114,128,.15); color: #6b7280; }
+.badge.concluido { background: rgba(232,83,10,.15);  color: var(--vr-orange-dark); }
+.badge.atualizando { background: rgba(79,142,247,.15); color: #4f8ef7; }
+.badge.erro      { background: rgba(239,68,68,.15);  color: #dc2626; }
+.dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.dot.pulse { animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
-  /* STATUS BADGE */
-  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 99px; font-size: 11px; font-weight: 600; }
-  .badge.online    { background: rgba(34,197,94,.15);  color: var(--green);  }
-  .badge.offline   { background: rgba(239,68,68,.15);  color: var(--red);    }
-  .badge.checking  { background: rgba(107,114,128,.15); color: var(--gray);  }
-  .badge.success   { background: rgba(34,197,94,.15);  color: var(--green);  }
-  .badge.error     { background: rgba(239,68,68,.15);  color: var(--red);    }
-  .badge.updating  { background: rgba(79,142,247,.15); color: var(--accent); }
-  .badge.enviando  { background: rgba(245,158,11,.15); color: var(--yellow); }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  .dot.pulse { animation: pulse 1.2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+.pdv-progress { margin-top: 6px; }
+.bar-wrap { background: rgba(255,255,255,0.08); border-radius: 99px; height: 4px; overflow: hidden; }
+.bar { height: 100%; border-radius: 99px; background: var(--vr-orange); transition: width .4s; width: 0%; }
+.pdv-etapa { font-size: 10px; color: #64748b; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /* PROGRESS BAR DO PDV */
-  .pdv-progress { margin-top: 8px; }
-  .pdv-progress .bar-wrap { height: 4px; }
-  .pdv-etapa { font-size: 11px; color: var(--text2); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.actions-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.btn-verify, .btn-refresh { padding: 7px 14px; border-radius: 8px; font-size: 12px; cursor: pointer; font-weight: 600; font-family: inherit; transition: all .15s; }
+.btn-update { color: #fff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: inherit; transition: all .15s; }
+.btn-update:disabled { opacity: .45; cursor: not-allowed; }
+.sel-all { font-size: 12px; color: var(--vr-orange); cursor: pointer; text-decoration: underline; }
+.divider { height: 1px; margin: 4px 0; }
 
-  /* BOTÕES */
-  .btn { padding: 10px 22px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 8px; }
-  .btn:disabled { opacity: .45; cursor: not-allowed; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover:not(:disabled) { background: var(--accent2); }
-  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
-  .btn-ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
-  .btn-sm { padding: 6px 14px; font-size: 13px; }
+.top-actions { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.empty { text-align: center; color: #64748b; padding: 24px; font-size: 13px; }
 
-  .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .select-all { font-size: 13px; color: var(--accent); cursor: pointer; text-decoration: underline; }
-
-  /* TOAST */
-  #toast { position: fixed; bottom: 28px; right: 28px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 20px; font-size: 14px; box-shadow: 0 8px 32px rgba(0,0,0,.4); transform: translateY(20px); opacity: 0; transition: all .25s; z-index: 999; max-width: 360px; }
-  #toast.show { transform: translateY(0); opacity: 1; }
-  #toast.success { border-color: var(--green); }
-  #toast.error   { border-color: var(--red); }
-
-  /* EMPTY STATE */
-  .empty { text-align: center; color: var(--text2); padding: 32px; font-size: 14px; }
-
-  .divider { height: 1px; background: var(--border); margin: 4px 0; }
+/* Upload progress */
+.upload-progress { margin-top: 10px; display: none; }
+.bar-wrap-upload { background: rgba(255,255,255,0.08); border-radius: 99px; height: 6px; overflow: hidden; margin-top: 6px; }
 </style>
 </head>
 <body>
-
-<header>
-  <h1><span>⚡</span> PDV Updater</h1>
-  <div class="header-info" id="headerInfo">Selecione uma loja para começar</div>
-</header>
-
-<div class="container">
-
-  <!-- UPLOAD -->
-  <div class="card">
-    <div class="card-title">📦 Arquivo de Atualização</div>
-    <div class="upload-area" id="uploadArea">
-      <div class="icon">☁️</div>
-      <strong>Clique para selecionar ou arraste o .zip aqui</strong>
-      <p>Arquivo .zip de atualização do PDV</p>
-      <input type="file" id="fileInput" accept=".zip">
+<div class="app dark" id="app">
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      </div>
+      <span class="logo-name">VRPdvUpdate<span>Pro</span></span>
     </div>
-    <div class="upload-progress" id="uploadProgress">
-      <span id="uploadStatus" style="font-size:13px;color:var(--text2)">Enviando...</span>
-      <div class="bar-wrap"><div class="bar" id="uploadBar"></div></div>
+    <div class="toggle-wrap">
+      <span class="text-muted">Modo escuro</span>
+      <label class="toggle">
+        <input type="checkbox" id="modeToggle" checked onchange="toggleMode()">
+        <span class="slider"></span>
+      </label>
     </div>
+  </div>
 
-    <div style="margin-top:16px">
-      <div class="card-title">🗂 Arquivos Disponíveis</div>
+  <div class="body">
+
+    <!-- UPLOAD -->
+    <div class="card">
+      <div class="section-title">📦 Arquivo de atualização</div>
+      <div class="upload-area" id="uploadArea">
+        <div style="font-size:28px">☁</div>
+        <strong>Clique para selecionar ou arraste o .zip aqui</strong>
+        <p class="text-muted">Arquivo .zip de atualização do PDV</p>
+        <input type="file" id="fileInput" accept=".zip">
+      </div>
+      <div class="upload-progress" id="uploadProgress">
+        <span id="uploadStatus" style="font-size:12px" class="text-muted">Enviando...</span>
+        <div class="bar-wrap-upload"><div class="bar" id="uploadBar"></div></div>
+      </div>
+
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px; margin-bottom:8px;">
+        <div class="section-title" style="margin-bottom:0">🗂 Arquivos disponíveis</div>
+        <button class="btn-clear" onclick="limparTodos()">🗑 Limpar todos</button>
+      </div>
       <div class="file-list" id="fileList">
         <div class="empty">Nenhum arquivo disponível</div>
       </div>
     </div>
-  </div>
 
-  <!-- LOJAS E PDVs -->
-  <div class="card">
-    <div class="card-title">🏪 Lojas & PDVs</div>
-    <div class="loja-tabs" id="lojaTabs"></div>
-    <div class="divider" style="margin-bottom:16px"></div>
-
-    <div class="actions" style="margin-bottom:16px">
-      <button class="btn btn-ghost btn-sm" onclick="verificarOnline()">🔍 Verificar Online</button>
-      <span class="select-all" onclick="toggleSelecionarTodos()">Selecionar todos</span>
+    <!-- LOJAS E PDVs -->
+    <div class="card">
+      <div class="top-actions">
+        <div class="section-title" style="margin-bottom:0">🏪 Lojas & PDVs</div>
+        <button class="btn-refresh" onclick="redescobrir()">🔄 Redescobrir PDVs</button>
+      </div>
+      <div class="loja-tabs" id="lojaTabs"></div>
+      <div class="divider"></div>
+      <div style="display:flex; align-items:center; gap:12px; margin:10px 0;">
+        <button class="btn-verify" onclick="verificarOnline()">🔍 Verificar online</button>
+        <span class="sel-all" onclick="toggleSelecionarTodos()">Selecionar todos</span>
+      </div>
+      <div class="pdv-grid" id="pdvGrid">
+        <div class="empty">Carregando PDVs...</div>
+      </div>
     </div>
 
-    <div class="pdv-grid" id="pdvGrid">
-      <div class="empty">Selecione uma loja acima</div>
+    <!-- AÇÕES -->
+    <div class="actions-row">
+      <button class="btn-update" id="btnAtualizar" onclick="iniciarAtualizacao()" disabled>
+        ⚡ Atualizar PDVs Selecionados
+      </button>
+      <span id="selInfo" class="text-muted" style="font-size:12px"></span>
     </div>
-  </div>
 
-  <!-- AÇÃO -->
-  <div class="actions">
-    <button class="btn btn-primary" id="btnAtualizar" onclick="iniciarAtualizacao()" disabled>
-      ⚡ Atualizar PDVs Selecionados
-    </button>
-    <span id="selInfo" style="font-size:13px;color:var(--text2)"></span>
   </div>
-
 </div>
-
-<div id="toast"></div>
 
 <script>
 // ──────────────────────────────────────────────
 // ESTADO
 // ──────────────────────────────────────────────
-let lojas          = [];
-let lojaAtiva      = null;
+let lojas = [];
+let lojaAtiva = null;
 let pdvsSelecionados = new Set();
 let arquivoSelecionado = null;
-let eventSource    = null;
-let statusPDVs     = {};
+let eventSource = null;
+let statusPDVs = {};
 
 // ──────────────────────────────────────────────
 // INIT
 // ──────────────────────────────────────────────
 async function init() {
-  const r = await fetch("/api/lojas");
-  lojas = await r.json();
-  renderLojaTabs();
-  if (lojas.length > 0) selecionarLoja(lojas[0].id);
-  carregarArquivos();
+  await carregarLojas();
+  await carregarArquivos();
 }
 
 // ──────────────────────────────────────────────
 // LOJAS
 // ──────────────────────────────────────────────
+async function carregarLojas() {
+  try {
+    const r = await fetch("/api/lojas");
+    lojas = await r.json();
+    renderLojaTabs();
+    if (lojas.length > 0) selecionarLoja(lojas[0].id);
+    else document.getElementById("pdvGrid").innerHTML = '<div class="empty">Nenhum PDV online encontrado.<br>Verifique se o MongoDB está rodando e tente redescobrir.</div>';
+  } catch(e) {
+    document.getElementById("pdvGrid").innerHTML = '<div class="empty">Erro ao carregar lojas.</div>';
+  }
+}
+
+async function redescobrir() {
+  document.getElementById("pdvGrid").innerHTML = '<div class="empty">Redescubrindo PDVs via MongoDB...</div>';
+  document.getElementById("lojaTabs").innerHTML = '';
+  try {
+    const r = await fetch("/api/lojas/atualizar", { method: "POST" });
+    const d = await r.json();
+    lojas = d.lojas || [];
+    renderLojaTabs();
+    if (lojas.length > 0) selecionarLoja(lojas[0].id);
+    else document.getElementById("pdvGrid").innerHTML = '<div class="empty">Nenhum PDV online encontrado.</div>';
+  } catch(e) {
+    document.getElementById("pdvGrid").innerHTML = '<div class="empty">Erro ao redescobrir.</div>';
+  }
+}
+
 function renderLojaTabs() {
   const el = document.getElementById("lojaTabs");
+  if (lojas.length === 0) { el.innerHTML = ''; return; }
   el.innerHTML = lojas.map(l =>
-    `<div class="loja-tab" id="tab-${l.id}" onclick="selecionarLoja('${l.id}')">${l.nome}</div>`
+    `<div class="tab" id="tab-${l.id}" onclick="selecionarLoja('${l.id}')">${l.nome}</div>`
   ).join("");
 }
 
 function selecionarLoja(lojaId) {
   lojaAtiva = lojaId;
   pdvsSelecionados.clear();
-  document.querySelectorAll(".loja-tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
   document.getElementById(`tab-${lojaId}`)?.classList.add("active");
-
-  const loja = lojas.find(l => l.id === lojaId);
-  document.getElementById("headerInfo").textContent = loja ? loja.nome : "";
-
   renderPDVs();
-  iniciarStream();
   atualizarBotao();
-
-  // Para stream anterior e inicia novo
+  // Stream de status
   if (eventSource) eventSource.close();
   eventSource = new EventSource(`/api/status_stream/${lojaId}`);
   eventSource.onmessage = e => {
@@ -232,11 +285,15 @@ function renderPDVs() {
   const loja = lojas.find(l => l.id === lojaAtiva);
   if (!loja) return;
   const grid = document.getElementById("pdvGrid");
+  if (loja.pdvs.length === 0) {
+    grid.innerHTML = '<div class="empty">Nenhum PDV encontrado nesta loja.</div>';
+    return;
+  }
   grid.innerHTML = loja.pdvs.map(p => `
     <div class="pdv-card" id="pdv-${p.id}" onclick="togglePDV('${p.id}')">
-      <div class="pdv-check"></div>
       <div class="pdv-name">${p.id}</div>
-      <div class="pdv-ip">${p.ip}</div>
+      <div class="pdv-ip text-muted">${p.ip}</div>
+      ${p.versao ? `<div class="pdv-versao">v${p.versao}</div>` : ''}
       <div id="badge-${p.id}"><span class="badge checking"><span class="dot"></span>—</span></div>
       <div class="pdv-progress" id="progress-${p.id}" style="display:none">
         <div class="bar-wrap"><div class="bar" id="bar-${p.id}" style="width:0%"></div></div>
@@ -274,13 +331,15 @@ function toggleSelecionarTodos() {
 }
 
 function atualizarBotao() {
-  const btn = document.getElementById("btnAtualizar");
+  const btn  = document.getElementById("btnAtualizar");
   const info = document.getElementById("selInfo");
-  const ok = pdvsSelecionados.size > 0 && arquivoSelecionado;
+  const ok   = pdvsSelecionados.size > 0 && arquivoSelecionado;
   btn.disabled = !ok;
-  info.textContent = pdvsSelecionados.size > 0
-    ? `${pdvsSelecionados.size} PDV(s) selecionado(s)${arquivoSelecionado ? "" : " — selecione um arquivo"}`
-    : "Selecione ao menos um PDV";
+  if (pdvsSelecionados.size > 0) {
+    info.textContent = `${pdvsSelecionados.size} PDV(s) selecionado(s)${arquivoSelecionado ? "" : " — selecione um arquivo"}`;
+  } else {
+    info.textContent = "Selecione ao menos um PDV";
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -288,32 +347,26 @@ function atualizarBotao() {
 // ──────────────────────────────────────────────
 function atualizarStatusPDVs() {
   for (const [pdvId, dados] of Object.entries(statusPDVs)) {
-    const badge   = document.getElementById(`badge-${pdvId}`);
-    const progEl  = document.getElementById(`progress-${pdvId}`);
-    const barEl   = document.getElementById(`bar-${pdvId}`);
-    const etapaEl = document.getElementById(`etapa-${pdvId}`);
+    const badge    = document.getElementById(`badge-${pdvId}`);
+    const progEl   = document.getElementById(`progress-${pdvId}`);
+    const barEl    = document.getElementById(`bar-${pdvId}`);
+    const etapaEl  = document.getElementById(`etapa-${pdvId}`);
     if (!badge) continue;
-
     const { status, progresso, etapa, erro } = dados;
-
-    let badgeHtml = "";
-    if (status === "success")  badgeHtml = `<span class="badge success"><span class="dot"></span>Concluído</span>`;
-    else if (status === "error") badgeHtml = `<span class="badge error"><span class="dot"></span>Erro</span>`;
-    else if (status === "updating") badgeHtml = `<span class="badge updating"><span class="dot pulse"></span>Atualizando</span>`;
-    else if (status === "enviando")  badgeHtml = `<span class="badge enviando"><span class="dot pulse"></span>Enviando</span>`;
-
-    if (badgeHtml) badge.innerHTML = badgeHtml;
-
+    let html = "";
+    if (status === "success")     html = `<span class="badge concluido"><span class="dot"></span>Concluído</span>`;
+    else if (status === "error")  html = `<span class="badge erro"><span class="dot"></span>Erro</span>`;
+    else if (status === "updating") html = `<span class="badge atualizando"><span class="dot pulse"></span>Atualizando</span>`;
+    else if (status === "enviando") html = `<span class="badge atualizando"><span class="dot pulse"></span>Enviando</span>`;
+    if (html) badge.innerHTML = html;
     if (["updating","enviando","success","error"].includes(status)) {
       progEl.style.display = "block";
       barEl.style.width = `${progresso}%`;
-      barEl.style.background = status === "error" ? "var(--red)" : status === "success" ? "var(--green)" : "var(--accent)";
+      barEl.style.background = status === "error" ? "#ef4444" : status === "success" ? "#22c55e" : "var(--vr-orange)";
       etapaEl.textContent = erro || etapa;
     }
   }
 }
-
-function iniciarStream() {} // stream já iniciado em selecionarLoja
 
 // ──────────────────────────────────────────────
 // VERIFICAR ONLINE
@@ -321,12 +374,10 @@ function iniciarStream() {} // stream já iniciado em selecionarLoja
 async function verificarOnline() {
   if (!lojaAtiva) return;
   const loja = lojas.find(l => l.id === lojaAtiva);
-  // Mostra "verificando" em todos
   loja.pdvs.forEach(p => {
     const el = document.getElementById(`badge-${p.id}`);
     if (el) el.innerHTML = `<span class="badge checking"><span class="dot pulse"></span>Verificando</span>`;
   });
-
   const r = await fetch(`/api/ping_loja/${lojaAtiva}`);
   const dados = await r.json();
   for (const [pdvId, info] of Object.entries(dados)) {
@@ -345,48 +396,40 @@ const uploadArea = document.getElementById("uploadArea");
 const fileInput  = document.getElementById("fileInput");
 
 uploadArea.addEventListener("click", () => fileInput.click());
-uploadArea.addEventListener("dragover", e => { e.preventDefault(); uploadArea.classList.add("drag"); });
-uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("drag"));
+uploadArea.addEventListener("dragover", e => { e.preventDefault(); uploadArea.style.opacity = ".7"; });
+uploadArea.addEventListener("dragleave", () => uploadArea.style.opacity = "1");
 uploadArea.addEventListener("drop", e => {
-  e.preventDefault();
-  uploadArea.classList.remove("drag");
-  const f = e.dataTransfer.files[0];
-  if (f) fazerUpload(f);
+  e.preventDefault(); uploadArea.style.opacity = "1";
+  if (e.dataTransfer.files[0]) fazerUpload(e.dataTransfer.files[0]);
 });
 fileInput.addEventListener("change", () => {
   if (fileInput.files[0]) fazerUpload(fileInput.files[0]);
 });
 
 async function fazerUpload(file) {
-  if (!file.name.endsWith(".zip")) { mostrarToast("Apenas arquivos .zip são aceitos", "error"); return; }
+  if (!file.name.endsWith(".zip")) { alert("Apenas arquivos .zip são aceitos"); return; }
   const prog = document.getElementById("uploadProgress");
   const bar  = document.getElementById("uploadBar");
   const stat = document.getElementById("uploadStatus");
   prog.style.display = "block"; bar.style.width = "0%";
   stat.textContent = `Enviando ${file.name}...`;
-
-  // Simula progresso visual
   let p = 0;
-  const iv = setInterval(() => { p = Math.min(p + 5, 85); bar.style.width = p + "%"; }, 200);
-
+  const iv = setInterval(() => { p = Math.min(p + 4, 85); bar.style.width = p + "%"; }, 150);
   const fd = new FormData();
   fd.append("arquivo", file);
   try {
-    const r  = await fetch("/api/upload", { method: "POST", body: fd });
-    const d  = await r.json();
+    const r = await fetch("/api/upload", { method: "POST", body: fd });
+    const d = await r.json();
     clearInterval(iv); bar.style.width = "100%";
     if (r.ok) {
       stat.textContent = `✓ ${d.arquivo} (${d.tamanho_mb} MB)`;
-      mostrarToast(`Upload concluído: ${d.arquivo}`, "success");
-      carregarArquivos();
+      await carregarArquivos();
     } else {
       stat.textContent = `Erro: ${d.erro}`;
-      mostrarToast(d.erro, "error");
     }
   } catch(e) {
     clearInterval(iv);
     stat.textContent = "Erro no upload";
-    mostrarToast("Erro ao enviar arquivo", "error");
   }
 }
 
@@ -400,13 +443,15 @@ async function carregarArquivos() {
   }
   el.innerHTML = arquivos.map(a => `
     <div class="file-item ${arquivoSelecionado === a.nome ? 'selected' : ''}"
-         id="file-${a.nome.replace(/\./g,'_')}"
          onclick="selecionarArquivo('${a.nome}')">
       <div>
         <div class="file-name">📦 ${a.nome}</div>
-        <div class="file-meta">${a.tamanho_mb} MB — ${a.data}</div>
+        <div class="file-meta text-muted">${a.tamanho_mb} MB — ${a.data}</div>
       </div>
-      <span style="font-size:18px">${arquivoSelecionado === a.nome ? '✅' : ''}</span>
+      <div class="file-actions">
+        ${arquivoSelecionado === a.nome ? '<span style="font-size:16px">✅</span>' : ''}
+        <button class="btn-del" onclick="event.stopPropagation(); deletarArquivo('${a.nome}')">🗑</button>
+      </div>
     </div>
   `).join("");
 }
@@ -417,16 +462,29 @@ function selecionarArquivo(nome) {
   atualizarBotao();
 }
 
+async function deletarArquivo(nome) {
+  if (!confirm(`Remover ${nome}?`)) return;
+  await fetch(`/api/arquivos/${encodeURIComponent(nome)}`, { method: "DELETE" });
+  if (arquivoSelecionado === nome) arquivoSelecionado = null;
+  await carregarArquivos();
+  atualizarBotao();
+}
+
+async function limparTodos() {
+  if (!confirm("Remover todos os arquivos de atualização?")) return;
+  await fetch("/api/arquivos/limpar", { method: "DELETE" });
+  arquivoSelecionado = null;
+  await carregarArquivos();
+  atualizarBotao();
+}
+
 // ──────────────────────────────────────────────
 // ATUALIZAR
 // ──────────────────────────────────────────────
 async function iniciarAtualizacao() {
   if (!lojaAtiva || pdvsSelecionados.size === 0 || !arquivoSelecionado) return;
-
   const btn = document.getElementById("btnAtualizar");
-  btn.disabled = true;
-  btn.textContent = "⏳ Iniciando...";
-
+  btn.disabled = true; btn.textContent = "⏳ Iniciando...";
   const r = await fetch("/api/atualizar", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -436,29 +494,28 @@ async function iniciarAtualizacao() {
       arquivo: arquivoSelecionado
     })
   });
-  const d = await r.json();
-
-  if (r.ok) {
-    mostrarToast(`✓ ${d.mensagem}`, "success");
-    btn.textContent = "⚡ Atualizar PDVs Selecionados";
-  } else {
-    mostrarToast(d.erro, "error");
+  btn.textContent = "⚡ Atualizar PDVs Selecionados";
+  if (!r.ok) {
+    const d = await r.json();
+    alert(d.erro);
     btn.disabled = false;
-    btn.textContent = "⚡ Atualizar PDVs Selecionados";
   }
 }
 
 // ──────────────────────────────────────────────
-// TOAST
+// MODO CLARO/ESCURO
 // ──────────────────────────────────────────────
-let toastTimer;
-function mostrarToast(msg, tipo = "info") {
-  const el = document.getElementById("toast");
-  el.textContent = msg;
-  el.className = `show ${tipo}`;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove("show"), 4000);
+function toggleMode() {
+  const app     = document.getElementById("app");
+  const checked = document.getElementById("modeToggle").checked;
+  app.className = "app " + (checked ? "dark" : "light");
+  localStorage.setItem("theme", checked ? "dark" : "light");
 }
+
+// Restaura tema salvo
+const savedTheme = localStorage.getItem("theme") || "dark";
+document.getElementById("app").className = "app " + savedTheme;
+document.getElementById("modeToggle").checked = savedTheme === "dark";
 
 init();
 </script>

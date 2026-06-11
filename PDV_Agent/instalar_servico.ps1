@@ -33,22 +33,51 @@ if (-not (Test-Path $origem)) {
 Copy-Item -Path $origem -Destination $ExeAgente -Force
 Write-Host "agente.exe copiado." -ForegroundColor Green
 
-# 3. Baixar NSSM (gerenciador de servicos)
-Write-Host "[3/6] Baixando NSSM..." -ForegroundColor Yellow
-try {
-    $url  = "https://nssm.cc/release/nssm-2.24.zip"
-    $zip  = "$env:TEMP\nssm.zip"
-    $dest = "$env:TEMP\nssm"
-    Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
-    Expand-Archive -Path $zip -DestinationPath $dest -Force
-    $nssmBin = Get-ChildItem -Path $dest -Recurse -Filter "nssm.exe" |
-               Where-Object { $_.FullName -like "*win64*" } |
-               Select-Object -First 1
-    Copy-Item -Path $nssmBin.FullName -Destination $NssmExe -Force
-    Write-Host "NSSM instalado." -ForegroundColor Green
-} catch {
-    Write-Host "ERRO ao baixar NSSM: $_" -ForegroundColor Red
-    exit 1
+# 3. Instalar NSSM (gerenciador de servicos)
+Write-Host "[3/6] Configurando NSSM..." -ForegroundColor Yellow
+
+# Verifica se NSSM já existe no destino
+if (Test-Path $NssmExe) {
+    Write-Host "NSSM ja existe em $NssmExe." -ForegroundColor Green
+} else {
+    # Verifica se nssm.exe está na mesma pasta do script
+    $nssmLocal = Join-Path $PastaScript "nssm.exe"
+    if (Test-Path $nssmLocal) {
+        Copy-Item -Path $nssmLocal -Destination $NssmExe -Force
+        Write-Host "NSSM copiado da pasta local." -ForegroundColor Green
+    } else {
+    $urls = @(
+        "https://nssm.cc/release/nssm-2.24.zip",
+        "https://github.com/nickelc/nssm/releases/download/2.24/nssm-2.24.zip",
+        "https://www.nssm.cc/release/nssm-2.24.zip"
+    )
+    $baixou = $false
+    foreach ($url in $urls) {
+        try {
+            Write-Host "Tentando: $url" -ForegroundColor Yellow
+            $zip  = "$env:TEMP\nssm.zip"
+            $dest = "$env:TEMP\nssm"
+            Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing -TimeoutSec 15
+            Expand-Archive -Path $zip -DestinationPath $dest -Force
+            $nssmBin = Get-ChildItem -Path $dest -Recurse -Filter "nssm.exe" |
+                       Where-Object { $_.FullName -like "*win64*" } |
+                       Select-Object -First 1
+            if ($nssmBin) {
+                Copy-Item -Path $nssmBin.FullName -Destination $NssmExe -Force
+                Write-Host "NSSM instalado." -ForegroundColor Green
+                $baixou = $true
+                break
+            }
+        } catch {
+            Write-Host "Falhou: $_" -ForegroundColor Yellow
+        }
+    }
+    if (-not $baixou) {
+            Write-Host "ERRO: NSSM nao encontrado." -ForegroundColor Red
+            Write-Host "Coloque o nssm.exe na mesma pasta que este script e tente novamente." -ForegroundColor Yellow
+            exit 1
+        }
+    }
 }
 
 # 4. Remover serviço anterior se existir

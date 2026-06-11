@@ -13,8 +13,8 @@ sudo chmod -R 755 /opt/pdv-server/
 
 # Instalar dependências Python
 echo "Instalando dependências..."
-pip3 install flask requests --break-system-packages 2>/dev/null || \
-pip3 install flask requests
+pip3 install flask requests pymongo --break-system-packages 2>/dev/null || \
+pip3 install flask requests pymongo --user
 
 # Criar serviço systemd para o servidor rodar automaticamente
 echo "Criando serviço systemd..."
