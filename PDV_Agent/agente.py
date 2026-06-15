@@ -1,5 +1,5 @@
 """
-PDV Agent v1.3 - Agente de Atualização
+PDV Agent v1.4 - Agente de Atualização
 Roda como serviço Windows em cada PDV.
 """
 
@@ -13,6 +13,8 @@ VRPDV_DIR       = r"C:\vrpdv"
 VRPDV_OLD_DIR   = r"C:\vrpdv_old"
 TEMP_ZIP        = r"C:\vrpdv\_update.zip"
 LMDB_PATH       = r"C:\vrpdv\db\localdb"
+DB_DIR          = r"C:\vrpdv\db"
+DB_TEMP_DIR     = r"C:\PDVAgent\db_backup"
 PROCESSOS       = ["vrcheckout", "vrpdvapi"]
 LOG_FILE        = r"C:\PDVAgent\agente_pdv.log"
 PROGRESSO_FILE  = r"C:\PDVAgent\progresso.json"
@@ -29,28 +31,26 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.FileHandler(LOG_FILE, encoding="utf-8"),
-        logging.StreamHandler(open(sys.stdout.fileno(), mode="w", encoding="utf-8", errors="replace", closefd=False))
+        logging.StreamHandler(
+            open(sys.stdout.fileno(), mode="w", encoding="utf-8",
+                 errors="replace", closefd=False)
+        )
     ]
 )
 log = logging.getLogger(__name__)
 
 # ──────────────────────────────────────────────
 # LEITURA DO LMDB
-# Key fixa 1800000c00000001 contém numeroPdv, idLoja e nomeLoja
-# Padrão no buffer: [numeroPdv int32][0x00000000][idLoja int32]
 # ──────────────────────────────────────────────
 def ler_info_pdv():
     try:
         import lmdb
         env = lmdb.open(LMDB_PATH, readonly=True, lock=False, max_dbs=100)
         info = {}
-
         with env.begin() as txn:
             KEY_CONFIG = bytes.fromhex("1800000c00000001")
             value = txn.get(KEY_CONFIG)
-
             if value and len(value) >= 232:
-                # Varre o buffer buscando padrão [numeroPdv][0][idLoja]
                 for p in range(100, len(value) - 12, 4):
                     v1  = struct.unpack_from("<i", value, p)[0]
                     gap = struct.unpack_from("<i", value, p + 4)[0]
@@ -60,18 +60,12 @@ def ler_info_pdv():
                         info["idLoja"]    = v2
                         log.info(f"numeroPdv={v1} idLoja={v2} na pos {p}")
                         break
-
-                # nomeLoja removido — usando idLoja e numeroPdv como identificadores
-
         env.close()
-
         if info:
             log.info(f"Info PDV lida: {info}")
         else:
             log.warning("Nao foi possivel extrair info do LMDB")
-
         return info if info else None
-
     except ImportError:
         log.warning("lmdb nao instalado")
         return None
@@ -139,6 +133,11 @@ def detectar_servicos():
             return existentes
     return []
 
+def processo_rodando(nome):
+    r = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {nome}.exe"],
+                       capture_output=True, text=True)
+    return f"{nome}.exe" in r.stdout
+
 # ──────────────────────────────────────────────
 # FLASK
 # ──────────────────────────────────────────────
@@ -149,7 +148,7 @@ def verificar_token(req):
 
 @app.route("/ping")
 def ping():
-    return jsonify({"online": True, "versao": "1.3.0"})
+    return jsonify({"online": True, "versao": "1.4.5"})
 
 @app.route("/info")
 def info():
@@ -162,7 +161,7 @@ def status():
 
 @app.route("/atualizar_agente", methods=["POST"])
 def atualizar_agente():
-    """Recebe novo agente.exe e executa auto-atualização via PowerShell."""
+    """Recebe novo agente.exe e executa auto-atualizacao via .bat independente."""
     if not verificar_token(request):
         return jsonify({"erro": "Token invalido"}), 403
     if "arquivo" not in request.files:
@@ -171,36 +170,46 @@ def atualizar_agente():
     if not arq.filename.endswith(".exe"):
         return jsonify({"erro": "Apenas arquivos .exe sao aceitos"}), 400
     try:
-        pasta_agente  = r"C:\PDVAgent"
-        novo_exe      = os.path.join(pasta_agente, "agente_novo.exe")
-        exe_atual     = os.path.join(pasta_agente, "agente.exe")
-        script_ps1    = os.path.join(pasta_agente, "atualizar_agente.ps1")
+        pasta   = r"C:\PDVAgent"
+        novo    = os.path.join(pasta, "agente_novo.exe")
+        atual   = os.path.join(pasta, "agente.exe")
+        nssm    = os.path.join(pasta, "nssm.exe")
+        bat     = os.path.join(pasta, "atualizar_agente.bat")
 
-        # Salva novo exe
-        arq.save(novo_exe)
-        log.info(f"Novo agente recebido: {novo_exe}")
+        arq.save(novo)
+        log.info(f"Novo agente recebido: {novo}")
 
-        # Cria script PowerShell que faz a substituição fora do processo
-        script = f"""
-Start-Sleep -Seconds 3
-Stop-Service -Name PDVAgent -Force
-Start-Sleep -Seconds 2
-Copy-Item -Path '{novo_exe}' -Destination '{exe_atual}' -Force
-Remove-Item -Path '{novo_exe}' -Force
-Start-Service -Name PDVAgent
-Remove-Item -Path '{script_ps1}' -Force
-"""
-        with open(script_ps1, "w", encoding="utf-8") as f:
-            f.write(script)
+        # Script .bat completamente independente
+        # ping -n X = pausa de X-1 segundos (truque clássico do Windows)
+        linhas = [
+            "@echo off",
+            "ping 127.0.0.1 -n 4 > nul",
+            f'"{nssm}" stop PDVAgent',
+            "ping 127.0.0.1 -n 5 > nul",
+            f'copy /Y "{novo}" "{atual}"',
+            f'del /F /Q "{novo}"',
+            f'"{nssm}" start PDVAgent',
+            'schtasks /delete /tn "PDVAgentUpdate" /f',
+            f'del /F /Q "{bat}"',
+        ]
+        with open(bat, "w", encoding="ascii") as f:
+            f.write("\r\n".join(linhas))
 
-        # Dispara o script em processo separado e retorna imediatamente
-        subprocess.Popen(
-            ["powershell.exe", "-ExecutionPolicy", "Bypass",
-             "-WindowStyle", "Hidden", "-File", script_ps1],
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+        # Dispara via Agendador de Tarefas do Windows.
+        # A tarefa roda sob o Task Scheduler (fora da arvore de processos
+        # do servico), entao sobrevive ao kill tree do NSSM no stop.
+        subprocess.run(
+            ["schtasks", "/create", "/tn", "PDVAgentUpdate",
+             "/tr", bat, "/sc", "once", "/st", "00:00",
+             "/ru", "SYSTEM", "/f"],
+            capture_output=True
         )
-        log.info("Script de atualizacao do agente disparado.")
-        return jsonify({"mensagem": "Atualizacao do agente iniciada. Servico sera reiniciado em instantes."}), 200
+        r = subprocess.run(
+            ["schtasks", "/run", "/tn", "PDVAgentUpdate"],
+            capture_output=True, text=True
+        )
+        log.info(f"Tarefa agendada de atualizacao disparada (rc={r.returncode}).")
+        return jsonify({"mensagem": "Atualizacao do agente iniciada."}), 200
 
     except Exception as e:
         log.error(f"Erro ao atualizar agente: {e}")
@@ -227,39 +236,28 @@ def atualizar():
     return jsonify({"mensagem": "Iniciado"}), 200
 
 # ──────────────────────────────────────────────
-# ATUALIZAÇÃO
+# ETAPAS DE ATUALIZAÇÃO
 # ──────────────────────────────────────────────
-def abrir_tela_status():
-    try:
-        time.sleep(1)
-        exe = os.path.join(os.path.dirname(sys.executable), "status_pdv.exe")
-        if os.path.exists(exe):
-            subprocess.Popen([exe], creationflags=subprocess.CREATE_NEW_CONSOLE)
-    except Exception as e:
-        log.warning(f"Tela de status: {e}")
-
-def processo_rodando(nome):
-    """Verifica se um processo está rodando pelo nome."""
-    r = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {nome}.exe"],
-                       capture_output=True, text=True)
-    return f"{nome}.exe" in r.stdout
+# NOTA IMPORTANTE: o agente roda como SERVICO (Session 0) e NUNCA deve
+# abrir, matar ou interagir com processos de GUI (status_pdv, vrcheckout).
+# Quem gerencia a tela e abre o PDV e o status_pdv.exe, que roda na
+# sessao do usuario via Run key e monitora o progresso.json.
 
 def encerrar_processos():
     set_estado("updating", "Encerrando processos", 10)
     for proc in PROCESSOS:
         if processo_rodando(proc):
-            subprocess.run(["taskkill", "/F", "/IM", f"{proc}.exe"], capture_output=True)
-            # Aguarda até o processo realmente encerrar (máx 10s)
+            subprocess.run(["taskkill", "/F", "/IM", f"{proc}.exe"],
+                           capture_output=True)
             for _ in range(10):
                 time.sleep(1)
                 if not processo_rodando(proc):
                     log.info(f"{proc} encerrado.")
                     break
             else:
-                log.warning(f"{proc} pode nao ter encerrado completamente.")
+                log.warning(f"{proc} pode nao ter encerrado.")
         else:
             log.info(f"{proc} nao estava rodando.")
-    # Pausa extra para garantir que os arquivos foram liberados
     time.sleep(2)
 
 def parar_servicos(servicos):
@@ -269,35 +267,51 @@ def parar_servicos(servicos):
         if st in ("disabled", "nao_existe", "stopped"):
             continue
         subprocess.run(["sc", "stop", svc], capture_output=True)
-        # Aguarda até o serviço realmente parar (máx 15s)
         for _ in range(15):
             time.sleep(1)
             if get_status_servico(svc) == "stopped":
                 log.info(f"{svc} parado.")
                 break
         else:
-            log.warning(f"{svc} pode nao ter parado completamente.")
-    # Pausa extra para liberar arquivos
+            log.warning(f"{svc} pode nao ter parado.")
     time.sleep(2)
+
+def salvar_banco():
+    """Move a pasta db para local seguro antes da atualização."""
+    if os.path.exists(DB_DIR):
+        if os.path.exists(DB_TEMP_DIR):
+            shutil.rmtree(DB_TEMP_DIR)
+        shutil.move(DB_DIR, DB_TEMP_DIR)
+        log.info(f"Banco movido para: {DB_TEMP_DIR}")
+    else:
+        log.warning("Pasta db nao encontrada.")
+
+def restaurar_banco():
+    """Restaura a pasta db após a atualização."""
+    if os.path.exists(DB_TEMP_DIR):
+        if os.path.exists(DB_DIR):
+            shutil.rmtree(DB_DIR)
+        shutil.move(DB_TEMP_DIR, DB_DIR)
+        log.info(f"Banco restaurado: {DB_DIR}")
+    else:
+        log.warning("Backup do banco nao encontrado!")
 
 def fazer_backup():
     set_estado("updating", "Realizando backup", 35)
+    salvar_banco()
     if os.path.exists(VRPDV_OLD_DIR):
         shutil.rmtree(VRPDV_OLD_DIR)
     if os.path.exists(VRPDV_DIR):
-        # Ignora pasta db (banco local do PDV) e o zip temporario
         shutil.copytree(VRPDV_DIR, VRPDV_OLD_DIR,
-                        ignore=shutil.ignore_patterns("_update.zip", "db"))
+                        ignore=shutil.ignore_patterns("_update.zip"))
     log.info("Backup OK.")
 
 def descompactar():
     set_estado("updating", "Descompactando", 55)
     with zipfile.ZipFile(TEMP_ZIP, "r") as z:
-        # Extrai tudo exceto a pasta db (banco local do PDV)
-        membros = [m for m in z.namelist()
-                   if not m.startswith("db/") and not m.startswith("db\\")]
-        z.extractall(VRPDV_DIR, members=membros)
+        z.extractall(VRPDV_DIR)
     os.remove(TEMP_ZIP)
+    restaurar_banco()
     global _info_pdv_cache
     _info_pdv_cache = None
     log.info("Descompactacao OK.")
@@ -315,20 +329,60 @@ def iniciar_servicos(servicos):
             raise Exception(f"{svc} nao iniciou")
         log.info(f"{svc} OK.")
 
+def verificar_arquivos():
+    """Verifica se os arquivos principais foram copiados corretamente."""
+    set_estado("updating", "Verificando arquivos", 80)
+    arquivos_principais = [
+        os.path.join(VRPDV_DIR, "vrcheckout.exe"),
+        os.path.join(VRPDV_DIR, "vrpdvapi.exe"),
+    ]
+    erros = []
+    for arq in arquivos_principais:
+        if not os.path.exists(arq):
+            erros.append(f"AUSENTE: {arq}")
+        elif os.path.getsize(arq) == 0:
+            erros.append(f"VAZIO: {arq}")
+    if erros:
+        raise Exception(f"Arquivos corrompidos ou ausentes: {'; '.join(erros)}")
+    log.info("Verificacao de arquivos OK.")
+
+def garantir_processos_encerrados():
+    """Garante que vrcheckout e vrpdvapi nao estao rodando antes de abrir."""
+    set_estado("updating", "Verificando processos", 85)
+    for proc in PROCESSOS:
+        if processo_rodando(proc):
+            log.warning(f"{proc} ainda rodando — forcando encerramento.")
+            subprocess.run(["taskkill", "/F", "/IM", f"{proc}.exe"],
+                           capture_output=True)
+            for _ in range(10):
+                time.sleep(1)
+                if not processo_rodando(proc):
+                    log.info(f"{proc} encerrado.")
+                    break
+            else:
+                raise Exception(f"{proc} nao foi encerrado — abortando abertura do PDV.")
+        else:
+            log.info(f"{proc} nao esta rodando. OK.")
+
 def iniciar_vrcheckout():
-    set_estado("updating", "Iniciando vrcheckout", 90)
+    set_estado("updating", "Aguardando para abrir PDV", 90,
+               "Aguardando 10 segundos antes de abrir o PDV...")
+    log.info("Aguardando 10 segundos antes de abrir o vrcheckout...")
+    time.sleep(10)
+    set_estado("updating", "Iniciando vrcheckout", 95)
     log.info("status_pdv.exe abrira o vrcheckout.")
     time.sleep(1)
 
 def executar_atualizacao():
     set_estado("updating", "Iniciando", 0, "Atualizacao iniciada...")
-    threading.Thread(target=abrir_tela_status, daemon=True).start()
     try:
         servicos = detectar_servicos()
         encerrar_processos()
         parar_servicos(servicos)
         fazer_backup()
         descompactar()
+        verificar_arquivos()
+        garantir_processos_encerrados()
         iniciar_servicos(servicos)
         iniciar_vrcheckout()
         set_estado("success", "Concluido", 100, "Atualizacao concluida!")
@@ -341,7 +395,7 @@ def executar_atualizacao():
 # ──────────────────────────────────────────────
 if __name__ == "__main__":
     log.info("=" * 50)
-    log.info("PDV Agent v1.3 iniciando...")
+    log.info("PDV Agent v1.4.5 iniciando...")
     log.info(f"Porta: {PORTA}")
     threading.Thread(target=get_info_pdv, daemon=True).start()
     log.info("=" * 50)

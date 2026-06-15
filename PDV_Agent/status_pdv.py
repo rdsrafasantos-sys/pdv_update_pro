@@ -1,9 +1,13 @@
 """
 ===============================================================
-  PDV Status - Monitor de atualização
-  Fica rodando invisível na inicialização do Windows.
-  Quando detecta C:\PDVAgent\progresso.json, abre a janela.
-  Fecha sozinho ao concluir.
+  PDV Status v2.0 - Monitor de atualização
+  Roda permanentemente na sessão do usuário (Run key).
+  - Single instance: nunca roda duplicado
+  - Monitora C:\PDVAgent\progresso.json
+  - Mostra a janela quando atualização começa
+  - Abre o vrcheckout.exe ao concluir (na sessão do usuário!)
+  - Esconde e reseta — pronto para a próxima atualização
+  - NUNCA fecha sozinho
 ===============================================================
 """
 
@@ -13,20 +17,46 @@ import json
 import time
 import os
 import sys
+import socket
+import logging
 import subprocess
 
 PROGRESSO_FILE = r"C:\PDVAgent\progresso.json"
+STATUS_LOG     = r"C:\PDVAgent\status_pdv.log"
 POLL_MS        = 800
 VRCHECKOUT_EXE = r"C:\vrpdv\vrcheckout.exe"
 VRPDV_DIR      = r"C:\vrpdv"
+SINGLE_PORT    = 50505  # porta local para garantir instância única
+
+# ── Logging próprio para debug ──
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.FileHandler(STATUS_LOG, encoding="utf-8")]
+)
+log = logging.getLogger(__name__)
+
+# ── Single instance: tenta abrir porta local ──
+def garantir_instancia_unica():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("127.0.0.1", SINGLE_PORT))
+        s.listen(1)
+        return s  # mantém o socket aberto enquanto o processo viver
+    except OSError:
+        log.info("Outra instancia ja esta rodando. Saindo.")
+        sys.exit(0)
 
 ETAPAS_IDX = {
-    "Encerrando processos": 0,
-    "Parando serviços":     1,
-    "Realizando backup":    2,
-    "Descompactando":       3,
-    "Iniciando serviços":   4,
-    "Iniciando vrcheckout": 5,
+    "Encerrando processos":  0,
+    "Parando servicos":      1,
+    "Realizando backup":     2,
+    "Descompactando":        3,
+    "Verificando arquivos":  4,
+    "Verificando processos": 4,
+    "Iniciando servicos":    5,
+    "Aguardando para abrir PDV": 6,
+    "Iniciando vrcheckout":  6,
 }
 
 ETAPAS_LABELS = [
@@ -34,17 +64,21 @@ ETAPAS_LABELS = [
     "Parando serviços",
     "Realizando backup",
     "Descompactando arquivos",
+    "Verificando integridade",
     "Iniciando serviços",
     "Iniciando PDV",
 ]
 
 ICONES_ETAPA = {
-    "Encerrando processos": ("🔴", "Finalizando processos ativos..."),
-    "Parando serviços":     ("⏹",  "Parando serviços Mongo..."),
-    "Realizando backup":    ("💾",  "Fazendo cópia de segurança..."),
-    "Descompactando":       ("📦",  "Extraindo arquivos do .zip..."),
-    "Iniciando serviços":   ("▶",   "Iniciando serviços Mongo..."),
-    "Iniciando vrcheckout": ("🖥",  "Abrindo o sistema PDV..."),
+    "Encerrando processos":  ("🔴", "Finalizando processos ativos..."),
+    "Parando servicos":      ("⏹",  "Parando serviços Mongo..."),
+    "Realizando backup":     ("💾", "Fazendo cópia de segurança..."),
+    "Descompactando":        ("📦", "Extraindo arquivos do .zip..."),
+    "Verificando arquivos":  ("🔍", "Conferindo arquivos copiados..."),
+    "Verificando processos": ("🔍", "Garantindo processos encerrados..."),
+    "Iniciando servicos":    ("▶",  "Iniciando serviços Mongo..."),
+    "Aguardando para abrir PDV": ("⏰", "Aguardando para abrir o PDV..."),
+    "Iniciando vrcheckout":  ("🖥", "Abrindo o sistema PDV..."),
 }
 
 # Cores
@@ -60,11 +94,10 @@ TEXT2   = "#64748b"
 
 class StatusApp:
     def __init__(self, root):
-        self.root         = root
+        self.root          = root
         self.janela_aberta = False
         self.ultimo_status = None
 
-        # Janela começa oculta
         self.root.withdraw()
         self.root.title("PDV - Atualização em andamento")
         self.root.configure(bg=BG)
@@ -73,7 +106,7 @@ class StatusApp:
         self.root.overrideredirect(True)
         self._drag_x = self._drag_y = 0
 
-        w, h = 520, 580
+        w, h = 520, 620
         sw   = root.winfo_screenwidth()
         sh   = root.winfo_screenheight()
         self.root.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
@@ -85,9 +118,10 @@ class StatusApp:
         self._build_ui()
         self._animar_progresso()
         self._monitorar()
+        log.info("StatusApp iniciado e monitorando.")
 
     # ──────────────────────────────────────────
-    # MONITORAMENTO DO ARQUIVO DE SINAL
+    # MONITORAMENTO — loop infinito, NUNCA retorna
     # ──────────────────────────────────────────
     def _monitorar(self):
         def checar():
@@ -99,58 +133,61 @@ class StatusApp:
 
                         status = dados.get("status", "idle")
 
-                        # Mostra a janela quando começa
                         if status == "updating" and not self.janela_aberta:
                             self.janela_aberta = True
+                            log.info("Atualizacao detectada — mostrando janela.")
                             self.root.after(0, self.root.deiconify)
+                            self.root.after(0, self.root.lift)
 
-                        # Atualiza UI se mudou
                         chave = json.dumps(dados, sort_keys=True)
                         if chave != self.ultimo_status:
                             self.ultimo_status = chave
                             self.root.after(0, lambda d=dados: self.atualizar_ui(d))
 
-                        # Quando concluiu com sucesso: abre o PDV e fecha
                         if status == "success":
+                            log.info("Sucesso detectado — abrindo PDV.")
                             self.root.after(0, self._abrir_pdv)
-                            time.sleep(4)
-                            try:
-                                os.remove(PROGRESSO_FILE)
-                            except:
-                                pass
-                            self.root.after(0, self.root.destroy)
-                            return
+                            time.sleep(5)
+                            self._limpar_e_resetar()
+                            continue
 
-                        # Quando deu erro: só fecha após 6s sem abrir o PDV
                         if status == "error":
-                            time.sleep(6)
-                            try:
-                                os.remove(PROGRESSO_FILE)
-                            except:
-                                pass
-                            self.root.after(0, self.root.destroy)
-                            return
+                            log.info("Erro detectado — aguardando 8s.")
+                            time.sleep(8)
+                            self._limpar_e_resetar()
+                            continue
                     else:
-                        # Reseta estado se arquivo sumiu
                         if self.janela_aberta:
                             self.janela_aberta = False
+                            self.ultimo_status = None
                             self.root.after(0, self.root.withdraw)
 
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.warning(f"Erro no monitor: {e}")
                 time.sleep(POLL_MS / 1000)
 
         threading.Thread(target=checar, daemon=True).start()
+
+    def _limpar_e_resetar(self):
+        """Remove o progresso.json, reseta a UI e esconde — pronto p/ próxima."""
+        try:
+            os.remove(PROGRESSO_FILE)
+        except Exception:
+            pass
+        self.janela_aberta = False
+        self.ultimo_status = None
+        self.root.after(0, self._resetar_ui)
+        self.root.after(0, self.root.withdraw)
+        log.info("UI resetada — monitorando proxima atualizacao.")
 
     # ──────────────────────────────────────────
     # UI
     # ──────────────────────────────────────────
     def _build_ui(self):
-        # Barra de título arrastável
         tbar = tk.Frame(self.root, bg=SURFACE, height=40)
         tbar.pack(fill="x")
         tbar.bind("<ButtonPress-1>", lambda e: setattr(self, '_drag_x', e.x) or setattr(self, '_drag_y', e.y))
-        tbar.bind("<B1-Motion>",     self._do_drag)
+        tbar.bind("<B1-Motion>", self._do_drag)
         tk.Label(tbar, text="⚡  PDV Updater", bg=SURFACE, fg=ACCENT,
                  font=("Segoe UI", 11, "bold")).pack(side="left", padx=16, pady=8)
         tk.Frame(self.root, bg=BORDER, height=1).pack(fill="x")
@@ -158,7 +195,6 @@ class StatusApp:
         body = tk.Frame(self.root, bg=BG)
         body.pack(fill="both", expand=True, padx=28, pady=24)
 
-        # Ícone principal
         self.lbl_icone = tk.Label(body, text="⚡", bg=BG, fg=ACCENT,
                                    font=("Segoe UI", 36))
         self.lbl_icone.pack(pady=(0, 6))
@@ -171,7 +207,6 @@ class StatusApp:
                                  bg=BG, fg=TEXT2, font=("Segoe UI", 10))
         self.lbl_sub.pack(pady=(4, 20))
 
-        # Card etapa atual
         card = tk.Frame(body, bg=SURFACE, highlightthickness=1,
                         highlightbackground=BORDER)
         card.pack(fill="x", pady=(0, 14))
@@ -200,7 +235,6 @@ class StatusApp:
                                  font=("Segoe UI", 18, "bold"), width=5, anchor="e")
         self.lbl_pct.pack(side="right")
 
-        # Barra de progresso
         bar_frame = tk.Frame(card, bg=SURFACE)
         bar_frame.pack(fill="x", padx=16, pady=(0, 14))
 
@@ -209,7 +243,6 @@ class StatusApp:
         self.canvas_bar.pack(fill="x")
         self.canvas_bar.bind("<Configure>", lambda e: self._redraw_bar())
 
-        # Lista de etapas
         steps = tk.Frame(body, bg=BG)
         steps.pack(fill="x")
         self.step_widgets = []
@@ -298,7 +331,7 @@ class StatusApp:
         self.lbl_titulo.config(text="Atualização Concluída!", fg=GREEN)
         self.lbl_etapa_icone.config(text="✅")
         self.lbl_etapa_nome.config(text="Atualizado com sucesso!")
-        self.lbl_etapa_desc.config(text="PDV atualizado e reiniciado")
+        self.lbl_etapa_desc.config(text="Abrindo o PDV...")
         self.lbl_pct.config(text="100%", fg=GREEN)
         for sw in self.step_widgets:
             sw["row"].config(bg="#0f2a1a", highlightbackground="#1a3a2a")
@@ -314,7 +347,7 @@ class StatusApp:
                 self.lbl_sub.config(
                     text=f"Concluído em {m}min {s}s" if m else f"Concluído em {s}s",
                     fg=ACCENT)
-            except:
+            except Exception:
                 self.lbl_sub.config(text="Concluído!", fg=ACCENT)
 
     def _mostrar_erro(self, msg):
@@ -327,24 +360,37 @@ class StatusApp:
         self.lbl_pct.config(fg=RED)
         self.lbl_sub.config(text="Contate o suporte técnico", fg=RED)
 
+    def _resetar_ui(self):
+        self.progresso_atual = 0
+        self.progresso_alvo  = 0
+        self.bar_cor         = ACCENT
+        self.lbl_icone.config(text="⚡", fg=ACCENT)
+        self.lbl_titulo.config(text="Atualização do PDV", fg=TEXT)
+        self.lbl_sub.config(text="Aguardando início...", fg=TEXT2)
+        self.lbl_etapa_icone.config(text="⏳")
+        self.lbl_etapa_nome.config(text="Aguardando...")
+        self.lbl_etapa_desc.config(text="Processo será iniciado em breve")
+        self.lbl_pct.config(text="0%", fg=ACCENT)
+        for sw in self.step_widgets:
+            sw["row"].config(bg=SURFACE2, highlightbackground=BORDER)
+            sw["num"].config(bg=SURFACE2, fg=TEXT2)
+            sw["lbl"].config(bg=SURFACE2, fg=TEXT2)
+            sw["check"].config(bg=SURFACE2, text="")
+        self._redraw_bar()
+
     def _abrir_pdv(self):
-        """Abre o vrcheckout.exe — executado pelo usuário logado, não pelo serviço."""
+        """Abre o vrcheckout.exe NA SESSAO DO USUARIO (este processo)."""
         try:
             if os.path.exists(VRCHECKOUT_EXE):
-                subprocess.Popen(
-                    [VRCHECKOUT_EXE],
-                    cwd=VRPDV_DIR
-                )
-                import logging
-                logging.getLogger(__name__).info("vrcheckout.exe aberto pelo status_pdv.")
+                subprocess.Popen([VRCHECKOUT_EXE], cwd=VRPDV_DIR)
+                log.info("vrcheckout.exe aberto na sessao do usuario.")
             else:
-                import logging
-                logging.getLogger(__name__).warning(f"vrcheckout.exe nao encontrado: {VRCHECKOUT_EXE}")
+                log.warning(f"vrcheckout.exe nao encontrado: {VRCHECKOUT_EXE}")
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Erro ao abrir vrcheckout: {e}")
+            log.error(f"Erro ao abrir vrcheckout: {e}")
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app  = StatusApp(root)
+    _lock = garantir_instancia_unica()
+    root  = tk.Tk()
+    app   = StatusApp(root)
     root.mainloop()
