@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# PyInstaller
+build/
+dist/
+*.spec.bak
+
+# NSIS / instalador (artefatos de build, nao fonte)
+*.exe
+PDVAgent_Setup.exe
+
+# Logs e estado em runtime (gerados no PDV/servidor, nao no repo)
+*.log
+progresso.json
+
+# Uploads do servidor (zips e agente.exe distribuidos)
+server/uploads/
+
+# Ambiente local
+.env
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,18 +1,18 @@
 # ===============================================================
 #  build_agent.spec
-#  Compila agente.exe e status_pdv.exe juntos
-#  Execute no Windows: python -m PyInstaller build_agent.spec
+#  Compila agente.exe e status_pdv.exe a partir de src/pdv_agent
+#  Execute na pasta agent/: python -m PyInstaller build_agent.spec
 # ===============================================================
 
 block_cipher = None
 
 # ── AGENTE ──────────────────────────────────────────────────
 agente = Analysis(
-    ['agente.py'],
-    pathex=[],
+    ['main_agent.py'],
+    pathex=['src'],
     binaries=[],
     datas=[],
-    hiddenimports=['waitress', 'flask', 'lmdb'],
+    hiddenimports=['waitress', 'flask', 'lmdb', 'pdv_agent'],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
@@ -36,11 +36,11 @@ agente_exe = EXE(
 
 # ── STATUS PDV ───────────────────────────────────────────────
 status = Analysis(
-    ['status_pdv.py'],
-    pathex=[],
+    ['main_status.py'],
+    pathex=['src'],
     binaries=[],
     datas=[],
-    hiddenimports=['requests', 'tkinter'],
+    hiddenimports=['tkinter', 'pdv_agent'],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],

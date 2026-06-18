@@ -1,34 +1,31 @@
 """
-===============================================================
-  PDV Status v2.0 - Monitor de atualização
-  Roda permanentemente na sessão do usuário (Run key).
-  - Single instance: nunca roda duplicado
-  - Monitora C:\PDVAgent\progresso.json
-  - Mostra a janela quando atualização começa
-  - Abre o vrcheckout.exe ao concluir (na sessão do usuário!)
-  - Esconde e reseta — pronto para a próxima atualização
-  - NUNCA fecha sozinho
-===============================================================
+PDV Status v2.0 - Monitor de atualização
+Roda permanentemente na sessão do usuário (Run key).
+- Single instance: nunca roda duplicado
+- Monitora C:\\PDVAgent\\progresso.json
+- Mostra a janela quando atualização começa
+- Abre o vrcheckout.exe ao concluir (na sessão do usuário!)
+- Esconde e reseta — pronto para a próxima atualização
+- NUNCA fecha sozinho
 """
 
-import tkinter as tk
-import threading
 import json
-import time
-import os
-import sys
-import socket
 import logging
+import os
+import socket
 import subprocess
+import sys
+import threading
+import time
+import tkinter as tk
 
 PROGRESSO_FILE = r"C:\PDVAgent\progresso.json"
-STATUS_LOG     = r"C:\PDVAgent\status_pdv.log"
-POLL_MS        = 800
+STATUS_LOG = r"C:\PDVAgent\status_pdv.log"
+POLL_MS = 800
 VRCHECKOUT_EXE = r"C:\vrpdv\vrcheckout.exe"
-VRPDV_DIR      = r"C:\vrpdv"
-SINGLE_PORT    = 50505  # porta local para garantir instância única
+VRPDV_DIR = r"C:\vrpdv"
+SINGLE_PORT = 50505  # porta local para garantir instância única
 
-# ── Logging próprio para debug ──
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -36,7 +33,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# ── Single instance: tenta abrir porta local ──
+
 def garantir_instancia_unica():
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -47,16 +44,17 @@ def garantir_instancia_unica():
         log.info("Outra instancia ja esta rodando. Saindo.")
         sys.exit(0)
 
+
 ETAPAS_IDX = {
-    "Encerrando processos":  0,
-    "Parando servicos":      1,
-    "Realizando backup":     2,
-    "Descompactando":        3,
-    "Verificando arquivos":  4,
+    "Encerrando processos": 0,
+    "Parando servicos": 1,
+    "Realizando backup": 2,
+    "Descompactando": 3,
+    "Verificando arquivos": 4,
     "Verificando processos": 4,
-    "Iniciando servicos":    5,
+    "Iniciando servicos": 5,
     "Aguardando para abrir PDV": 6,
-    "Iniciando vrcheckout":  6,
+    "Iniciando vrcheckout": 6,
 }
 
 ETAPAS_LABELS = [
@@ -70,31 +68,32 @@ ETAPAS_LABELS = [
 ]
 
 ICONES_ETAPA = {
-    "Encerrando processos":  ("🔴", "Finalizando processos ativos..."),
-    "Parando servicos":      ("⏹",  "Parando serviços Mongo..."),
-    "Realizando backup":     ("💾", "Fazendo cópia de segurança..."),
-    "Descompactando":        ("📦", "Extraindo arquivos do .zip..."),
-    "Verificando arquivos":  ("🔍", "Conferindo arquivos copiados..."),
+    "Encerrando processos": ("🔴", "Finalizando processos ativos..."),
+    "Parando servicos": ("⏹", "Parando serviços Mongo..."),
+    "Realizando backup": ("💾", "Fazendo cópia de segurança..."),
+    "Descompactando": ("📦", "Extraindo arquivos do .zip..."),
+    "Verificando arquivos": ("🔍", "Conferindo arquivos copiados..."),
     "Verificando processos": ("🔍", "Garantindo processos encerrados..."),
-    "Iniciando servicos":    ("▶",  "Iniciando serviços Mongo..."),
+    "Iniciando servicos": ("▶", "Iniciando serviços Mongo..."),
     "Aguardando para abrir PDV": ("⏰", "Aguardando para abrir o PDV..."),
-    "Iniciando vrcheckout":  ("🖥", "Abrindo o sistema PDV..."),
+    "Iniciando vrcheckout": ("🖥", "Abrindo o sistema PDV..."),
 }
 
 # Cores
-BG      = "#0a0e1a"
+BG = "#0a0e1a"
 SURFACE = "#1a1d27"
-SURFACE2= "#22263a"
-BORDER  = "#2e3248"
-ACCENT  = "#4f8ef7"
-GREEN   = "#22c55e"
-RED     = "#ef4444"
-TEXT    = "#e2e8f0"
-TEXT2   = "#64748b"
+SURFACE2 = "#22263a"
+BORDER = "#2e3248"
+ACCENT = "#4f8ef7"
+GREEN = "#22c55e"
+RED = "#ef4444"
+TEXT = "#e2e8f0"
+TEXT2 = "#64748b"
+
 
 class StatusApp:
     def __init__(self, root):
-        self.root          = root
+        self.root = root
         self.janela_aberta = False
         self.ultimo_status = None
 
@@ -107,13 +106,13 @@ class StatusApp:
         self._drag_x = self._drag_y = 0
 
         w, h = 520, 620
-        sw   = root.winfo_screenwidth()
-        sh   = root.winfo_screenheight()
+        sw = root.winfo_screenwidth()
+        sh = root.winfo_screenheight()
         self.root.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
 
         self.progresso_atual = 0
-        self.progresso_alvo  = 0
-        self.bar_cor         = ACCENT
+        self.progresso_alvo = 0
+        self.bar_cor = ACCENT
 
         self._build_ui()
         self._animar_progresso()
@@ -208,7 +207,7 @@ class StatusApp:
         self.lbl_sub.pack(pady=(4, 20))
 
         card = tk.Frame(body, bg=SURFACE, highlightthickness=1,
-                        highlightbackground=BORDER)
+                         highlightbackground=BORDER)
         card.pack(fill="x", pady=(0, 14))
 
         row = tk.Frame(card, bg=SURFACE)
@@ -285,11 +284,11 @@ class StatusApp:
     # ATUALIZAR UI
     # ──────────────────────────────────────────
     def atualizar_ui(self, dados):
-        status    = dados.get("status", "idle")
-        etapa     = dados.get("etapa", "")
+        status = dados.get("status", "idle")
+        etapa = dados.get("etapa", "")
         progresso = dados.get("progresso", 0)
-        erro      = dados.get("erro", "")
-        inicio    = dados.get("inicio")
+        erro = dados.get("erro", "")
+        inicio = dados.get("inicio")
 
         self.progresso_alvo = progresso
 
@@ -362,8 +361,8 @@ class StatusApp:
 
     def _resetar_ui(self):
         self.progresso_atual = 0
-        self.progresso_alvo  = 0
-        self.bar_cor         = ACCENT
+        self.progresso_alvo = 0
+        self.bar_cor = ACCENT
         self.lbl_icone.config(text="⚡", fg=ACCENT)
         self.lbl_titulo.config(text="Atualização do PDV", fg=TEXT)
         self.lbl_sub.config(text="Aguardando início...", fg=TEXT2)
@@ -389,8 +388,9 @@ class StatusApp:
         except Exception as e:
             log.error(f"Erro ao abrir vrcheckout: {e}")
 
-if __name__ == "__main__":
+
+def main():
     _lock = garantir_instancia_unica()
-    root  = tk.Tk()
-    app   = StatusApp(root)
+    root = tk.Tk()
+    app = StatusApp(root)
     root.mainloop()

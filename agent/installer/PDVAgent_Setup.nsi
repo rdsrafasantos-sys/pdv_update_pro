@@ -2,7 +2,7 @@
 ;  PDVAgent_Setup.nsi
 ;  Instalador do PDV Agent
 ;  Compilar com: makensis PDVAgent_Setup.nsi
-;  Requer na mesma pasta:
+;  Requer na mesma pasta (copie do dist/ gerado pelo PyInstaller):
 ;    - agente.exe
 ;    - status_pdv.exe
 ;    - nssm.exe
@@ -12,7 +12,7 @@
 ; Configurações gerais
 ;--------------------------------
 !define PRODUTO        "PDV Agent"
-!define VERSAO         "1.2.0"
+!define VERSAO         "1.4.5"
 !define FABRICANTE     "VR Software"
 !define PASTA_DESTINO  "C:\PDVAgent"
 !define NOME_SERVICO   "PDVAgent"
