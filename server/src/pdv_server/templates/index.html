@@ -49,7 +49,7 @@
       <div class="menu-item" data-view="pdv" onclick="mostrarView('pdv')">📦 Atualização de PDV</div>
 
       <div class="menu-section">Replicações</div>
-      <div class="menu-item" data-view="replicacao" onclick="mostrarView('replicacao')">🔄 Verificação de Replicação</div>
+      <div class="menu-item" data-view="replicacao" onclick="mostrarView('replicacao')">🔄 Replicação</div>
     </div>
 
     <div class="content">
@@ -74,6 +74,11 @@
               <div class="kpi-label">⚠️ Última verificação</div>
               <div class="kpi-value" id="kpiUltima" style="font-size:16px;">—</div>
             </div>
+          </div>
+
+          <div class="card">
+            <div class="section-title">📡 PDVs online por loja</div>
+            <div id="dashOnlinePorLoja"><div class="empty">Carregando...</div></div>
           </div>
 
           <div class="card">

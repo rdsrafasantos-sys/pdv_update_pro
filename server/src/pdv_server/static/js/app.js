@@ -81,11 +81,17 @@ function renderPDVs(key) {
     const bar = prog && prog.progresso != null
       ? `<div class="pdv-progress"><div class="bar-wrap"><div class="bar" style="width:${prog.progresso}%"></div></div>${etapa}</div>`
       : "";
+    const versaoPdv = key === "pdv" && pdv.versao ? `<div class="pdv-versao">v${pdv.versao}</div>` : "";
+    const versaoAgente = key === "agente"
+      ? `<div class="pdv-versao-agente">agente v${ping && ping.versao_agente ? ping.versao_agente : "—"}</div>`
+      : "";
     return `
       <div class="pdv-card ${sel ? 'selected' : ''}" onclick="togglePDV('${key}','${pdv.id}')">
         <div class="pdv-name">${pdv.nome || pdv.id}</div>
         <div class="pdv-ip">${pdv.ip}</div>
+        ${versaoPdv}
         ${badge}
+        ${versaoAgente}
         ${bar}
       </div>
     `;
@@ -444,6 +450,32 @@ function svgGraficoBarras(historico) {
   `;
 }
 
+function renderOnlinePorLoja(dadosPorLoja) {
+  if (dadosPorLoja.length === 0) return '<div class="empty">Nenhuma loja encontrada.</div>';
+  return dadosPorLoja.map(({ loja, status }) => {
+    const online = loja.pdvs.filter(p => status[p.id] && status[p.id].online).length;
+    const total = loja.pdvs.length;
+    const pontos = loja.pdvs.map(p => {
+      const isOnline = !!(status[p.id] && status[p.id].online);
+      return `<span class="dash-pdv-dot ${isOnline ? 'online' : 'offline'}" title="${p.nome || p.id} — ${isOnline ? 'online' : 'offline'}"></span>`;
+    }).join("");
+    return `
+      <div class="dash-loja-row">
+        <div class="dash-loja-nome">${loja.nome}</div>
+        <div class="dash-loja-pdvs">${pontos}</div>
+        <div class="dash-loja-contagem">${online}/${total} online</div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function statusOnlinePorLoja(lojasList) {
+  const resultados = await Promise.all(
+    lojasList.map(l => fetch(`/api/ping_loja/${l.id}`).then(r => r.json()).catch(() => ({})))
+  );
+  return lojasList.map((loja, i) => ({ loja, status: resultados[i] }));
+}
+
 async function carregarDashboard() {
   const [lojasResp, cfg, historico] = await Promise.all([
     fetch("/api/lojas").then(r => r.json()).catch(() => []),
@@ -474,6 +506,12 @@ async function carregarDashboard() {
 
   const grafico = document.getElementById("dashGrafico");
   if (grafico) grafico.innerHTML = svgGraficoBarras(historico);
+
+  const elOnline = document.getElementById("dashOnlinePorLoja");
+  if (elOnline) {
+    const dadosOnline = await statusOnlinePorLoja(lojas);
+    elOnline.innerHTML = renderOnlinePorLoja(dadosOnline);
+  }
 }
 
 // ──────────────────────────────────────────────
