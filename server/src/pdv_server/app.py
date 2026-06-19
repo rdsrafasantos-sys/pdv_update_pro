@@ -293,3 +293,12 @@ def api_replicacao_config_set():
 @app.route("/api/replicacao/historico", methods=["GET"])
 def api_replicacao_historico():
     return jsonify(replication.obter_historico())
+
+
+@app.route("/replicacao/detalhe/<loja_id>/<pdv_id>/<colecao>")
+def replicacao_detalhe(loja_id, pdv_id, colecao):
+    """Pagina em aba separada com o conteudo completo dos documentos
+    divergentes de uma colecao (consome o mesmo /api/replicacao/status)."""
+    return render_template(
+        "replicacao_detalhe.html", loja_id=loja_id, pdv_id=pdv_id, colecao=colecao
+    )

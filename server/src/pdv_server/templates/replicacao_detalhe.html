@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detalhe de divergência — {{ colecao }}</title>
+<style>
+:root {
+  --vr-orange: #E8530A;
+  --vr-orange-dark: #C44208;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', sans-serif; font-size: 14px; min-height: 100vh; }
+
+body.light { background: #F5F5F5; color: #1a1a1a; }
+body.light .card { background: #fff; border: 1px solid #e5e5e5; }
+body.light .doc-table th { background: #f0f0f0; }
+body.light .doc-table td, body.light .doc-table th { border-color: #e5e5e5; }
+body.light .text-muted { color: #888; }
+body.light .tab { background: #f0f0f0; color: #666; }
+body.light .tab.active { background: var(--vr-orange); color: #fff; }
+body.light .diff-old { background: rgba(239,68,68,.08); }
+body.light .diff-new { background: rgba(34,197,94,.08); }
+
+body.dark { background: #0a0e1a; color: #e2e8f0; }
+body.dark .card { background: #1a1d27; border: 1px solid #2e3248; }
+body.dark .doc-table th { background: #22263a; }
+body.dark .doc-table td, body.dark .doc-table th { border-color: #2e3248; }
+body.dark .text-muted { color: #64748b; }
+body.dark .tab { background: #22263a; color: #94a3b8; }
+body.dark .tab.active { background: var(--vr-orange); color: #fff; }
+body.dark .diff-old { background: rgba(239,68,68,.12); }
+body.dark .diff-new { background: rgba(34,197,94,.12); }
+
+.topbar { padding: 16px 24px; border-bottom: 1px solid rgba(128,128,128,.2); }
+.topbar h1 { font-size: 16px; font-weight: 700; }
+.topbar .sub { font-size: 12px; margin-top: 2px; }
+.topbar .sub strong { color: var(--vr-orange); }
+
+.body { padding: 20px 24px; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.tabs { display: flex; gap: 8px; }
+.tab { padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; }
+.card { border-radius: 12px; padding: 16px; }
+.doc-card { border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+.doc-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.doc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.doc-table td, .doc-table th { border: 1px solid; padding: 4px 8px; text-align: left; vertical-align: top; word-break: break-word; }
+.doc-table th { width: 180px; font-weight: 600; }
+.diff-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.diff-pair h4 { font-size: 11px; text-transform: uppercase; margin-bottom: 4px; }
+</style>
+</head>
+<body class="dark" id="bd">
+  <div class="topbar">
+    <h1>🔍 Detalhe de divergência</h1>
+    <div class="sub">Coleção <strong>{{ colecao }}</strong> — Loja {{ loja_id }} — PDV {{ pdv_id }}</div>
+  </div>
+  <div class="body">
+    <div class="tabs" id="tabs"></div>
+    <div id="conteudo" class="text-muted">Carregando...</div>
+  </div>
+
+<script>
+const lojaId = {{ loja_id|tojson }};
+const pdvId = {{ pdv_id|tojson }};
+const colecao = {{ colecao|tojson }};
+
+document.body.className = localStorage.getItem("theme") || "dark";
+
+const CAMPOS_TITULO = ["nome", "descricao", "nomeProduto", "razaoSocial", "razao_social", "codigo", "codigoBarras"];
+
+function tituloDoc(doc) {
+  for (const campo of CAMPOS_TITULO) {
+    if (doc[campo]) return `${campo}: ${doc[campo]}`;
+  }
+  return doc._id != null ? `_id: ${doc._id}` : "(documento)";
+}
+
+function tabelaDoc(doc) {
+  const linhas = Object.keys(doc).sort().map(k => `
+    <tr><th>${k}</th><td>${formatarValor(doc[k])}</td></tr>
+  `).join("");
+  return `<table class="doc-table">${linhas}</table>`;
+}
+
+function formatarValor(v) {
+  if (v === null || v === undefined) return "<span class=\"text-muted\">—</span>";
+  if (typeof v === "object") return `<pre style="white-space:pre-wrap;margin:0">${JSON.stringify(v, null, 2)}</pre>`;
+  return String(v);
+}
+
+function tabelaDiff(integradora, pdv) {
+  const chaves = Array.from(new Set([...Object.keys(integradora), ...Object.keys(pdv)])).sort();
+  const linhas = chaves.map(k => {
+    const a = JSON.stringify(integradora[k]);
+    const b = JSON.stringify(pdv[k]);
+    const mudou = a !== b;
+    return `<tr>
+      <th>${k}</th>
+      <td class="${mudou ? 'diff-old' : ''}">${formatarValor(integradora[k])}</td>
+      <td class="${mudou ? 'diff-new' : ''}">${formatarValor(pdv[k])}</td>
+    </tr>`;
+  }).join("");
+  return `<table class="doc-table">
+    <tr><th></th><th>Integradora</th><th>PDV</th></tr>
+    ${linhas}
+  </table>`;
+}
+
+let dadosColecao = null;
+let abaAtual = "alterados";
+
+function renderAbas() {
+  const abas = [
+    ["alterados", `✏️ Alterados (${dadosColecao.alterados_total || 0})`],
+    ["faltando", `❌ Faltando no PDV (${dadosColecao.faltando_no_pdv_total || 0})`],
+    ["extras", `➕ Extras no PDV (${dadosColecao.extras_no_pdv_total || 0})`],
+  ];
+  document.getElementById("tabs").innerHTML = abas.map(([id, label]) => `
+    <div class="tab ${id === abaAtual ? 'active' : ''}" onclick="mudarAba('${id}')">${label}</div>
+  `).join("");
+}
+
+function mudarAba(id) {
+  abaAtual = id;
+  renderAbas();
+  renderConteudo();
+}
+window.mudarAba = mudarAba;
+
+function renderConteudo() {
+  const el = document.getElementById("conteudo");
+  if (abaAtual === "alterados") {
+    const lista = dadosColecao.exemplos_alterados || [];
+    el.innerHTML = lista.length === 0
+      ? '<div class="card text-muted">Nenhum exemplo disponível.</div>'
+      : lista.map(ex => `
+          <div class="card doc-card">
+            <div class="doc-title">${tituloDoc(ex.integradora)}</div>
+            <div class="diff-pair">${tabelaDiff(ex.integradora, ex.pdv)}</div>
+          </div>
+        `).join("");
+  } else if (abaAtual === "faltando") {
+    const lista = dadosColecao.exemplos_faltando || [];
+    el.innerHTML = lista.length === 0
+      ? '<div class="card text-muted">Nenhum exemplo disponível.</div>'
+      : lista.map(doc => `
+          <div class="card doc-card">
+            <div class="doc-title">${tituloDoc(doc)}</div>
+            ${tabelaDoc(doc)}
+          </div>
+        `).join("");
+  } else {
+    const lista = dadosColecao.exemplos_extras || [];
+    el.innerHTML = lista.length === 0
+      ? '<div class="card text-muted">Nenhum exemplo disponível.</div>'
+      : lista.map(doc => `
+          <div class="card doc-card">
+            <div class="doc-title">${tituloDoc(doc)}</div>
+            ${tabelaDoc(doc)}
+          </div>
+        `).join("");
+  }
+}
+
+async function carregar() {
+  const r = await fetch(`/api/replicacao/status/${lojaId}/${pdvId}`);
+  const dados = await r.json();
+  const colecoes = (dados.resultado || {}).colecoes || {};
+  dadosColecao = colecoes[colecao];
+  if (!dadosColecao) {
+    document.getElementById("conteudo").innerHTML =
+      '<div class="card text-muted">Resultado ainda não disponível para esta coleção. Volte ao painel e aguarde a verificação terminar.</div>';
+    return;
+  }
+  renderAbas();
+  renderConteudo();
+}
+
+carregar();
+</script>
+</body>
+</html>

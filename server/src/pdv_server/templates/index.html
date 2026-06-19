@@ -721,35 +721,62 @@ function renderResultadosReplicacao(pdvIds) {
   `).join("");
 }
 
+function linhaColecao(pdvId, nome, c) {
+  if (c.erro) {
+    return `
+      <div style="font-size:12px;margin-top:6px">
+        <strong>${nome}</strong> — <span style="color:#e0a800">⚠ ${c.erro}</span>
+      </div>
+    `;
+  }
+  if (!c.tem_divergencia) {
+    // sem divergencia: riscado e esmaecido, para o olho ir direto ao que importa
+    return `
+      <div style="font-size:12px;margin-top:6px;opacity:.45;text-decoration:line-through">
+        ${nome} — integradora: ${c.total_integradora}, pdv: ${c.total_pdv} (sem divergência)
+      </div>
+    `;
+  }
+  const link = `/replicacao/detalhe/${lojaAtiva}/${pdvId}/${nome}`;
+  return `
+    <div style="font-size:12px;margin-top:6px">
+      <strong>${nome}</strong> —
+      integradora: ${c.total_integradora}, pdv: ${c.total_pdv}
+      ${c.faltando_no_pdv_total ? `<br>❌ Faltando no PDV: ${c.faltando_no_pdv_total}` : ""}
+      ${c.extras_no_pdv_total ? `<br>➕ Extras no PDV: ${c.extras_no_pdv_total}` : ""}
+      ${c.alterados_total ? `<br>✏️ Alterados (existem nos dois, conteúdo diferente): ${c.alterados_total}` : ""}
+      <br><a href="${link}" target="_blank" style="color:var(--vr-orange);font-weight:600">🔗 Ver conteúdo da divergência →</a>
+    </div>
+  `;
+}
+
 function atualizarBlocoReplicacao(pdvId, dados) {
   const statusEl = document.getElementById(`repl-status-${pdvId}`);
   const detEl = document.getElementById(`repl-detalhe-${pdvId}`);
   if (!statusEl) return;
-  if (dados.status === "executando") { statusEl.innerHTML = "⏳ verificando..."; return; }
   if (dados.status === "erro") {
     statusEl.innerHTML = `<span class="badge erro">Erro</span>`;
     detEl.innerHTML = `<div style="font-size:12px;margin-top:4px">${dados.erro}</div>`;
     return;
   }
-  if (dados.status === "concluido" && dados.resultado) {
+  if ((dados.status === "executando" || dados.status === "concluido") && dados.resultado) {
     const r = dados.resultado;
-    statusEl.innerHTML = r.tem_divergencia
-      ? `<span class="badge erro">⚠ Divergência</span>`
-      : `<span class="badge online">✓ OK</span>`;
-    detEl.innerHTML = Object.entries(r.colecoes).map(([nome, c]) => c.erro ? `
-      <div style="font-size:12px;margin-top:6px">
-        <strong>${nome}</strong> — <span style="color:#e0a800">⚠ ${c.erro}</span>
-      </div>
-    ` : `
-      <div style="font-size:12px;margin-top:6px">
-        <strong>${nome}</strong> —
-        integradora: ${c.total_integradora}, pdv: ${c.total_pdv}
-        ${c.faltando_no_pdv_total ? `<br>❌ Faltando no PDV: ${c.faltando_no_pdv_total}` : ""}
-        ${c.extras_no_pdv_total ? `<br>➕ Extras no PDV: ${c.extras_no_pdv_total}` : ""}
-        ${c.alterados_total ? `<br>✏️ Alterados (existem nos dois, conteúdo diferente): ${c.alterados_total}` : ""}
-      </div>
-    `).join("");
+    const colecoesProntas = Object.keys(r.colecoes).length;
+    if (dados.status === "executando") {
+      statusEl.innerHTML = `⏳ verificando... (${colecoesProntas}/8)`;
+    } else {
+      statusEl.innerHTML = r.tem_divergencia
+        ? `<span class="badge erro">⚠ Divergência</span>`
+        : `<span class="badge online">✓ OK</span>`;
+    }
+    // Renderiza cada coleção conforme o resultado vai chegando, em vez de
+    // esperar a comparação inteira terminar.
+    detEl.innerHTML = Object.entries(r.colecoes)
+      .map(([nome, c]) => linhaColecao(pdvId, nome, c))
+      .join("");
+    return;
   }
+  if (dados.status === "executando") { statusEl.innerHTML = "⏳ verificando..."; }
 }
 
 async function carregarConfigReplicacaoAuto() {

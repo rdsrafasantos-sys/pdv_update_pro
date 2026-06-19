@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import threading
@@ -22,6 +23,10 @@ COLECOES = [
 # Quantos _id reportar em cada categoria de divergencia (o total real continua
 # disponivel em "_total" mesmo quando a lista e cortada).
 MAX_IDS_REPORTADOS = 200
+
+# Quantos documentos completos (nao so o _id) trazer como exemplo de cada
+# categoria de divergencia, para exibir o conteudo real na tela de detalhe.
+MAX_EXEMPLOS = 20
 
 # Campos a ignorar na comparacao documento-a-documento (ex: metadados que a
 # propria replicacao adiciona e que nao representam divergencia real).
@@ -68,6 +73,20 @@ def _remover_campos_ignorados(doc):
     return {k: v for k, v in doc.items() if k not in CAMPOS_IGNORADOS_DIFF}
 
 
+def _serializar_valor(v):
+    """Converte tipos do BSON/Python que o json padrao nao serializa
+    (ObjectId, datetime) para algo exibivel na tela de detalhe."""
+    if isinstance(v, dict):
+        return {str(k): _serializar_valor(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_serializar_valor(x) for x in v]
+    if isinstance(v, (datetime.datetime, datetime.date)):
+        return v.isoformat()
+    if isinstance(v, (str, int, float, bool)) or v is None:
+        return v
+    return str(v)
+
+
 def _comparar_colecao(col_integradora, col_pdv):
     docs_integradora = {d["_id"]: d for d in col_integradora.find({})}
     docs_pdv = {d["_id"]: d for d in col_pdv.find({})}
@@ -75,12 +94,17 @@ def _comparar_colecao(col_integradora, col_pdv):
     ids_integradora = set(docs_integradora)
     ids_pdv = set(docs_pdv)
 
-    faltando = sorted(str(i) for i in (ids_integradora - ids_pdv))
-    extras = sorted(str(i) for i in (ids_pdv - ids_integradora))
-    alterados = sorted(
-        str(i) for i in (ids_integradora & ids_pdv)
-        if _remover_campos_ignorados(docs_integradora[i]) != _remover_campos_ignorados(docs_pdv[i])
+    faltando_ids = sorted(ids_integradora - ids_pdv, key=str)
+    extras_ids = sorted(ids_pdv - ids_integradora, key=str)
+    alterados_ids = sorted(
+        (i for i in (ids_integradora & ids_pdv)
+         if _remover_campos_ignorados(docs_integradora[i]) != _remover_campos_ignorados(docs_pdv[i])),
+        key=str,
     )
+
+    faltando = [str(i) for i in faltando_ids]
+    extras = [str(i) for i in extras_ids]
+    alterados = [str(i) for i in alterados_ids]
 
     return {
         "total_integradora": len(ids_integradora),
@@ -92,6 +116,20 @@ def _comparar_colecao(col_integradora, col_pdv):
         "alterados": alterados[:MAX_IDS_REPORTADOS],
         "alterados_total": len(alterados),
         "tem_divergencia": bool(faltando or extras or alterados),
+        "exemplos_faltando": [
+            _serializar_valor(docs_integradora[i]) for i in faltando_ids[:MAX_EXEMPLOS]
+        ],
+        "exemplos_extras": [
+            _serializar_valor(docs_pdv[i]) for i in extras_ids[:MAX_EXEMPLOS]
+        ],
+        "exemplos_alterados": [
+            {
+                "id": str(i),
+                "integradora": _serializar_valor(docs_integradora[i]),
+                "pdv": _serializar_valor(docs_pdv[i]),
+            }
+            for i in alterados_ids[:MAX_EXEMPLOS]
+        ],
     }
 
 
@@ -113,11 +151,15 @@ def _comparar_colecao_com_retry(col_integradora, col_pdv, tentativas=2):
     return {"erro": f"Falha ao ler colecao (provavel replicacao em andamento): {ultimo_erro}"}
 
 
-def comparar_pdv(pdv_ip):
+def comparar_pdv(pdv_ip, callback=None):
     """Compara as colecoes da integradora com as do PDV em pdv_ip.
 
     Conecta direto no MongoDB do PDV (porta PDV_LOCAL_MONGO_PORTA) -- exige
     rota de rede livre do Service Manager até essa porta em cada PDV.
+
+    Se "callback" for informado, e chamado como callback(nome, resultado)
+    logo apos cada colecao terminar, para a UI poder exibir o resultado
+    parcial em sequencia em vez de esperar todas as colecoes.
     """
     from pymongo import MongoClient
     from pymongo.errors import PyMongoError
@@ -148,6 +190,8 @@ def comparar_pdv(pdv_ip):
             colecoes_resultado[nome] = r
             if r.get("tem_divergencia"):
                 tem_divergencia_geral = True
+            if callback:
+                callback(nome, r)
 
         return {
             "ok": True,
@@ -174,6 +218,29 @@ def _concluir_verificacao(loja_id, pdv_id, resultado):
         })
 
 
+def _comparar_pdv_com_progresso(loja_id, pdv_id, pdv_ip):
+    """Roda comparar_pdv atualizando o estado a cada colecao concluida, para
+    a UI exibir os resultados em sequencia em vez de tudo de uma vez no final."""
+    inicio = time.strftime("%Y-%m-%d %H:%M:%S")
+    colecoes_parciais = {}
+
+    def ao_concluir_colecao(nome, resultado_colecao):
+        colecoes_parciais[nome] = resultado_colecao
+        tem_div = any(c.get("tem_divergencia") for c in colecoes_parciais.values())
+        _set_estado(loja_id, pdv_id, {
+            "status": "executando", "inicio": inicio, "fim": None,
+            "resultado": {
+                "ok": True, "tem_divergencia": tem_div,
+                "colecoes": dict(colecoes_parciais),
+            },
+            "erro": "",
+        })
+
+    resultado = comparar_pdv(pdv_ip, callback=ao_concluir_colecao)
+    _concluir_verificacao(loja_id, pdv_id, resultado)
+    return resultado
+
+
 def iniciar_verificacao(loja_id, pdv_id, pdv_ip):
     """Dispara a comparacao em background. Consulte get_estado() para o resultado."""
     _set_estado(loja_id, pdv_id, {
@@ -181,10 +248,9 @@ def iniciar_verificacao(loja_id, pdv_id, pdv_ip):
         "fim": None, "resultado": None, "erro": "",
     })
 
-    def rodar():
-        _concluir_verificacao(loja_id, pdv_id, comparar_pdv(pdv_ip))
-
-    threading.Thread(target=rodar, daemon=True).start()
+    threading.Thread(
+        target=_comparar_pdv_com_progresso, args=(loja_id, pdv_id, pdv_ip), daemon=True
+    ).start()
 
 
 # ──────────────────────────────────────────────
@@ -256,7 +322,7 @@ def _executar_verificacao_automatica():
     divergencia_geral = False
 
     for loja_id, pdv in pdvs_alvo:
-        resultado = comparar_pdv(pdv["ip"])
+        resultado = _comparar_pdv_com_progresso(loja_id, pdv["id"], pdv["ip"])
         ok = resultado.get("ok", False)
         tem_div = resultado.get("tem_divergencia") if ok else None
         detalhes[pdv["id"]] = {
@@ -265,7 +331,6 @@ def _executar_verificacao_automatica():
         }
         if tem_div:
             divergencia_geral = True
-        _concluir_verificacao(loja_id, pdv["id"], resultado)
 
     _registrar_historico({
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
