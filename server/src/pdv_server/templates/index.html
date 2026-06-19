@@ -736,7 +736,11 @@ function atualizarBlocoReplicacao(pdvId, dados) {
     statusEl.innerHTML = r.tem_divergencia
       ? `<span class="badge erro">⚠ Divergência</span>`
       : `<span class="badge online">✓ OK</span>`;
-    detEl.innerHTML = Object.entries(r.colecoes).map(([nome, c]) => `
+    detEl.innerHTML = Object.entries(r.colecoes).map(([nome, c]) => c.erro ? `
+      <div style="font-size:12px;margin-top:6px">
+        <strong>${nome}</strong> — <span style="color:#e0a800">⚠ ${c.erro}</span>
+      </div>
+    ` : `
       <div style="font-size:12px;margin-top:6px">
         <strong>${nome}</strong> —
         integradora: ${c.total_integradora}, pdv: ${c.total_pdv}

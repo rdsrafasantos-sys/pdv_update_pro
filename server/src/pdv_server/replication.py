@@ -95,6 +95,24 @@ def _comparar_colecao(col_integradora, col_pdv):
     }
 
 
+def _comparar_colecao_com_retry(col_integradora, col_pdv, tentativas=2):
+    """A replicacao do PDV pode fazer drop+reinsert da colecao durante a
+    leitura (erro 'collection dropped' / code 175 QueryPlanKilled). Isso e
+    uma condicao de corrida transitoria, nao uma falha real -- tenta de novo
+    antes de reportar erro para essa colecao especifica."""
+    from pymongo.errors import OperationFailure
+
+    ultimo_erro = None
+    for tentativa in range(tentativas):
+        try:
+            return _comparar_colecao(col_integradora, col_pdv)
+        except OperationFailure as e:
+            ultimo_erro = e
+            if tentativa < tentativas - 1:
+                time.sleep(2)
+    return {"erro": f"Falha ao ler colecao (provavel replicacao em andamento): {ultimo_erro}"}
+
+
 def comparar_pdv(pdv_ip):
     """Compara as colecoes da integradora com as do PDV em pdv_ip.
 
@@ -126,9 +144,9 @@ def comparar_pdv(pdv_ip):
         colecoes_resultado = {}
         tem_divergencia_geral = False
         for nome in COLECOES:
-            r = _comparar_colecao(db_integradora[nome], db_pdv[nome])
+            r = _comparar_colecao_com_retry(db_integradora[nome], db_pdv[nome])
             colecoes_resultado[nome] = r
-            if r["tem_divergencia"]:
+            if r.get("tem_divergencia"):
                 tem_divergencia_geral = True
 
         return {
