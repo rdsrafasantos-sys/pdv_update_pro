@@ -176,11 +176,10 @@ input:checked + .slider:before { transform: translateX(18px); }
 .chart-legend span { display: flex; align-items: center; gap: 5px; }
 .chart-legend .dot { width: 8px; height: 8px; }
 
-.dash-loja-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; flex-wrap: wrap; }
-.dash-loja-row + .dash-loja-row { border-top: 1px solid rgba(128,128,128,.15); }
-.dash-loja-nome { font-size: 13px; font-weight: 600; min-width: 110px; }
-.dash-loja-pdvs { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
-.dash-pdv-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-.dash-pdv-dot.online { background: #16a34a; }
-.dash-pdv-dot.offline { background: #dc2626; opacity: .6; }
-.dash-loja-contagem { font-size: 11px; opacity: .8; white-space: nowrap; }
+.dash-loja-grupo + .dash-loja-grupo { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(128,128,128,.15); }
+.dash-loja-titulo { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; opacity: .7; margin-bottom: 8px; }
+.dash-pdv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.dash-pdv-replicacao { font-size: 10px; margin-top: 6px; }
+.dash-pdv-replicacao.ok { color: #16a34a; }
+.dash-pdv-replicacao.divergente { color: #dc2626; }
+.dash-pdv-replicacao.semdados { opacity: .6; }

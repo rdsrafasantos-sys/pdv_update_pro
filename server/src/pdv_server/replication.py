@@ -241,16 +241,38 @@ def _comparar_pdv_com_progresso(loja_id, pdv_id, pdv_ip):
     return resultado
 
 
-def iniciar_verificacao(loja_id, pdv_id, pdv_ip):
-    """Dispara a comparacao em background. Consulte get_estado() para o resultado."""
-    _set_estado(loja_id, pdv_id, {
-        "status": "executando", "inicio": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "fim": None, "resultado": None, "erro": "",
-    })
+def iniciar_verificacao_lote(loja_id, pdvs, tipo="manual"):
+    """Dispara a comparacao para varios PDVs selecionados na UI, em sequencia
+    numa unica thread (assim como a verificacao automatica), registrando um
+    unico item consolidado no historico quando todos terminarem."""
+    for pdv in pdvs:
+        _set_estado(loja_id, pdv["id"], {
+            "status": "executando", "inicio": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "fim": None, "resultado": None, "erro": "",
+        })
 
-    threading.Thread(
-        target=_comparar_pdv_com_progresso, args=(loja_id, pdv_id, pdv_ip), daemon=True
-    ).start()
+    def trabalhar():
+        detalhes = {}
+        divergencia_geral = False
+        for pdv in pdvs:
+            resultado = _comparar_pdv_com_progresso(loja_id, pdv["id"], pdv["ip"])
+            ok = resultado.get("ok", False)
+            tem_div = resultado.get("tem_divergencia") if ok else None
+            detalhes[pdv["id"]] = {
+                "loja_id": loja_id, "ok": ok, "tem_divergencia": tem_div,
+                "erro": None if ok else resultado.get("erro"),
+            }
+            if tem_div:
+                divergencia_geral = True
+
+        _registrar_historico({
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "tipo": tipo,
+            "tem_divergencia": divergencia_geral,
+            "pdvs": detalhes,
+        })
+
+    threading.Thread(target=trabalhar, daemon=True).start()
 
 
 # ──────────────────────────────────────────────

@@ -450,20 +450,43 @@ function svgGraficoBarras(historico) {
   `;
 }
 
-function renderOnlinePorLoja(dadosPorLoja) {
+function ultimaReplicacaoPorPdv(historico) {
+  const mapa = {};
+  for (const entrada of historico) {
+    for (const [pdvId, info] of Object.entries(entrada.pdvs || {})) {
+      if (!(pdvId in mapa)) {
+        mapa[pdvId] = { timestamp: entrada.timestamp, ok: info.ok, tem_divergencia: info.tem_divergencia };
+      }
+    }
+  }
+  return mapa;
+}
+
+function cardReplicacaoPdv(ult) {
+  if (!ult) return '<div class="dash-pdv-replicacao semdados">Sem verificação registrada</div>';
+  if (!ult.ok) return `<div class="dash-pdv-replicacao divergente">Erro na última verificação — ${ult.timestamp}</div>`;
+  return ult.tem_divergencia
+    ? `<div class="dash-pdv-replicacao divergente">⚠️ Divergência — ${ult.timestamp}</div>`
+    : `<div class="dash-pdv-replicacao ok">✔ Sem divergência — ${ult.timestamp}</div>`;
+}
+
+function renderOnlinePorLoja(dadosPorLoja, ultimaPorPdv) {
   if (dadosPorLoja.length === 0) return '<div class="empty">Nenhuma loja encontrada.</div>';
   return dadosPorLoja.map(({ loja, status }) => {
-    const online = loja.pdvs.filter(p => status[p.id] && status[p.id].online).length;
-    const total = loja.pdvs.length;
-    const pontos = loja.pdvs.map(p => {
-      const isOnline = !!(status[p.id] && status[p.id].online);
-      return `<span class="dash-pdv-dot ${isOnline ? 'online' : 'offline'}" title="${p.nome || p.id} — ${isOnline ? 'online' : 'offline'}"></span>`;
-    }).join("");
+    const online = loja.pdvs.filter(p => status[p.id] && status[p.id].online);
+    const cards = online.map(p => `
+      <div class="pdv-card" style="cursor:default;">
+        <div class="pdv-name">${p.nome || p.id}</div>
+        <div class="pdv-ip">${p.ip}</div>
+        ${p.versao ? `<div class="pdv-versao">v${p.versao}</div>` : ""}
+        <div class="badge online"><span class="dot"></span>online</div>
+        ${cardReplicacaoPdv(ultimaPorPdv[p.id])}
+      </div>
+    `).join("");
     return `
-      <div class="dash-loja-row">
-        <div class="dash-loja-nome">${loja.nome}</div>
-        <div class="dash-loja-pdvs">${pontos}</div>
-        <div class="dash-loja-contagem">${online}/${total} online</div>
+      <div class="dash-loja-grupo">
+        <div class="dash-loja-titulo">${loja.nome} (${online.length}/${loja.pdvs.length} online)</div>
+        ${online.length > 0 ? `<div class="dash-pdv-grid">${cards}</div>` : '<div class="empty">Nenhum PDV online nesta loja.</div>'}
       </div>
     `;
   }).join("");
@@ -510,7 +533,7 @@ async function carregarDashboard() {
   const elOnline = document.getElementById("dashOnlinePorLoja");
   if (elOnline) {
     const dadosOnline = await statusOnlinePorLoja(lojas);
-    elOnline.innerHTML = renderOnlinePorLoja(dadosOnline);
+    elOnline.innerHTML = renderOnlinePorLoja(dadosOnline, ultimaReplicacaoPorPdv(historico));
   }
 }
 

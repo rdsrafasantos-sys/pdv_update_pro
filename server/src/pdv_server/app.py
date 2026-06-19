@@ -264,8 +264,7 @@ def api_replicacao_verificar():
     if not pdvs_alvo:
         return jsonify({"erro": "Nenhum PDV selecionado"}), 400
 
-    for pdv in pdvs_alvo:
-        replication.iniciar_verificacao(loja_id, pdv["id"], pdv["ip"])
+    replication.iniciar_verificacao_lote(loja_id, pdvs_alvo, tipo="manual")
 
     return jsonify({
         "mensagem": f"Verificacao de replicacao iniciada para {len(pdvs_alvo)} PDV(s)",
