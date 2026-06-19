@@ -32,8 +32,22 @@ Nenhum segredo deve ser commitado. Os componentes leem config de variáveis de a
 | `PDV_SERVER_PORTA` | server | `8888` | Porta do painel web |
 | `PDV_SERVER_UPLOAD_DIR` | server | `/opt/pdv-server/uploads` | Onde ficam os `.zip`/`agente.exe` enviados |
 | `PDV_SERVER_MONGO_URI` | server | `mongodb://localhost:27016` | Conexão com o MongoDB do integrador VR |
+| `PDV_REPLICACAO_DB` | server | `pdv` | Banco que contém as coleções replicadas (mesmo nome nos dois lados) |
+| `PDV_LOCAL_MONGO_PORTA` | server | `27018` | Porta do MongoDB local de cada PDV, acessado pelo IP do PDV |
+| `PDV_REPLICACAO_DATA_DIR` | server | `/opt/pdv-server/replicacao` | Onde fica a config da verificação automática e o histórico |
 
 Em produção, defina `PDV_AGENT_TOKEN`/`PDV_SERVER_TOKEN` com um valor forte e igual nos dois lados (no agente isso normalmente é feito configurando a variável de ambiente do serviço NSSM; no servidor, via `Environment=` no unit do systemd — ver `server/installer/instalar_servidor.sh`).
+
+## Verificação de replicação
+
+O painel web compara, sob demanda ou em agenda configurável, as coleções `pessoas`, `produtos`, `produtoscodigobarras`, `produtosimpostos`, `promocoes`, `promocoesconnectsimdepor`, `promocoesdepor` e `promocoeslevepor` entre o MongoDB da integradora (`PDV_SERVER_MONGO_URI`) e o MongoDB local de cada PDV (`<ip-do-pdv>:PDV_LOCAL_MONGO_PORTA`). Isso exige que o Service Manager tenha rota de rede livre até essa porta em cada PDV.
+
+A comparação é por documento completo (via `_id`), reportando:
+- **faltando no PDV** — não replicou;
+- **extras no PDV** — existe no PDV mas não na integradora;
+- **alterados** — existe nos dois lados mas o conteúdo difere.
+
+Por ser uma comparação pesada (baixa as coleções inteiras dos dois lados), ela só roda quando disparada manualmente (botão no painel, por PDV selecionado) ou pela verificação automática configurável (`/api/replicacao/config`: habilitada, intervalo em minutos, todos os PDVs ou uma lista). O resultado de cada execução automática fica no histórico (`/api/replicacao/historico`), exibido no painel — não há envio de notificação externa (e-mail/webhook) nesta versão.
 
 ## Agent — build e instalação (Windows)
 

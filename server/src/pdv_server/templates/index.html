@@ -238,6 +238,49 @@ input:checked + .slider:before { transform: translateX(18px); }
       <span id="selInfo" class="text-muted" style="font-size:12px"></span>
     </div>
 
+    <!-- REPLICAÇÃO -->
+    <div class="card">
+      <div class="section-title">🔄 Verificação de Replicação</div>
+      <p class="text-muted" style="font-size:12px;margin-bottom:10px">
+        Compara pessoas, produtos, produtoscodigobarras, produtosimpostos, promoções e
+        derivadas entre a integradora e o PDV. Use os PDVs selecionados acima em "Lojas & PDVs".
+      </p>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+        <button class="btn-verify" id="btnVerificarReplicacao" onclick="verificarReplicacaoSelecionados()">
+          🔍 Verificar Replicação dos PDVs Selecionados
+        </button>
+      </div>
+      <div id="replicacaoResultados"></div>
+
+      <div class="divider" style="margin:14px 0"></div>
+
+      <div class="section-title" style="margin-bottom:8px">⏱ Verificação automática</div>
+      <div style="display:flex; flex-wrap:wrap; align-items:center; gap:14px; font-size:12px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="replAutoHabilitado"> Habilitada
+        </label>
+        <label style="display:flex;align-items:center;gap:6px">
+          Intervalo (min):
+          <input type="number" id="replAutoIntervalo" min="5" value="60" style="width:70px">
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="radio" name="replAutoAlvo" id="replAutoTodos" checked> Todos os PDVs
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="radio" name="replAutoAlvo" id="replAutoSelecionados"> PDVs selecionados acima
+        </label>
+        <button class="btn-verify" onclick="salvarConfigReplicacaoAuto()">💾 Salvar</button>
+        <span id="replAutoStatus" class="text-muted"></span>
+      </div>
+      <div class="text-muted" style="font-size:11px;margin-top:6px">
+        Última execução automática: <span id="replAutoUltima">—</span>
+      </div>
+
+      <div class="divider" style="margin:14px 0"></div>
+      <div class="section-title" style="margin-bottom:8px">🕘 Histórico</div>
+      <div id="replHistorico"><div class="empty">Carregando...</div></div>
+    </div>
+
   </div>
 </div>
 
@@ -259,6 +302,8 @@ async function init() {
   await carregarLojas();
   await carregarArquivos();
   await verificarAgenteDisponivel();
+  await carregarConfigReplicacaoAuto();
+  await carregarHistoricoReplicacao();
 }
 
 // ──────────────────────────────────────────────
@@ -619,6 +664,139 @@ async function iniciarAtualizacao() {
     alert(d.erro);
     btn.disabled = false;
   }
+}
+
+// ──────────────────────────────────────────────
+// REPLICAÇÃO
+// ──────────────────────────────────────────────
+let pollReplicacaoTimer = null;
+
+async function verificarReplicacaoSelecionados() {
+  if (!lojaAtiva || pdvsSelecionados.size === 0) { alert("Selecione ao menos um PDV em Lojas & PDVs"); return; }
+  const btn = document.getElementById("btnVerificarReplicacao");
+  btn.disabled = true; btn.textContent = "⏳ Iniciando...";
+  try {
+    const r = await fetch("/api/replicacao/verificar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ loja_id: lojaAtiva, pdv_ids: [...pdvsSelecionados] })
+    });
+    const d = await r.json();
+    if (!r.ok) { alert(d.erro); return; }
+    renderResultadosReplicacao(d.pdvs);
+    pollReplicacao(d.pdvs);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔍 Verificar Replicação dos PDVs Selecionados";
+  }
+}
+
+function pollReplicacao(pdvIds) {
+  if (pollReplicacaoTimer) clearInterval(pollReplicacaoTimer);
+  pollReplicacaoTimer = setInterval(async () => {
+    let pendente = false;
+    for (const pdvId of pdvIds) {
+      const r = await fetch(`/api/replicacao/status/${lojaAtiva}/${pdvId}`);
+      const d = await r.json();
+      atualizarBlocoReplicacao(pdvId, d);
+      if (d.status === "executando") pendente = true;
+    }
+    if (!pendente) {
+      clearInterval(pollReplicacaoTimer);
+      carregarHistoricoReplicacao();
+    }
+  }, 2000);
+}
+
+function renderResultadosReplicacao(pdvIds) {
+  const el = document.getElementById("replicacaoResultados");
+  el.innerHTML = pdvIds.map(id => `
+    <div id="repl-${id}" style="margin-top:8px;padding:10px 12px;border-radius:8px" class="file-item">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <strong style="font-size:13px">${id}</strong>
+        <span id="repl-status-${id}">⏳ verificando...</span>
+      </div>
+      <div id="repl-detalhe-${id}"></div>
+    </div>
+  `).join("");
+}
+
+function atualizarBlocoReplicacao(pdvId, dados) {
+  const statusEl = document.getElementById(`repl-status-${pdvId}`);
+  const detEl = document.getElementById(`repl-detalhe-${pdvId}`);
+  if (!statusEl) return;
+  if (dados.status === "executando") { statusEl.innerHTML = "⏳ verificando..."; return; }
+  if (dados.status === "erro") {
+    statusEl.innerHTML = `<span class="badge erro">Erro</span>`;
+    detEl.innerHTML = `<div style="font-size:12px;margin-top:4px">${dados.erro}</div>`;
+    return;
+  }
+  if (dados.status === "concluido" && dados.resultado) {
+    const r = dados.resultado;
+    statusEl.innerHTML = r.tem_divergencia
+      ? `<span class="badge erro">⚠ Divergência</span>`
+      : `<span class="badge online">✓ OK</span>`;
+    detEl.innerHTML = Object.entries(r.colecoes).map(([nome, c]) => `
+      <div style="font-size:12px;margin-top:6px">
+        <strong>${nome}</strong> —
+        integradora: ${c.total_integradora}, pdv: ${c.total_pdv}
+        ${c.faltando_no_pdv_total ? `<br>❌ Faltando no PDV: ${c.faltando_no_pdv_total}` : ""}
+        ${c.extras_no_pdv_total ? `<br>➕ Extras no PDV: ${c.extras_no_pdv_total}` : ""}
+        ${c.alterados_total ? `<br>✏️ Alterados (existem nos dois, conteúdo diferente): ${c.alterados_total}` : ""}
+      </div>
+    `).join("");
+  }
+}
+
+async function carregarConfigReplicacaoAuto() {
+  const r = await fetch("/api/replicacao/config");
+  const cfg = await r.json();
+  document.getElementById("replAutoHabilitado").checked = !!cfg.habilitado;
+  document.getElementById("replAutoIntervalo").value = cfg.intervalo_minutos || 60;
+  const usaTodos = cfg.pdvs === "todos";
+  document.getElementById("replAutoTodos").checked = usaTodos;
+  document.getElementById("replAutoSelecionados").checked = !usaTodos;
+  document.getElementById("replAutoUltima").textContent = cfg.ultima_execucao || "nunca";
+}
+
+async function salvarConfigReplicacaoAuto() {
+  const habilitado = document.getElementById("replAutoHabilitado").checked;
+  const intervalo = parseInt(document.getElementById("replAutoIntervalo").value, 10) || 60;
+  const usarTodos = document.getElementById("replAutoTodos").checked;
+  let pdvsCfg = "todos";
+  if (!usarTodos) {
+    if (!lojaAtiva || pdvsSelecionados.size === 0) {
+      alert("Selecione ao menos um PDV em Lojas & PDVs antes de salvar com 'PDVs selecionados'.");
+      return;
+    }
+    pdvsCfg = [...pdvsSelecionados].map(id => ({ loja_id: lojaAtiva, pdv_id: id }));
+  }
+  const r = await fetch("/api/replicacao/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ habilitado, intervalo_minutos: intervalo, pdvs: pdvsCfg })
+  });
+  const cfg = await r.json();
+  document.getElementById("replAutoStatus").textContent = "✓ Configuração salva";
+  document.getElementById("replAutoUltima").textContent = cfg.ultima_execucao || "nunca";
+}
+
+async function carregarHistoricoReplicacao() {
+  const r = await fetch("/api/replicacao/historico");
+  const hist = await r.json();
+  const el = document.getElementById("replHistorico");
+  if (hist.length === 0) { el.innerHTML = '<div class="empty">Nenhuma verificação automática registrada ainda</div>'; return; }
+  el.innerHTML = hist.map(h => {
+    const totalPdvs = Object.keys(h.pdvs || {}).length;
+    const comDivergencia = Object.values(h.pdvs || {}).filter(p => p.tem_divergencia).map(() => 1).length;
+    return `
+      <div style="font-size:12px;padding:6px 0;border-bottom:1px solid var(--vr-orange-border)">
+        ${h.timestamp} —
+        ${h.tem_divergencia ? '<span class="badge erro">⚠ Divergência</span>' : '<span class="badge online">✓ OK</span>'}
+        (${totalPdvs} PDV(s) verificado(s)${comDivergencia ? `, ${comDivergencia} com divergência` : ""})
+      </div>
+    `;
+  }).join("");
 }
 
 // ──────────────────────────────────────────────

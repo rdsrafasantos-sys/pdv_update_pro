@@ -16,3 +16,12 @@ UPLOAD_DIR = os.environ.get("PDV_SERVER_UPLOAD_DIR", "/opt/pdv-server/uploads")
 # Sem autenticacao (padrao): mongodb://localhost:27016
 # Com autenticacao: mongodb://usuario:senha@localhost:27016
 MONGO_URI = os.environ.get("PDV_SERVER_MONGO_URI", "mongodb://localhost:27016")
+
+# Nome do banco que contem as colecoes replicadas (igual nos dois lados)
+REPLICACAO_DB = os.environ.get("PDV_REPLICACAO_DB", "pdv")
+
+# Porta do MongoDB local de cada PDV (acessado pelo IP do PDV, ex: 192.168.x.x:27018)
+PDV_LOCAL_MONGO_PORTA = int(os.environ.get("PDV_LOCAL_MONGO_PORTA", "27018"))
+
+# Onde ficam persistidos a configuracao de verificacao automatica e o historico
+REPLICACAO_DATA_DIR = os.environ.get("PDV_REPLICACAO_DATA_DIR", "/opt/pdv-server/replicacao")

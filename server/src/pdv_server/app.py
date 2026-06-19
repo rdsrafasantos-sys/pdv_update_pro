@@ -12,6 +12,7 @@ from pdv_server.dispatch import (
     enviar_agente_para_pdvs, get_atualizacoes_loja, iniciar_envio_zip,
 )
 from pdv_server.discovery import encontrar_pdv, get_lojas, invalidar_cache
+from pdv_server import replication
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
@@ -243,3 +244,52 @@ def api_status_stream(loja_id):
             time.sleep(1)
     return Response(gerar(), mimetype="text/event-stream",
                      headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ──────────────────────────────────────────────
+# VERIFICACAO DE REPLICACAO
+# ──────────────────────────────────────────────
+@app.route("/api/replicacao/verificar", methods=["POST"])
+def api_replicacao_verificar():
+    dados = request.json or {}
+    loja_id = dados.get("loja_id")
+    pdv_ids = dados.get("pdv_ids", [])
+
+    loja = next((l for l in get_lojas() if l["id"] == loja_id), None)
+    if not loja:
+        return jsonify({"erro": "Loja nao encontrada"}), 404
+
+    pdvs_alvo = loja["pdvs"] if pdv_ids == "todos" else \
+        [p for p in loja["pdvs"] if p["id"] in pdv_ids]
+    if not pdvs_alvo:
+        return jsonify({"erro": "Nenhum PDV selecionado"}), 400
+
+    for pdv in pdvs_alvo:
+        replication.iniciar_verificacao(loja_id, pdv["id"], pdv["ip"])
+
+    return jsonify({
+        "mensagem": f"Verificacao de replicacao iniciada para {len(pdvs_alvo)} PDV(s)",
+        "pdvs": [p["id"] for p in pdvs_alvo]
+    })
+
+
+@app.route("/api/replicacao/status/<loja_id>/<pdv_id>", methods=["GET"])
+def api_replicacao_status(loja_id, pdv_id):
+    return jsonify(replication.get_estado(loja_id, pdv_id))
+
+
+@app.route("/api/replicacao/config", methods=["GET"])
+def api_replicacao_config_get():
+    return jsonify(replication.carregar_config_auto())
+
+
+@app.route("/api/replicacao/config", methods=["POST"])
+def api_replicacao_config_set():
+    dados = request.json or {}
+    alteracoes = {k: dados[k] for k in ("habilitado", "intervalo_minutos", "pdvs") if k in dados}
+    return jsonify(replication.salvar_config_auto(alteracoes))
+
+
+@app.route("/api/replicacao/historico", methods=["GET"])
+def api_replicacao_historico():
+    return jsonify(replication.obter_historico())
