@@ -18,7 +18,7 @@ let pollReplicacaoTimer = null;
 // NAVEGACAO (sidebar + views)
 // ──────────────────────────────────────────────
 function mostrarView(nome) {
-  for (const v of ["dashboard", "agente", "pdv", "replicacao", "config"]) {
+  for (const v of ["dashboard", "agente", "pdv", "replicacao", "config", "config-integrador"]) {
     const el = document.getElementById(`view-${v}`);
     if (el) el.style.display = v === nome ? "flex" : "none";
   }
@@ -472,6 +472,82 @@ function atualizarKpiErpDb(dados) {
 }
 
 // ──────────────────────────────────────────────
+// CONFIGURACOES: INTEGRADOR VR
+// ──────────────────────────────────────────────
+async function carregarConfigIntegrador() {
+  const r = await fetch("/api/integrador/config");
+  const cfg = await r.json();
+  const ip = document.getElementById("integradorIp");
+  const porta = document.getElementById("integradorPorta");
+  const mongoIp = document.getElementById("integradorMongoIp");
+  const mongoPorta = document.getElementById("integradorMongoPorta");
+  if (ip) ip.value = cfg.ip || "";
+  if (porta) porta.value = cfg.porta || "";
+  if (mongoIp) mongoIp.value = cfg.mongo_ip || "";
+  if (mongoPorta) mongoPorta.value = cfg.mongo_porta || 27016;
+}
+
+async function salvarConfigIntegrador() {
+  const dados = {
+    ip: document.getElementById("integradorIp").value.trim(),
+    porta: parseInt(document.getElementById("integradorPorta").value, 10) || 0,
+    mongo_ip: document.getElementById("integradorMongoIp").value.trim(),
+    mongo_porta: parseInt(document.getElementById("integradorMongoPorta").value, 10) || 27016,
+  };
+  await fetch("/api/integrador/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  const el = document.getElementById("integradorResultado");
+  if (el) { el.textContent = "Configuração salva."; el.style.color = ""; }
+}
+window.salvarConfigIntegrador = salvarConfigIntegrador;
+
+function textoStatusIntegrador(dados) {
+  if (dados.status === "ok") return "✔ Integrador online e replicando normalmente.";
+  if (dados.status === "atencao") return `⚠️ ${dados.erro || "Replicação pode estar parada."}`;
+  if (dados.status === "erro") return `✖ ${dados.erro || "Integrador com erro."}`;
+  if (dados.status === "offline") return `✖ ${dados.erro || "Integrador offline."}`;
+  return "Integrador ainda não configurado.";
+}
+
+function corStatusIntegrador(status) {
+  if (status === "ok") return "#16a34a";
+  if (status === "atencao") return "#d97706";
+  return "#dc2626";
+}
+
+async function testarStatusIntegrador() {
+  const el = document.getElementById("integradorResultado");
+  const colEl = document.getElementById("integradorColecoes");
+  if (el) { el.textContent = "Verificando..."; el.style.color = ""; }
+  const dados = await fetch("/api/integrador/status").then(r => r.json());
+  if (el) { el.textContent = textoStatusIntegrador(dados); el.style.color = corStatusIntegrador(dados.status); }
+  if (colEl) {
+    const linhas = Object.entries(dados.colecoes || {});
+    colEl.innerHTML = linhas.map(([nome, info]) => `
+      <div class="text-muted" style="font-size:11px;padding:2px 0;">
+        ${nome}: ${info.total} documento(s) — última inserção ${info.ultima_insercao || "—"}
+      </div>
+    `).join("");
+  }
+  atualizarKpiIntegrador(dados);
+}
+window.testarStatusIntegrador = testarStatusIntegrador;
+
+function atualizarKpiIntegrador(dados) {
+  const el = document.getElementById("kpiIntegrador");
+  const sub = document.getElementById("kpiIntegradorSub");
+  if (!el) return;
+  const rotulos = {
+    ok: "🟢 OK", atencao: "🟡 Atenção", erro: "🔴 Erro",
+    offline: "🔴 Offline", nao_configurado: "— Não configurado",
+  };
+  el.textContent = rotulos[dados.status] || "—";
+  if (sub) sub.textContent = dados.status === "ok" || dados.status === "nao_configurado" ? "" : (dados.erro || "");
+}
+
+// ──────────────────────────────────────────────
 // DASHBOARD
 // ──────────────────────────────────────────────
 function svgGraficoBarras(historico) {
@@ -554,14 +630,16 @@ async function statusOnlinePorLoja(lojasList) {
 }
 
 async function carregarDashboard() {
-  const [lojasResp, cfg, historico, erpDbStatus] = await Promise.all([
+  const [lojasResp, cfg, historico, erpDbStatus, integradorStatus] = await Promise.all([
     fetch("/api/lojas").then(r => r.json()).catch(() => []),
     fetch("/api/replicacao/config").then(r => r.json()).catch(() => ({})),
     fetch("/api/replicacao/historico").then(r => r.json()).catch(() => []),
     fetch("/api/erp_db/status").then(r => r.json()).catch(() => ({ online: false })),
+    fetch("/api/integrador/status").then(r => r.json()).catch(() => ({ status: "erro", erro: "Falha ao consultar." })),
   ]);
   lojas = lojasResp;
   atualizarKpiErpDb(erpDbStatus);
+  atualizarKpiIntegrador(integradorStatus);
 
   const totalLojas = lojas.length;
   const totalPdvs = lojas.reduce((acc, l) => acc + l.pdvs.length, 0);
@@ -621,6 +699,7 @@ async function init() {
   await carregarConfigReplicacaoAuto();
   await carregarHistoricoReplicacao();
   await carregarConfigErpDb();
+  await carregarConfigIntegrador();
   configurarDropZone();
   mostrarView("dashboard");
 }

@@ -31,3 +31,10 @@ REPLICACAO_DATA_DIR = os.environ.get("PDV_REPLICACAO_DATA_DIR", "/opt/pdv-server
 # ──────────────────────────────────────────────
 # Onde fica persistida a configuracao de conexao com o banco do ERP
 ERP_DB_DATA_DIR = os.environ.get("PDV_ERP_DB_DATA_DIR", "/opt/pdv-server/erp_db")
+
+# ──────────────────────────────────────────────
+# INTEGRADOR VR — testado em "Configuracoes" no painel
+# ──────────────────────────────────────────────
+# Onde fica persistida a configuracao de conexao com o integrador (ip/porta) e
+# com o MongoDB que ele alimenta
+INTEGRADOR_DATA_DIR = os.environ.get("PDV_INTEGRADOR_DATA_DIR", "/opt/pdv-server/integrador")

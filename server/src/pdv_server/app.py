@@ -12,7 +12,7 @@ from pdv_server.dispatch import (
     enviar_agente_para_pdvs, get_atualizacoes_loja, iniciar_envio_zip,
 )
 from pdv_server.discovery import encontrar_pdv, get_lojas, invalidar_cache
-from pdv_server import erp_db, replication
+from pdv_server import erp_db, integrador, replication
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
@@ -320,3 +320,22 @@ def api_erp_db_config_set():
 @app.route("/api/erp_db/status", methods=["GET"])
 def api_erp_db_status():
     return jsonify(erp_db.testar_conexao())
+
+
+# ──────────────────────────────────────────────
+# INTEGRADOR VR — Configuracoes
+# ──────────────────────────────────────────────
+@app.route("/api/integrador/config", methods=["GET"])
+def api_integrador_config_get():
+    return jsonify(integrador.carregar_config())
+
+
+@app.route("/api/integrador/config", methods=["POST"])
+def api_integrador_config_set():
+    dados = request.json or {}
+    return jsonify(integrador.salvar_config(dados))
+
+
+@app.route("/api/integrador/status", methods=["GET"])
+def api_integrador_status():
+    return jsonify(integrador.testar_status())

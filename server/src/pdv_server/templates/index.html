@@ -53,6 +53,7 @@
 
       <div class="menu-section">Configurações</div>
       <div class="menu-item" data-view="config" onclick="mostrarView('config')">🛢️ Banco de Dados ERP</div>
+      <div class="menu-item" data-view="config-integrador" onclick="mostrarView('config-integrador')">🔗 Integrador</div>
     </div>
 
     <div class="content">
@@ -80,6 +81,11 @@
             <div class="kpi-card">
               <div class="kpi-label">🛢️ Banco de dados ERP</div>
               <div class="kpi-value" id="kpiErpDb" style="font-size:16px;">—</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">🔗 Integrador</div>
+              <div class="kpi-value" id="kpiIntegrador" style="font-size:16px;">—</div>
+              <div class="kpi-sub" id="kpiIntegradorSub"></div>
             </div>
           </div>
 
@@ -212,6 +218,33 @@
               <button class="btn-update" onclick="salvarConfigErpDb()">💾 Salvar</button>
             </div>
             <div id="erpDbResultado" class="text-muted" style="margin-top:10px;font-size:12px;"></div>
+          </div>
+        </div>
+
+        <!-- ═══════════════ CONFIGURAÇÕES: INTEGRADOR ═══════════════ -->
+        <div class="view" id="view-config-integrador" style="display:none;">
+          <div class="card">
+            <div class="section-title">🔗 Conexão com o Integrador</div>
+            <div class="form-grid">
+              <label class="form-field">IP do integrador
+                <input type="text" id="integradorIp" placeholder="192.168.1.20">
+              </label>
+              <label class="form-field">Porta do integrador
+                <input type="number" id="integradorPorta" placeholder="8080">
+              </label>
+              <label class="form-field">IP do banco MongoDB
+                <input type="text" id="integradorMongoIp" placeholder="192.168.1.20">
+              </label>
+              <label class="form-field">Porta do MongoDB
+                <input type="number" id="integradorMongoPorta" placeholder="27016">
+              </label>
+            </div>
+            <div class="actions-row">
+              <button class="btn-verify" onclick="testarStatusIntegrador()">🔌 Testar status</button>
+              <button class="btn-update" onclick="salvarConfigIntegrador()">💾 Salvar</button>
+            </div>
+            <div id="integradorResultado" class="text-muted" style="margin-top:10px;font-size:12px;"></div>
+            <div id="integradorColecoes" style="margin-top:8px;"></div>
           </div>
         </div>
 
