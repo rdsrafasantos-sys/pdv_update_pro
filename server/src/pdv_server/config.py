@@ -25,3 +25,9 @@ PDV_LOCAL_MONGO_PORTA = int(os.environ.get("PDV_LOCAL_MONGO_PORTA", "27018"))
 
 # Onde ficam persistidos a configuracao de verificacao automatica e o historico
 REPLICACAO_DATA_DIR = os.environ.get("PDV_REPLICACAO_DATA_DIR", "/opt/pdv-server/replicacao")
+
+# ──────────────────────────────────────────────
+# BANCO DE DADOS DO ERP — PostgreSQL (testado em "Configuracoes" no painel)
+# ──────────────────────────────────────────────
+# Onde fica persistida a configuracao de conexao com o banco do ERP
+ERP_DB_DATA_DIR = os.environ.get("PDV_ERP_DB_DATA_DIR", "/opt/pdv-server/erp_db")

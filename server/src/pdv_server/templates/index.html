@@ -50,6 +50,9 @@
 
       <div class="menu-section">Replicações</div>
       <div class="menu-item" data-view="replicacao" onclick="mostrarView('replicacao')">🔄 Replicação</div>
+
+      <div class="menu-section">Configurações</div>
+      <div class="menu-item" data-view="config" onclick="mostrarView('config')">🛢️ Banco de Dados ERP</div>
     </div>
 
     <div class="content">
@@ -73,6 +76,10 @@
             <div class="kpi-card">
               <div class="kpi-label">⚠️ Última verificação</div>
               <div class="kpi-value" id="kpiUltima" style="font-size:16px;">—</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">🛢️ Banco de dados ERP</div>
+              <div class="kpi-value" id="kpiErpDb" style="font-size:16px;">—</div>
             </div>
           </div>
 
@@ -176,6 +183,35 @@
           <div class="card">
             <div class="section-title">📜 Histórico</div>
             <div id="repHistorico"><div class="empty">Carregando...</div></div>
+          </div>
+        </div>
+
+        <!-- ═══════════════ CONFIGURAÇÕES: BANCO DE DADOS ERP ═══════════════ -->
+        <div class="view" id="view-config" style="display:none;">
+          <div class="card">
+            <div class="section-title">🛢️ Conexão com o banco de dados do ERP (PostgreSQL)</div>
+            <div class="form-grid">
+              <label class="form-field">IP do servidor
+                <input type="text" id="erpDbHost" placeholder="192.168.1.10">
+              </label>
+              <label class="form-field">Porta
+                <input type="number" id="erpDbPorta" placeholder="5432">
+              </label>
+              <label class="form-field">Usuário
+                <input type="text" id="erpDbUsuario" placeholder="postgres">
+              </label>
+              <label class="form-field">Senha
+                <input type="password" id="erpDbSenha">
+              </label>
+              <label class="form-field">Nome do banco
+                <input type="text" id="erpDbBanco">
+              </label>
+            </div>
+            <div class="actions-row">
+              <button class="btn-verify" onclick="testarConexaoErpDb()">🔌 Testar conexão</button>
+              <button class="btn-update" onclick="salvarConfigErpDb()">💾 Salvar</button>
+            </div>
+            <div id="erpDbResultado" class="text-muted" style="margin-top:10px;font-size:12px;"></div>
           </div>
         </div>
 

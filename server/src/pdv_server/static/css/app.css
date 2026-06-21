@@ -183,3 +183,10 @@ input:checked + .slider:before { transform: translateX(18px); }
 .dash-pdv-replicacao.ok { color: #16a34a; }
 .dash-pdv-replicacao.divergente { color: #dc2626; }
 .dash-pdv-replicacao.semdados { opacity: .6; }
+
+/* FORMULARIOS (Configuracoes) */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.form-field input { padding: 7px 10px; border-radius: 8px; font-size: 13px; font-family: inherit; }
+.app.light .form-field input { background: #fff; border: 1px solid #e5e5e5; color: #1a1a1a; }
+.app.dark .form-field input { background: #22263a; border: 1px solid #2e3248; color: #e2e8f0; }

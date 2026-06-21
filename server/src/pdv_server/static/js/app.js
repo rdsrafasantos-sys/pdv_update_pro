@@ -18,7 +18,7 @@ let pollReplicacaoTimer = null;
 // NAVEGACAO (sidebar + views)
 // ──────────────────────────────────────────────
 function mostrarView(nome) {
-  for (const v of ["dashboard", "agente", "pdv", "replicacao"]) {
+  for (const v of ["dashboard", "agente", "pdv", "replicacao", "config"]) {
     const el = document.getElementById(`view-${v}`);
     if (el) el.style.display = v === nome ? "flex" : "none";
   }
@@ -418,6 +418,60 @@ async function carregarHistoricoReplicacao() {
 }
 
 // ──────────────────────────────────────────────
+// CONFIGURACOES: BANCO DE DADOS DO ERP (PostgreSQL)
+// ──────────────────────────────────────────────
+async function carregarConfigErpDb() {
+  const r = await fetch("/api/erp_db/config");
+  const cfg = await r.json();
+  const host = document.getElementById("erpDbHost");
+  const porta = document.getElementById("erpDbPorta");
+  const usuario = document.getElementById("erpDbUsuario");
+  const senha = document.getElementById("erpDbSenha");
+  const banco = document.getElementById("erpDbBanco");
+  if (host) host.value = cfg.host || "";
+  if (porta) porta.value = cfg.porta || 5432;
+  if (usuario) usuario.value = cfg.usuario || "";
+  if (senha) senha.value = cfg.senha || "";
+  if (banco) banco.value = cfg.banco || "";
+}
+
+async function salvarConfigErpDb() {
+  const dados = {
+    host: document.getElementById("erpDbHost").value.trim(),
+    porta: parseInt(document.getElementById("erpDbPorta").value, 10) || 5432,
+    usuario: document.getElementById("erpDbUsuario").value.trim(),
+    senha: document.getElementById("erpDbSenha").value,
+    banco: document.getElementById("erpDbBanco").value.trim(),
+  };
+  await fetch("/api/erp_db/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  const el = document.getElementById("erpDbResultado");
+  if (el) { el.textContent = "Configuração salva."; el.style.color = ""; }
+}
+window.salvarConfigErpDb = salvarConfigErpDb;
+
+async function testarConexaoErpDb() {
+  const el = document.getElementById("erpDbResultado");
+  if (el) { el.textContent = "Testando conexão..."; el.style.color = ""; }
+  const r = await fetch("/api/erp_db/status");
+  const dados = await r.json();
+  if (el) {
+    el.textContent = dados.online ? "✔ Conexão bem-sucedida." : `✖ Falha na conexão: ${dados.erro || "erro desconhecido"}`;
+    el.style.color = dados.online ? "#16a34a" : "#dc2626";
+  }
+  atualizarKpiErpDb(dados);
+}
+window.testarConexaoErpDb = testarConexaoErpDb;
+
+function atualizarKpiErpDb(dados) {
+  const el = document.getElementById("kpiErpDb");
+  if (!el) return;
+  el.textContent = dados.online ? "🟢 Online" : "🔴 Offline";
+}
+
+// ──────────────────────────────────────────────
 // DASHBOARD
 // ──────────────────────────────────────────────
 function svgGraficoBarras(historico) {
@@ -500,12 +554,14 @@ async function statusOnlinePorLoja(lojasList) {
 }
 
 async function carregarDashboard() {
-  const [lojasResp, cfg, historico] = await Promise.all([
+  const [lojasResp, cfg, historico, erpDbStatus] = await Promise.all([
     fetch("/api/lojas").then(r => r.json()).catch(() => []),
     fetch("/api/replicacao/config").then(r => r.json()).catch(() => ({})),
     fetch("/api/replicacao/historico").then(r => r.json()).catch(() => []),
+    fetch("/api/erp_db/status").then(r => r.json()).catch(() => ({ online: false })),
   ]);
   lojas = lojasResp;
+  atualizarKpiErpDb(erpDbStatus);
 
   const totalLojas = lojas.length;
   const totalPdvs = lojas.reduce((acc, l) => acc + l.pdvs.length, 0);
@@ -564,6 +620,7 @@ async function init() {
   await carregarArquivos();
   await carregarConfigReplicacaoAuto();
   await carregarHistoricoReplicacao();
+  await carregarConfigErpDb();
   configurarDropZone();
   mostrarView("dashboard");
 }

@@ -12,7 +12,7 @@ from pdv_server.dispatch import (
     enviar_agente_para_pdvs, get_atualizacoes_loja, iniciar_envio_zip,
 )
 from pdv_server.discovery import encontrar_pdv, get_lojas, invalidar_cache
-from pdv_server import replication
+from pdv_server import erp_db, replication
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
@@ -301,3 +301,22 @@ def replicacao_detalhe(loja_id, pdv_id, colecao):
     return render_template(
         "replicacao_detalhe.html", loja_id=loja_id, pdv_id=pdv_id, colecao=colecao
     )
+
+
+# ──────────────────────────────────────────────
+# BANCO DE DADOS DO ERP (PostgreSQL) — Configuracoes
+# ──────────────────────────────────────────────
+@app.route("/api/erp_db/config", methods=["GET"])
+def api_erp_db_config_get():
+    return jsonify(erp_db.carregar_config())
+
+
+@app.route("/api/erp_db/config", methods=["POST"])
+def api_erp_db_config_set():
+    dados = request.json or {}
+    return jsonify(erp_db.salvar_config(dados))
+
+
+@app.route("/api/erp_db/status", methods=["GET"])
+def api_erp_db_status():
+    return jsonify(erp_db.testar_conexao())
