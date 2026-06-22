@@ -14,7 +14,7 @@ Unicode true
 ; Configurações gerais
 ;--------------------------------
 !define PRODUTO        "PDV Agent"
-!define VERSAO         "1.4.5"
+!define VERSAO         "1.4.6"
 !define FABRICANTE     "VR Software"
 !define PASTA_DESTINO  "C:\PDVAgent"
 !define NOME_SERVICO   "PDVAgent"
