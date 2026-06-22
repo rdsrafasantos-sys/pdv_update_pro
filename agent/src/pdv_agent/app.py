@@ -8,6 +8,7 @@ from flask import Flask, jsonify, request
 from pdv_agent import VERSION
 from pdv_agent.config import PASTA_AGENTE, TOKEN_SEGURANCA, VRPDV_DIR, TEMP_ZIP
 from pdv_agent.lmdb_reader import get_info_pdv
+from pdv_agent.service_control import detectar_servicos, reiniciar_servico
 from pdv_agent.update_flow import estado, executar_atualizacao, lock
 
 log = logging.getLogger("pdv_agent")
@@ -90,6 +91,34 @@ def atualizar_agente():
     except Exception as e:
         log.error(f"Erro ao atualizar agente: {e}")
         return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/reiniciar_mongo", methods=["POST"])
+def reiniciar_mongo():
+    """Reinicia o(s) servico(s) Mongo local(is) deste PDV (ex: MongoFilho),
+    sem afetar o restante do fluxo de atualizacao."""
+    if not verificar_token(request):
+        return jsonify({"erro": "Token invalido"}), 403
+    with lock:
+        if estado["status"] == "updating":
+            return jsonify({"erro": "Atualizacao em andamento, aguarde terminar"}), 409
+    servicos = detectar_servicos()
+    if not servicos:
+        return jsonify({"erro": "Nenhum servico Mongo detectado neste PDV"}), 404
+    resultado = {}
+    for svc in servicos:
+        log.info(f"Reiniciando servico {svc} (solicitado remotamente)...")
+        resultado[svc] = reiniciar_servico(svc)
+    falhou = [s for s, st in resultado.items() if st != "running"]
+    if falhou:
+        return jsonify({
+            "erro": f"Falha ao reiniciar: {', '.join(falhou)}",
+            "status": resultado
+        }), 500
+    return jsonify({
+        "mensagem": "Servico(s) Mongo reiniciado(s) com sucesso",
+        "status": resultado
+    }), 200
 
 
 @app.route("/atualizar", methods=["POST"])

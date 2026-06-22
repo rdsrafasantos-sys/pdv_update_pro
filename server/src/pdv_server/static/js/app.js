@@ -399,7 +399,11 @@ function atualizarBlocoReplicacao(pdvId, dados) {
   const el = document.getElementById(`repResultado-${pdvId}`);
   if (!el) return;
   if (dados.status === "erro") {
-    el.innerHTML = `<div class="empty" style="color:#dc2626;">Erro: ${dados.erro}</div>`;
+    el.innerHTML = `
+      <div class="empty" style="color:#dc2626;">Erro: ${dados.erro}</div>
+      <button class="btn-verify" onclick="reiniciarMongoPdv('${pdvId}')">🔄 Reiniciar Mongo do PDV</button>
+      <div id="reiniciarMongoResultado-${pdvId}" style="margin-top:6px;font-size:12px;"></div>
+    `;
     return;
   }
   const colecoes = (dados.resultado || {}).colecoes || {};
@@ -452,6 +456,25 @@ async function pollReplicacao(pdvIds) {
     carregarHistoricoReplicacao();
   }
 }
+
+async function reiniciarMongoPdv(pdvId) {
+  const loja_id = seletores.replicacao.lojaAtiva;
+  const out = document.getElementById(`reiniciarMongoResultado-${pdvId}`);
+  if (out) out.innerHTML = '<span class="text-muted">Reiniciando o Mongo do PDV, aguarde (pode levar ~30s)...</span>';
+
+  try {
+    const r = await fetch(`/api/pdv/${loja_id}/${pdvId}/reiniciar_mongo`, { method: "POST" });
+    const dados = await r.json();
+    if (out) {
+      out.innerHTML = dados.ok
+        ? `<span style="color:#16a34a;">✅ ${dados.mensagem}</span>`
+        : `<span style="color:#dc2626;">⛔ ${dados.erro}</span>`;
+    }
+  } catch (e) {
+    if (out) out.innerHTML = `<span style="color:#dc2626;">⛔ Falha ao contatar o servidor: ${e}</span>`;
+  }
+}
+window.reiniciarMongoPdv = reiniciarMongoPdv;
 
 async function carregarConfigReplicacaoAuto() {
   const r = await fetch("/api/replicacao/config");

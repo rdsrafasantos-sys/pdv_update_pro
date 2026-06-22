@@ -1,5 +1,6 @@
 import logging
 import subprocess
+import time
 
 from pdv_agent.config import CONJUNTOS_SERVICOS
 
@@ -36,3 +37,26 @@ def processo_rodando(nome):
     r = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {nome}.exe"],
                         capture_output=True, text=True)
     return f"{nome}.exe" in r.stdout
+
+
+def reiniciar_servico(nome, espera_parar=15, espera_iniciar=15):
+    """Para e inicia um servico Windows, retornando o status final
+    ('running', 'stopped', 'disabled' ou 'nao_existe')."""
+    status = get_status_servico(nome)
+    if status in ("nao_existe", "disabled"):
+        return status
+
+    if status == "running":
+        subprocess.run(["sc", "stop", nome], capture_output=True)
+        for _ in range(espera_parar):
+            time.sleep(1)
+            if get_status_servico(nome) == "stopped":
+                break
+
+    subprocess.run(["sc", "start", nome], capture_output=True)
+    for _ in range(espera_iniciar):
+        time.sleep(1)
+        if get_status_servico(nome) == "running":
+            break
+
+    return get_status_servico(nome)

@@ -10,6 +10,7 @@ from werkzeug.utils import secure_filename
 from pdv_server.config import TOKEN_SEGURANCA, UPLOAD_DIR
 from pdv_server.dispatch import (
     enviar_agente_para_pdvs, get_atualizacoes_loja, iniciar_envio_zip,
+    reiniciar_mongo_pdv,
 )
 from pdv_server.discovery import encontrar_pdv, get_lojas, invalidar_cache
 from pdv_server import erp_db, integrador, replication
@@ -84,6 +85,15 @@ def api_ping_loja(loja_id):
         t.join(timeout=5)
 
     return jsonify(resultados)
+
+
+@app.route("/api/pdv/<loja_id>/<pdv_id>/reiniciar_mongo", methods=["POST"])
+def api_reiniciar_mongo(loja_id, pdv_id):
+    pdv = encontrar_pdv(loja_id, pdv_id)
+    if not pdv:
+        return jsonify({"erro": "PDV não encontrado"}), 404
+    resultado = reiniciar_mongo_pdv(pdv)
+    return jsonify(resultado)
 
 
 @app.route("/api/upload", methods=["POST"])

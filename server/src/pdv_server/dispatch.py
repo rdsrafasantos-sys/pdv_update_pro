@@ -104,6 +104,22 @@ def _enviar_para_pdv(loja_id, pdv, caminho_zip):
         })
 
 
+def reiniciar_mongo_pdv(pdv):
+    try:
+        r = requests.post(
+            f"http://{pdv['ip']}:5000/reiniciar_mongo",
+            headers={"X-Agent-Token": TOKEN_SEGURANCA},
+            timeout=40
+        )
+        dados = r.json()
+        dados["ok"] = r.status_code == 200
+        return dados
+    except requests.exceptions.ConnectionError:
+        return {"ok": False, "erro": f"PDV {pdv['ip']} não acessível."}
+    except Exception as e:
+        return {"ok": False, "erro": str(e)}
+
+
 def _monitorar_pdv(loja_id, pdv_id, ip):
     falhas = 0
     while True:
