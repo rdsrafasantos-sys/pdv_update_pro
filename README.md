@@ -112,3 +112,5 @@ python main.py
 ## Versionamento
 
 A versão do agente fica em `agent/src/pdv_agent/__init__.py` (`VERSION`) e é exposta em `/ping`. Ao lançar uma nova versão, atualize também `!define VERSAO` em `agent/installer/PDVAgent_Setup.nsi` para manter o instalador consistente.
+
+**Regra**: toda mudança de código no agente (não cosmética/instalador) deve vir acompanhada de um bump de `VERSION`/`VERSAO` — mesmo que pequena (ex: uma rota nova). Sem isso, `/ping` e o painel continuam reportando a versão antiga, dando a falsa impressão de que um PDV ainda não recebeu um recurso/fix que já está rodando nele.
