@@ -89,7 +89,12 @@ input:checked + .slider:before { transform: translateX(18px); }
 /* SHELL (sidebar + conteudo) */
 .shell { display: flex; min-height: calc(100vh - 52px); }
 .sidebar { width: 220px; flex-shrink: 0; padding: 16px 10px; }
-.menu-section { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 12px 10px 6px; }
+.menu-group { margin-bottom: 4px; }
+.menu-section { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 12px 10px 6px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; }
+.menu-section:hover { opacity: .8; }
+.menu-chevron { font-size: 10px; transition: transform .15s; }
+.menu-group.collapsed .menu-chevron { transform: rotate(-90deg); }
+.menu-group.collapsed .menu-items { display: none; }
 .menu-item { padding: 9px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; transition: all .15s; margin-bottom: 2px; }
 .content { flex: 1; overflow-y: auto; min-width: 0; }
 .body { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; max-width: 1000px; margin: 0 auto; }
@@ -172,9 +177,16 @@ input:checked + .slider:before { transform: translateX(18px); }
 .btn-quick { padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s; }
 
 .chart-wrap { overflow-x: auto; }
-.chart-legend { display: flex; gap: 16px; font-size: 11px; margin-top: 8px; }
+.chart-legend { display: flex; gap: 16px; font-size: 11px; margin-top: 8px; flex-wrap: wrap; }
 .chart-legend span { display: flex; align-items: center; gap: 5px; }
 .chart-legend .dot { width: 8px; height: 8px; }
+
+.dash-insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(128,128,128,.15); }
+.dash-stat-valor { font-size: 24px; font-weight: 700; }
+.dash-stat-label { font-size: 11px; opacity: .7; text-transform: uppercase; letter-spacing: .4px; }
+.dash-ranking { grid-column: span 2; }
+.dash-ranking-item { display: flex; align-items: center; justify-content: space-between; font-size: 12px; padding: 4px 0; }
+.dash-ranking-item + .dash-ranking-item { border-top: 1px solid rgba(128,128,128,.1); }
 
 .dash-loja-grupo + .dash-loja-grupo { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(128,128,128,.15); }
 .dash-loja-titulo { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; opacity: .7; margin-bottom: 8px; }

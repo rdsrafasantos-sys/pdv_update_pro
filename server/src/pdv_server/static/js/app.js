@@ -18,7 +18,7 @@ let pollReplicacaoTimer = null;
 // NAVEGACAO (sidebar + views)
 // ──────────────────────────────────────────────
 function mostrarView(nome) {
-  for (const v of ["dashboard", "agente", "pdv", "replicacao", "config", "config-integrador"]) {
+  for (const v of ["dashboard", "agente", "pdv", "replicacao", "config"]) {
     const el = document.getElementById(`view-${v}`);
     if (el) el.style.display = v === nome ? "flex" : "none";
   }
@@ -28,6 +28,32 @@ function mostrarView(nome) {
   if (nome === "dashboard") carregarDashboard();
 }
 window.mostrarView = mostrarView;
+
+// ──────────────────────────────────────────────
+// SIDEBAR: secoes recolhiveis (clicar no titulo expande/recolhe)
+// ──────────────────────────────────────────────
+function toggleMenuGroup(tituloEl) {
+  const grupo = tituloEl.parentElement;
+  grupo.classList.toggle("collapsed");
+  const grupos = {};
+  document.querySelectorAll(".menu-group").forEach(g => {
+    grupos[g.querySelector(".menu-section").textContent.trim()] = g.classList.contains("collapsed");
+  });
+  localStorage.setItem("menuGruposRecolhidos", JSON.stringify(grupos));
+}
+window.toggleMenuGroup = toggleMenuGroup;
+
+function restaurarEstadoMenu() {
+  const salvo = localStorage.getItem("menuGruposRecolhidos");
+  if (!salvo) return;
+  try {
+    const grupos = JSON.parse(salvo);
+    document.querySelectorAll(".menu-group").forEach(g => {
+      const titulo = g.querySelector(".menu-section").textContent.trim();
+      g.classList.toggle("collapsed", !!grupos[titulo]);
+    });
+  } catch (e) { /* ignora estado invalido */ }
+}
 
 // ──────────────────────────────────────────────
 // SELETOR DE LOJA/PDV (parametrizado por key: "agente" | "pdv" | "replicacao")
@@ -550,31 +576,101 @@ function atualizarKpiIntegrador(dados) {
 // ──────────────────────────────────────────────
 // DASHBOARD
 // ──────────────────────────────────────────────
-function svgGraficoBarras(historico) {
-  const ultimos = historico.slice(0, 10).reverse();
-  if (ultimos.length === 0) {
-    return '<div class="empty">Sem histórico suficiente para o gráfico ainda.</div>';
+// Classifica cada PDV de uma entrada do historico em ok / divergente / erro,
+// para o grafico empilhado mostrar a composicao real de cada execucao (e nao
+// so "teve ou nao divergencia").
+function _composicaoExecucao(entrada) {
+  const pdvs = Object.values(entrada.pdvs || {});
+  let ok = 0, divergente = 0, erro = 0;
+  for (const p of pdvs) {
+    if (!p.ok) erro++;
+    else if (p.tem_divergencia) divergente++;
+    else ok++;
   }
-  const W = 480, H = 140, pad = 20;
-  const max = Math.max(1, ...ultimos.map(h => Object.values(h.pdvs || {}).filter(p => p.tem_divergencia).length));
-  const larguraBarra = (W - pad * 2) / ultimos.length;
+  return { ok, divergente, erro, total: pdvs.length };
+}
+
+function svgGraficoBarras(historico) {
+  const ultimos = historico.slice(0, 12).reverse();
+  if (ultimos.length === 0) {
+    return '<div class="empty">Sem histórico suficiente para o gráfico ainda. Rode uma verificação manual ou habilite a automática.</div>';
+  }
+
+  const W = 560, H = 180, padTop = 10, padBottom = 36, padX = 10;
+  const composicoes = ultimos.map(_composicaoExecucao);
+  const max = Math.max(1, ...composicoes.map(c => c.total));
+  const alturaMax = H - padTop - padBottom;
+  const larguraBarra = (W - padX * 2) / ultimos.length;
+  const corOk = "#16a34a", corDivergente = "#d97706", corErro = "#dc2626";
+
   const barras = ultimos.map((h, i) => {
-    const qtd = Object.values(h.pdvs || {}).filter(p => p.tem_divergencia).length;
-    const alturaMax = H - pad * 2;
-    const altura = qtd === 0 ? 2 : (qtd / max) * alturaMax;
-    const x = pad + i * larguraBarra + 4;
-    const y = H - pad - altura;
-    const cor = qtd > 0 ? "#dc2626" : "#16a34a";
-    return `<rect x="${x}" y="${y}" width="${larguraBarra - 8}" height="${altura}" rx="3" fill="${cor}">
-      <title>${h.timestamp}: ${qtd} PDV(s) com divergência</title>
-    </rect>`;
+    const c = composicoes[i];
+    const x = padX + i * larguraBarra + 3;
+    const larguraReal = larguraBarra - 6;
+    let yAtual = H - padBottom;
+    const segmentos = [
+      [c.ok, corOk, "sem divergência"],
+      [c.divergente, corDivergente, "com divergência"],
+      [c.erro, corErro, "erro na verificação"],
+    ];
+    const rects = segmentos.map(([qtd, cor, rotulo]) => {
+      if (qtd === 0) return "";
+      const altura = (qtd / max) * alturaMax;
+      yAtual -= altura;
+      return `<rect x="${x}" y="${yAtual.toFixed(1)}" width="${larguraReal}" height="${altura.toFixed(1)}" fill="${cor}"><title>${h.timestamp} (${h.tipo}): ${qtd} PDV(s) ${rotulo}</title></rect>`;
+    }).join("");
+    const rotuloX = x + larguraReal / 2;
+    const dataResumida = h.timestamp.slice(5, 16).replace(" ", "\n");
+    return `
+      ${rects}
+      <text x="${rotuloX}" y="${H - padBottom + 14}" font-size="9" fill="currentColor" opacity=".65" text-anchor="middle">${h.timestamp.slice(5, 10)}</text>
+      <text x="${rotuloX}" y="${H - padBottom + 25}" font-size="9" fill="currentColor" opacity=".65" text-anchor="middle">${h.timestamp.slice(11, 16)}</text>
+    `;
   }).join("");
+
+  // Painel de insights: tendencia geral + ranking dos PDVs que mais divergem
+  // no recorte analisado -- e a parte que da valor de analise, alem do grafico.
+  const totalExecucoes = historico.length;
+  const comDivergencia = historico.filter(h => h.tem_divergencia).length;
+  const taxaDivergencia = totalExecucoes ? Math.round((comDivergencia / totalExecucoes) * 100) : 0;
+
+  const contagemPorPdv = {};
+  for (const h of historico) {
+    for (const [pdvId, info] of Object.entries(h.pdvs || {})) {
+      if (info.tem_divergencia) contagemPorPdv[pdvId] = (contagemPorPdv[pdvId] || 0) + 1;
+    }
+  }
+  const ranking = Object.entries(contagemPorPdv).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const rankingHtml = ranking.length > 0
+    ? ranking.map(([pdvId, qtd]) => `
+        <div class="dash-ranking-item">
+          <span>${pdvId}</span>
+          <span class="text-muted">${qtd}x divergiu</span>
+        </div>
+      `).join("")
+    : '<div class="text-muted" style="font-size:12px;">Nenhuma divergência registrada no histórico.</div>';
+
   return `
     <div class="chart-wrap">
-      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${barras}</svg>
+      <svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">${barras}</svg>
       <div class="chart-legend">
-        <span><span class="dot" style="background:#16a34a;"></span> sem divergência</span>
-        <span><span class="dot" style="background:#dc2626;"></span> com divergência</span>
+        <span><span class="dot" style="background:${corOk};"></span> sem divergência</span>
+        <span><span class="dot" style="background:${corDivergente};"></span> com divergência</span>
+        <span><span class="dot" style="background:${corErro};"></span> erro na verificação</span>
+      </div>
+    </div>
+    <div class="dash-insights">
+      <div class="dash-stat">
+        <div class="dash-stat-valor">${totalExecucoes}</div>
+        <div class="dash-stat-label">verificações no histórico</div>
+      </div>
+      <div class="dash-stat">
+        <div class="dash-stat-valor" style="color:${taxaDivergencia > 0 ? corDivergente : corOk};">${taxaDivergencia}%</div>
+        <div class="dash-stat-label">execuções com divergência</div>
+      </div>
+      <div class="dash-ranking">
+        <div class="dash-stat-label" style="margin-bottom:6px;">PDVs que mais divergem</div>
+        ${rankingHtml}
       </div>
     </div>
   `;
@@ -690,9 +786,8 @@ async function statusOnlinePorLoja(lojasList) {
 }
 
 async function carregarDashboard() {
-  const [lojasResp, cfg, historico, erpDbStatus, integradorStatus, pdvsAtivosErp] = await Promise.all([
+  const [lojasResp, historico, erpDbStatus, integradorStatus, pdvsAtivosErp] = await Promise.all([
     fetch("/api/lojas").then(r => r.json()).catch(() => []),
-    fetch("/api/replicacao/config").then(r => r.json()).catch(() => ({})),
     fetch("/api/replicacao/historico").then(r => r.json()).catch(() => []),
     fetch("/api/erp_db/status").then(r => r.json()).catch(() => ({ online: false })),
     fetch("/api/integrador/status").then(r => r.json()).catch(() => ({ status: "erro", erro: "Falha ao consultar." })),
@@ -708,7 +803,6 @@ async function carregarDashboard() {
   const elLojas = document.getElementById("kpiLojas");
   const elPdvs = document.getElementById("kpiPdvs");
   const elPdvsSub = document.getElementById("kpiPdvsSub");
-  const elAuto = document.getElementById("kpiAuto");
   const elUltima = document.getElementById("kpiUltima");
 
   const statusPorLoja = await statusOnlinePorLoja(lojas);
@@ -726,8 +820,6 @@ async function carregarDashboard() {
     if (elPdvs) elPdvs.textContent = totalPdvs;
     if (elPdvsSub) elPdvsSub.textContent = "";
   }
-
-  if (elAuto) elAuto.textContent = cfg.habilitado ? `Ativa (${cfg.intervalo_minutos}min)` : "Desativada";
 
   if (elUltima) {
     if (historico.length === 0) {
@@ -773,6 +865,7 @@ async function init() {
   app.classList.add(temaSalvo);
   const toggleInput = document.getElementById("themeToggle");
   if (toggleInput) toggleInput.checked = temaSalvo === "light";
+  restaurarEstadoMenu();
 
   await carregarLojas();
   await verificarAgenteDisponivel();

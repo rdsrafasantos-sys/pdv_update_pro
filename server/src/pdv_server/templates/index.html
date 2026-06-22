@@ -41,19 +41,34 @@
 
   <div class="shell">
     <div class="sidebar">
-      <div class="menu-section">Geral</div>
-      <div class="menu-item active" data-view="dashboard" onclick="mostrarView('dashboard')">📊 Dashboard</div>
+      <div class="menu-group">
+        <div class="menu-section" onclick="toggleMenuGroup(this)">Geral<span class="menu-chevron">▾</span></div>
+        <div class="menu-items">
+          <div class="menu-item active" data-view="dashboard" onclick="mostrarView('dashboard')">📊 Dashboard</div>
+        </div>
+      </div>
 
-      <div class="menu-section">Administrativo</div>
-      <div class="menu-item" data-view="agente" onclick="mostrarView('agente')">🤖 Atualização de Agente</div>
-      <div class="menu-item" data-view="pdv" onclick="mostrarView('pdv')">📦 Atualização de PDV</div>
+      <div class="menu-group">
+        <div class="menu-section" onclick="toggleMenuGroup(this)">Atualizações<span class="menu-chevron">▾</span></div>
+        <div class="menu-items">
+          <div class="menu-item" data-view="agente" onclick="mostrarView('agente')">🤖 Atualização de Agente</div>
+          <div class="menu-item" data-view="pdv" onclick="mostrarView('pdv')">📦 Atualização de PDV</div>
+        </div>
+      </div>
 
-      <div class="menu-section">Replicações</div>
-      <div class="menu-item" data-view="replicacao" onclick="mostrarView('replicacao')">🔄 Replicação</div>
+      <div class="menu-group">
+        <div class="menu-section" onclick="toggleMenuGroup(this)">Replicações<span class="menu-chevron">▾</span></div>
+        <div class="menu-items">
+          <div class="menu-item" data-view="replicacao" onclick="mostrarView('replicacao')">🔄 Check Replicação</div>
+        </div>
+      </div>
 
-      <div class="menu-section">Configurações</div>
-      <div class="menu-item" data-view="config" onclick="mostrarView('config')">🛢️ Banco de Dados ERP</div>
-      <div class="menu-item" data-view="config-integrador" onclick="mostrarView('config-integrador')">🔗 Integrador</div>
+      <div class="menu-group">
+        <div class="menu-section" onclick="toggleMenuGroup(this)">Configurações<span class="menu-chevron">▾</span></div>
+        <div class="menu-items">
+          <div class="menu-item" data-view="config" onclick="mostrarView('config')">⚙️ Configurações</div>
+        </div>
+      </div>
     </div>
 
     <div class="content">
@@ -70,10 +85,6 @@
               <div class="kpi-label">🖥️ PDVs online</div>
               <div class="kpi-value" id="kpiPdvs">—</div>
               <div class="kpi-sub" id="kpiPdvsSub"></div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-label">⏱ Verificação automática</div>
-              <div class="kpi-value" id="kpiAuto" style="font-size:16px;">—</div>
             </div>
             <div class="kpi-card">
               <div class="kpi-label">⚠️ Última verificação</div>
@@ -105,7 +116,7 @@
           </div>
 
           <div class="card">
-            <div class="section-title">📈 PDVs com divergência por verificação automática</div>
+            <div class="section-title">📈 Histórico de verificações de replicação</div>
             <div id="dashGrafico"><div class="empty">Carregando...</div></div>
           </div>
 
@@ -202,7 +213,7 @@
           </div>
         </div>
 
-        <!-- ═══════════════ CONFIGURAÇÕES: BANCO DE DADOS ERP ═══════════════ -->
+        <!-- ═══════════════ CONFIGURAÇÕES ═══════════════ -->
         <div class="view" id="view-config" style="display:none;">
           <div class="card">
             <div class="section-title">🛢️ Conexão com o banco de dados do ERP (PostgreSQL)</div>
@@ -229,10 +240,7 @@
             </div>
             <div id="erpDbResultado" class="text-muted" style="margin-top:10px;font-size:12px;"></div>
           </div>
-        </div>
 
-        <!-- ═══════════════ CONFIGURAÇÕES: INTEGRADOR ═══════════════ -->
-        <div class="view" id="view-config-integrador" style="display:none;">
           <div class="card">
             <div class="section-title">🔗 Conexão com o Integrador</div>
             <div class="form-grid">
