@@ -37,7 +37,9 @@ Nenhum segredo deve ser commitado. Os componentes leem config de variáveis de a
 | `PDV_LOCAL_MONGO_PORTA` | server | `27018` | Porta do MongoDB local de cada PDV, acessado pelo IP do PDV |
 | `PDV_REPLICACAO_DATA_DIR` | server | `/opt/pdv-server/replicacao` | Onde fica a config da verificação automática e o histórico |
 
-Em produção, defina `PDV_AGENT_TOKEN`/`PDV_SERVER_TOKEN` com um valor forte e igual nos dois lados (no agente isso normalmente é feito configurando a variável de ambiente do serviço NSSM; no servidor, via `Environment=` no unit do systemd — ver `server/installer/instalar_servidor.sh`).
+Rodando via Docker (recomendado), `PDV_SERVER_TOKEN` e `PDV_SERVER_MONGO_URI` são lidos do `server/.env` (ver `.env.example`); os diretórios (`UPLOAD_DIR`, `REPLICACAO_DATA_DIR`, etc.) já vêm mapeados como volumes no `docker-compose.yml` e não precisam ser sobrescritos.
+
+Em produção, defina `PDV_AGENT_TOKEN`/`PDV_SERVER_TOKEN` com um valor forte e igual nos dois lados (no agente isso normalmente é feito configurando a variável de ambiente do serviço NSSM; no servidor rodando via Docker, num arquivo `server/.env` — ver `server/.env.example` e a seção "Server — instalação" abaixo).
 
 ## Verificação de replicação
 
