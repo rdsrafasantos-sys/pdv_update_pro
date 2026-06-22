@@ -17,7 +17,8 @@ agent/
 server/
   src/pdv_server/      pacote Python do servidor (config, descoberta MongoDB, despacho de updates, rotas Flask)
   main.py               entrypoint do servidor
-  installer/             script de instalação systemd para Ubuntu
+  Dockerfile / docker-compose.yml   instalação via Docker (recomendado)
+  installer/             instalador Docker (recomendado) + script systemd legado
 ```
 
 ## Configuração via variáveis de ambiente
@@ -64,7 +65,28 @@ Isso gera `dist/agente.exe` e `dist/status_pdv.exe`. Para instalar em um PDV:
 - **Via NSIS**: copie os dois `.exe` + `nssm.exe` para `agent/installer/`, compile com `makensis PDVAgent_Setup.nsi` e distribua o instalador gerado.
 - **Via PowerShell**: copie os `.exe` para a mesma pasta de `instalar_servico.ps1` e execute como Administrador.
 
-## Server — instalação (Ubuntu)
+## Server — instalação (Ubuntu, via Docker — recomendado)
+
+Em qualquer servidor novo (cliente diferente, máquina diferente), com Docker
+instalado ou não:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rdsrafasantos-sys/pdv_update_pro/main/server/installer/instalar_servidor_docker.sh | bash
+```
+
+O script instala o Docker se necessário, clona o repositório, pergunta o
+IP/porta do MongoDB do integrador *desse* cliente e o token compartilhado com
+os agentes (grava em `server/.env`, não versionado), e sobe o container já
+configurado. Pode ser executado de novo no mesmo servidor para atualizar
+(faz `git pull` + rebuild, sem perder dados — uploads, histórico e config
+ficam em `server/data/`, fora do container).
+
+Comandos úteis após instalado (dentro de `~/pdv_update_pro/server`):
+- `docker compose logs -f` — acompanhar logs
+- `docker compose down` — parar
+- `docker compose up -d --build` — atualizar depois de um `git pull`
+
+### Instalação antiga via systemd (legado)
 
 ```bash
 git clone <repo>
@@ -72,9 +94,11 @@ cd pdv-updater
 ./server/installer/instalar_servidor.sh
 ```
 
-O script cria um virtualenv em `/opt/pdv-server/venv`, instala `server/requirements.txt` e registra o serviço `pdv-server` no systemd.
+Mantido apenas para referência/rollback — cria um virtualenv em
+`/opt/pdv-server/venv` e registra o serviço `pdv-server` no systemd, sem
+Docker. Não é mais o caminho recomendado para instalações novas.
 
-Para desenvolvimento local sem instalar como serviço:
+Para desenvolvimento local sem instalar como serviço nem Docker:
 
 ```bash
 cd server
