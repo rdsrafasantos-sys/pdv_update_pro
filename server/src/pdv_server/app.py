@@ -13,6 +13,7 @@ from pdv_server.dispatch import (
 )
 from pdv_server.discovery import encontrar_pdv, get_lojas, invalidar_cache
 from pdv_server import erp_db, integrador, replication
+from pdv_server.versioning import eh_downgrade, extrair_versao
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
@@ -113,7 +114,8 @@ def api_arquivos():
                 "nome": f,
                 "tamanho_mb": round(os.path.getsize(caminho) / 1024 / 1024, 2),
                 "data": time.strftime("%d/%m/%Y %H:%M",
-                                       time.localtime(os.path.getmtime(caminho)))
+                                       time.localtime(os.path.getmtime(caminho))),
+                "versao": extrair_versao(f)
             })
     arquivos.sort(key=lambda x: x["data"], reverse=True)
     return jsonify(arquivos)
@@ -204,6 +206,9 @@ def api_atualizar():
     if not loja_id or not arquivo:
         return jsonify({"erro": "loja_id e arquivo são obrigatórios"}), 400
 
+    if pdv_ids == "todos" or len(pdv_ids) != 1:
+        return jsonify({"erro": "Selecione exatamente um PDV por vez para atualizar."}), 400
+
     caminho_zip = os.path.join(UPLOAD_DIR, arquivo)
     if not os.path.exists(caminho_zip):
         return jsonify({"erro": f"Arquivo {arquivo} não encontrado"}), 404
@@ -212,18 +217,31 @@ def api_atualizar():
     if not loja:
         return jsonify({"erro": "Loja não encontrada"}), 404
 
-    pdvs_alvo = loja["pdvs"] if pdv_ids == "todos" else \
-        [p for p in loja["pdvs"] if p["id"] in pdv_ids]
-
+    pdvs_alvo = [p for p in loja["pdvs"] if p["id"] in pdv_ids]
     if not pdvs_alvo:
         return jsonify({"erro": "Nenhum PDV selecionado"}), 400
 
-    for pdv in pdvs_alvo:
-        iniciar_envio_zip(loja_id, pdv, caminho_zip)
+    pdv = pdvs_alvo[0]
+    versao_zip = extrair_versao(arquivo)
+    if not versao_zip:
+        return jsonify({
+            "erro": "Não foi possível identificar a versão pelo nome do arquivo "
+                    "(ex: VRPdvPro_7.1.0.zip). Renomeie o arquivo e envie novamente."
+        }), 400
+
+    versao_pdv = pdv.get("versao")
+    if eh_downgrade(versao_zip, versao_pdv):
+        return jsonify({
+            "erro": f"Atualização bloqueada: o pacote é da versão {versao_zip}, mas o "
+                    f"PDV {pdv['id']} já está na versão {versao_pdv}. Downgrade não é "
+                    f"permitido (risco de corromper o banco)."
+        }), 409
+
+    iniciar_envio_zip(loja_id, pdv, caminho_zip)
 
     return jsonify({
-        "mensagem": f"Atualização iniciada para {len(pdvs_alvo)} PDV(s)",
-        "pdvs": [p["id"] for p in pdvs_alvo]
+        "mensagem": f"Atualização iniciada para {pdv['id']}",
+        "pdvs": [pdv["id"]]
     })
 
 

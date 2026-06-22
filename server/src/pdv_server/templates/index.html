@@ -7,12 +7,16 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body>
-{% macro seletor_pdv(key, titulo) %}
+{% macro seletor_pdv(key, titulo, multi=True) %}
 <div class="card">
   <div class="top-actions">
     <div class="section-title">{{ titulo }}</div>
     <div style="display:flex;align-items:center;gap:10px;">
+      {% if multi %}
       <span class="sel-all" id="selall-{{ key }}" onclick="toggleSelecionarTodos('{{ key }}')">Selecionar todos</span>
+      {% else %}
+      <span class="text-muted" style="font-size:12px;">⚠️ Selecione apenas um PDV por vez</span>
+      {% endif %}
       <button class="btn-verify" onclick="verificarOnline('{{ key }}')">🔌 Verificar online</button>
     </div>
   </div>
@@ -171,11 +175,13 @@
             </div>
           </div>
 
-          {{ seletor_pdv("pdv", "🏪 Lojas & PDVs") }}
+          {{ seletor_pdv("pdv", "🏪 Lojas & PDVs", multi=False) }}
+
+          <div id="pdvVersaoAviso"></div>
 
           <div class="actions-row">
             <div></div>
-            <button class="btn-update" id="btnAtualizarPdv" disabled onclick="iniciarAtualizacao()">🚀 Atualizar PDVs Selecionados</button>
+            <button class="btn-update" id="btnAtualizarPdv" disabled onclick="iniciarAtualizacao()">🚀 Atualizar PDV Selecionado</button>
           </div>
         </div>
 

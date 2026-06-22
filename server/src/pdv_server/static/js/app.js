@@ -3,6 +3,7 @@
 // ──────────────────────────────────────────────
 let lojas = [];
 let arquivoSelecionado = null;
+let arquivosPorNome = {}; // nome -> {nome, tamanho_mb, data, versao}
 let eventSource = null;
 let statusPDVs = {}; // progresso de atualizacao de zip (somente view "pdv"), por pdvId
 
@@ -126,7 +127,12 @@ function renderPDVs(key) {
 
 function togglePDV(key, pdvId) {
   const sel = seletores[key].selecionados;
-  if (sel.has(pdvId)) sel.delete(pdvId); else sel.add(pdvId);
+  if (key === "pdv") {
+    // trava: apenas um PDV por vez nesta tela, para permitir checagem de versao segura
+    seletores[key].selecionados = sel.has(pdvId) ? new Set() : new Set([pdvId]);
+  } else {
+    if (sel.has(pdvId)) sel.delete(pdvId); else sel.add(pdvId);
+  }
   renderPDVs(key);
   if (key === "pdv") atualizarBotaoPdv();
   if (key === "agente") atualizarBotaoAgente();
@@ -239,6 +245,8 @@ async function fazerUpload(file) {
 async function carregarArquivos() {
   const r = await fetch("/api/arquivos");
   const arquivos = await r.json();
+  arquivosPorNome = {};
+  arquivos.forEach(a => { arquivosPorNome[a.nome] = a; });
   const el = document.getElementById("fileList");
   if (!el) return;
   if (arquivos.length === 0) {
@@ -248,7 +256,7 @@ async function carregarArquivos() {
   el.innerHTML = arquivos.map(a => `
     <div class="file-item ${a.nome === arquivoSelecionado ? 'selected' : ''}" onclick="selecionarArquivo('${a.nome}')">
       <div>
-        <div class="file-name">${a.nome}</div>
+        <div class="file-name">${a.nome} ${a.versao ? `<span class="file-versao">v${a.versao}</span>` : ''}</div>
         <div class="file-meta text-muted">${a.tamanho_mb} MB — ${a.data}</div>
       </div>
       <div class="file-actions">
@@ -280,10 +288,52 @@ async function limparTodos() {
 }
 window.limparTodos = limparTodos;
 
+function compararVersoes(v1, v2) {
+  const t1 = v1.split(".").map(Number);
+  const t2 = v2.split(".").map(Number);
+  const max = Math.max(t1.length, t2.length);
+  for (let i = 0; i < max; i++) {
+    const a = t1[i] || 0, b = t2[i] || 0;
+    if (a !== b) return a < b ? -1 : 1;
+  }
+  return 0;
+}
+
+function ehDowngrade(versaoZip, versaoPdvAtual) {
+  if (!versaoZip || !versaoPdvAtual) return false;
+  return compararVersoes(versaoZip, versaoPdvAtual) < 0;
+}
+
+function pdvSelecionadoAtual() {
+  const loja = lojas.find(l => l.id === seletores.pdv.lojaAtiva);
+  if (!loja) return null;
+  const id = Array.from(seletores.pdv.selecionados)[0];
+  return loja.pdvs.find(p => p.id === id) || null;
+}
+
 function atualizarBotaoPdv() {
   const btn = document.getElementById("btnAtualizarPdv");
+  const aviso = document.getElementById("pdvVersaoAviso");
   if (!btn) return;
-  btn.disabled = !arquivoSelecionado || seletores.pdv.selecionados.size === 0;
+
+  const pdv = pdvSelecionadoAtual();
+  const arquivo = arquivosPorNome[arquivoSelecionado];
+  let bloqueadoPorVersao = false;
+
+  if (aviso) aviso.innerHTML = "";
+
+  if (pdv && arquivo) {
+    if (!arquivo.versao) {
+      if (aviso) aviso.innerHTML = `<div class="card aviso-versao aviso-indefinido">⚠️ Não foi possível identificar a versão do arquivo <strong>${arquivo.nome}</strong> pelo nome. Renomeie incluindo a versão (ex: VRPdvPro_7.1.0.zip).</div>`;
+    } else if (pdv.versao && ehDowngrade(arquivo.versao, pdv.versao)) {
+      bloqueadoPorVersao = true;
+      if (aviso) aviso.innerHTML = `<div class="card aviso-versao aviso-bloqueado">⛔ Downgrade bloqueado: o pacote é a versão <strong>${arquivo.versao}</strong>, mas o PDV ${pdv.id} já está na <strong>${pdv.versao}</strong>. Atualizar para uma versão anterior pode corromper o banco.</div>`;
+    } else if (pdv.versao) {
+      if (aviso) aviso.innerHTML = `<div class="card aviso-versao aviso-ok">✅ ${pdv.id}: ${pdv.versao} → ${arquivo.versao}</div>`;
+    }
+  }
+
+  btn.disabled = !arquivoSelecionado || seletores.pdv.selecionados.size === 0 || bloqueadoPorVersao;
 }
 
 async function iniciarAtualizacao() {
