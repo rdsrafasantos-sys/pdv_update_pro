@@ -322,6 +322,11 @@ def api_erp_db_status():
     return jsonify(erp_db.testar_conexao())
 
 
+@app.route("/api/erp_db/pdvs_ativos", methods=["GET"])
+def api_erp_db_pdvs_ativos():
+    return jsonify(erp_db.listar_pdvs_ativos())
+
+
 # ──────────────────────────────────────────────
 # INTEGRADOR VR — Configuracoes
 # ──────────────────────────────────────────────

@@ -600,23 +600,65 @@ function cardReplicacaoPdv(ult) {
     : `<div class="dash-pdv-replicacao ok">✔ Sem divergência — ${ult.timestamp}</div>`;
 }
 
-function renderOnlinePorLoja(dadosPorLoja, ultimaPorPdv) {
-  if (dadosPorLoja.length === 0) return '<div class="empty">Nenhuma loja encontrada.</div>';
-  return dadosPorLoja.map(({ loja, status }) => {
-    const online = loja.pdvs.filter(p => status[p.id] && status[p.id].online);
-    const cards = online.map(p => `
-      <div class="pdv-card" style="cursor:default;">
-        <div class="pdv-name">${p.nome || p.id}</div>
-        <div class="pdv-ip">${p.ip}</div>
-        ${p.versao ? `<div class="pdv-versao">v${p.versao}</div>` : ""}
-        <div class="badge online"><span class="dot"></span>online</div>
-        ${cardReplicacaoPdv(ultimaPorPdv[p.id])}
-      </div>
-    `).join("");
+// Cruza a "fonte da verdade" (PDVs cadastrados ativos no ERP) com o que o sistema
+// efetivamente descobriu/conseguiu pingar via MongoDB+agente. Um PDV pode estar
+// ativo no cadastro e mesmo assim nao aparecer aqui como online -- depende de
+// estar ligado, na rede e com o agente instalado, o que o cadastro nao garante.
+function cruzarLojasErpComOnline(lojasErp, lojasDescoberta, statusPorLoja) {
+  return lojasErp.map(grupo => {
+    const lojaId = `loja${String(grupo.id_loja).padStart(2, "0")}`;
+    const lojaDescoberta = lojasDescoberta.find(l => l.id === lojaId);
+    const ping = statusPorLoja[lojaId] || {};
+    const pdvs = grupo.pdvs.map(ecf => {
+      const pdvId = `PDV-${ecf}`;
+      const pdvDescoberto = lojaDescoberta ? lojaDescoberta.pdvs.find(p => p.id === pdvId) : null;
+      const statusPing = ping[pdvId];
+      let status;
+      if (!pdvDescoberto) status = "sem_comunicacao";
+      else if (statusPing && statusPing.online) status = "online";
+      else status = "offline";
+      return { ecf, pdvId, pdv: pdvDescoberto, status };
+    });
+    return { id_loja: grupo.id_loja, nome: grupo.loja || lojaId, pdvs };
+  });
+}
+
+function rotuloStatusPdv(status) {
+  if (status === "online") return { texto: "online", classe: "online" };
+  if (status === "offline") return { texto: "offline", classe: "offline" };
+  return { texto: "sem comunicação", classe: "offline" };
+}
+
+function renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, erroErp) {
+  if (erroErp) {
+    return `<div class="empty">Não foi possível consultar os PDVs ativos no ERP: ${erroErp}</div>`;
+  }
+  if (lojasCruzadas.length === 0) {
+    return '<div class="empty">Nenhum PDV ativo cadastrado no ERP.</div>';
+  }
+  return lojasCruzadas.map(loja => {
+    const online = loja.pdvs.filter(p => p.status === "online").length;
+    const total = loja.pdvs.length;
+    const cards = loja.pdvs.map(p => {
+      const { texto, classe } = rotuloStatusPdv(p.status);
+      const nome = p.pdv && p.pdv.nome ? p.pdv.nome : p.pdvId;
+      const ip = p.pdv ? `<div class="pdv-ip">${p.pdv.ip}</div>` : '<div class="pdv-ip text-muted">IP desconhecido</div>';
+      const versao = p.pdv && p.pdv.versao ? `<div class="pdv-versao">v${p.pdv.versao}</div>` : "";
+      const replicacao = p.status === "online" ? cardReplicacaoPdv(ultimaPorPdv[p.pdvId]) : "";
+      return `
+        <div class="pdv-card" style="cursor:default;">
+          <div class="pdv-name">${nome}</div>
+          ${ip}
+          ${versao}
+          <div class="badge ${classe}"><span class="dot"></span>${texto}</div>
+          ${replicacao}
+        </div>
+      `;
+    }).join("");
     return `
       <div class="dash-loja-grupo">
-        <div class="dash-loja-titulo">${loja.nome} (${online.length}/${loja.pdvs.length} online)</div>
-        ${online.length > 0 ? `<div class="dash-pdv-grid">${cards}</div>` : '<div class="empty">Nenhum PDV online nesta loja.</div>'}
+        <div class="dash-loja-titulo">${loja.nome} (${online}/${total} online — ${total} ativo(s) cadastrado(s) no ERP)</div>
+        <div class="dash-pdv-grid">${cards}</div>
       </div>
     `;
   }).join("");
@@ -626,30 +668,49 @@ async function statusOnlinePorLoja(lojasList) {
   const resultados = await Promise.all(
     lojasList.map(l => fetch(`/api/ping_loja/${l.id}`).then(r => r.json()).catch(() => ({})))
   );
-  return lojasList.map((loja, i) => ({ loja, status: resultados[i] }));
+  const mapa = {};
+  lojasList.forEach((loja, i) => { mapa[loja.id] = resultados[i]; });
+  return mapa;
 }
 
 async function carregarDashboard() {
-  const [lojasResp, cfg, historico, erpDbStatus, integradorStatus] = await Promise.all([
+  const [lojasResp, cfg, historico, erpDbStatus, integradorStatus, pdvsAtivosErp] = await Promise.all([
     fetch("/api/lojas").then(r => r.json()).catch(() => []),
     fetch("/api/replicacao/config").then(r => r.json()).catch(() => ({})),
     fetch("/api/replicacao/historico").then(r => r.json()).catch(() => []),
     fetch("/api/erp_db/status").then(r => r.json()).catch(() => ({ online: false })),
     fetch("/api/integrador/status").then(r => r.json()).catch(() => ({ status: "erro", erro: "Falha ao consultar." })),
+    fetch("/api/erp_db/pdvs_ativos").then(r => r.json()).catch(() => ({ erro: "Falha ao consultar.", lojas: [] })),
   ]);
   lojas = lojasResp;
   atualizarKpiErpDb(erpDbStatus);
   atualizarKpiIntegrador(integradorStatus);
 
-  const totalLojas = lojas.length;
-  const totalPdvs = lojas.reduce((acc, l) => acc + l.pdvs.length, 0);
+  const usarErp = !pdvsAtivosErp.erro;
+  const lojasErp = pdvsAtivosErp.lojas || [];
 
   const elLojas = document.getElementById("kpiLojas");
   const elPdvs = document.getElementById("kpiPdvs");
+  const elPdvsSub = document.getElementById("kpiPdvsSub");
   const elAuto = document.getElementById("kpiAuto");
   const elUltima = document.getElementById("kpiUltima");
-  if (elLojas) elLojas.textContent = totalLojas;
-  if (elPdvs) elPdvs.textContent = totalPdvs;
+
+  const statusPorLoja = await statusOnlinePorLoja(lojas);
+  const lojasCruzadas = cruzarLojasErpComOnline(lojasErp, lojas, statusPorLoja);
+
+  if (usarErp) {
+    const totalAtivosErp = lojasCruzadas.reduce((acc, l) => acc + l.pdvs.length, 0);
+    const totalOnlineErp = lojasCruzadas.reduce((acc, l) => acc + l.pdvs.filter(p => p.status === "online").length, 0);
+    if (elLojas) elLojas.textContent = lojasCruzadas.length;
+    if (elPdvs) elPdvs.textContent = totalOnlineErp;
+    if (elPdvsSub) elPdvsSub.textContent = `de ${totalAtivosErp} ativo(s) no ERP`;
+  } else {
+    const totalPdvs = lojas.reduce((acc, l) => acc + l.pdvs.length, 0);
+    if (elLojas) elLojas.textContent = lojas.length;
+    if (elPdvs) elPdvs.textContent = totalPdvs;
+    if (elPdvsSub) elPdvsSub.textContent = "";
+  }
+
   if (elAuto) elAuto.textContent = cfg.habilitado ? `Ativa (${cfg.intervalo_minutos}min)` : "Desativada";
 
   if (elUltima) {
@@ -666,8 +727,7 @@ async function carregarDashboard() {
 
   const elOnline = document.getElementById("dashOnlinePorLoja");
   if (elOnline) {
-    const dadosOnline = await statusOnlinePorLoja(lojas);
-    elOnline.innerHTML = renderOnlinePorLoja(dadosOnline, ultimaReplicacaoPorPdv(historico));
+    elOnline.innerHTML = renderLojasEPdvs(lojasCruzadas, ultimaReplicacaoPorPdv(historico), pdvsAtivosErp.erro);
   }
 }
 

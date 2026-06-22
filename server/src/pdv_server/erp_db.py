@@ -30,6 +30,18 @@ def salvar_config(alteracoes):
     return atual
 
 
+def _conectar(cfg):
+    import psycopg2
+    return psycopg2.connect(
+        host=cfg["host"],
+        port=int(cfg.get("porta") or 5432),
+        user=cfg.get("usuario") or None,
+        password=cfg.get("senha") or None,
+        dbname=cfg["banco"],
+        connect_timeout=5,
+    )
+
+
 def testar_conexao():
     """Tenta conectar no Postgres do ERP com timeout curto, a partir da
     configuracao salva. Nunca expoe a senha no resultado."""
@@ -37,16 +49,40 @@ def testar_conexao():
     if not cfg.get("host") or not cfg.get("banco"):
         return {"online": False, "erro": "Conexao com o banco do ERP ainda nao configurada."}
     try:
-        import psycopg2
-        conn = psycopg2.connect(
-            host=cfg["host"],
-            port=int(cfg.get("porta") or 5432),
-            user=cfg.get("usuario") or None,
-            password=cfg.get("senha") or None,
-            dbname=cfg["banco"],
-            connect_timeout=5,
-        )
+        conn = _conectar(cfg)
         conn.close()
         return {"online": True, "erro": None}
     except Exception as e:
         return {"online": False, "erro": str(e)}
+
+
+def listar_pdvs_ativos():
+    """Consulta no ERP os PDVs cadastrados como ativos (situacao de cadastro = 1),
+    agrupados por loja. Esta lista e a "fonte da verdade" de quais PDVs deveriam
+    existir em cada loja -- nao indica se o PDV esta de fato ligado/online, isso
+    e cruzado depois com a verificacao de ping nos agentes."""
+    cfg = carregar_config()
+    if not cfg.get("host") or not cfg.get("banco"):
+        return {"erro": "Conexao com o banco do ERP ainda nao configurada.", "lojas": []}
+    try:
+        conn = _conectar(cfg)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT e.id_loja, l.descricao AS loja, e.ecf
+                    FROM pdv.ecf e
+                    INNER JOIN loja l ON l.id = e.id_loja
+                    WHERE e.id_situacaocadastro = 1
+                    ORDER BY l.descricao, e.ecf
+                """)
+                linhas = cur.fetchall()
+        finally:
+            conn.close()
+
+        lojas = {}
+        for id_loja, loja_nome, ecf in linhas:
+            grupo = lojas.setdefault(id_loja, {"id_loja": id_loja, "loja": loja_nome, "pdvs": []})
+            grupo["pdvs"].append(ecf)
+        return {"erro": None, "lojas": list(lojas.values())}
+    except Exception as e:
+        return {"erro": str(e), "lojas": []}
