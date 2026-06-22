@@ -7,8 +7,11 @@ services:
       - "8888:8888"
     environment:
       - PDV_SERVER_PORTA=8888
-      # - PDV_SERVER_TOKEN=troque-este-token
-      # - PDV_SERVER_MONGO_URI=mongodb://192.168.1.20:27016
+      - PDV_SERVER_TOKEN=${PDV_SERVER_TOKEN:-pdv-agent-2024}
+      # Dentro do container "localhost" e o proprio container, nao o host —
+      # aponte para o IP real onde o MongoDB do integrador esta escutando
+      # (defina em um arquivo .env nao versionado, ver .env.example).
+      - PDV_SERVER_MONGO_URI=${PDV_SERVER_MONGO_URI:-mongodb://localhost:27016}
     volumes:
       - ./data/uploads:/opt/pdv-server/uploads
       - ./data/replicacao:/opt/pdv-server/replicacao

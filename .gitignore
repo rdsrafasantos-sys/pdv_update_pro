@@ -19,6 +19,7 @@ progresso.json
 
 # Uploads do servidor (zips e agente.exe distribuidos)
 server/uploads/
+server/data/
 
 # Ambiente local
 .env
