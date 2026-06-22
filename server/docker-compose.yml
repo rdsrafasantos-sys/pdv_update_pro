@@ -1,0 +1,16 @@
+services:
+  pdv-server:
+    build: .
+    container_name: pdv-server
+    restart: always
+    ports:
+      - "8888:8888"
+    environment:
+      - PDV_SERVER_PORTA=8888
+      # - PDV_SERVER_TOKEN=troque-este-token
+      # - PDV_SERVER_MONGO_URI=mongodb://192.168.1.20:27016
+    volumes:
+      - ./data/uploads:/opt/pdv-server/uploads
+      - ./data/replicacao:/opt/pdv-server/replicacao
+      - ./data/erp_db:/opt/pdv-server/erp_db
+      - ./data/integrador:/opt/pdv-server/integrador
