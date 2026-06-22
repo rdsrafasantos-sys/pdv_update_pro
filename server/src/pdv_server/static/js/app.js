@@ -629,7 +629,7 @@ function rotuloStatusPdv(status) {
   return { texto: "sem comunicação", classe: "offline" };
 }
 
-function renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, erroErp) {
+function renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, erroErp, ocultarOffline) {
   if (erroErp) {
     return `<div class="empty">Não foi possível consultar os PDVs ativos no ERP: ${erroErp}</div>`;
   }
@@ -639,7 +639,8 @@ function renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, erroErp) {
   return lojasCruzadas.map(loja => {
     const online = loja.pdvs.filter(p => p.status === "online").length;
     const total = loja.pdvs.length;
-    const cards = loja.pdvs.map(p => {
+    const pdvsExibidos = ocultarOffline ? loja.pdvs.filter(p => p.status === "online") : loja.pdvs;
+    const cards = pdvsExibidos.map(p => {
       const { texto, classe } = rotuloStatusPdv(p.status);
       const nome = p.pdv && p.pdv.nome ? p.pdv.nome : p.pdvId;
       const ip = p.pdv ? `<div class="pdv-ip">${p.pdv.ip}</div>` : '<div class="pdv-ip text-muted">IP desconhecido</div>';
@@ -658,11 +659,26 @@ function renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, erroErp) {
     return `
       <div class="dash-loja-grupo">
         <div class="dash-loja-titulo">${loja.nome} (${online}/${total} online — ${total} ativo(s) cadastrado(s) no ERP)</div>
-        <div class="dash-pdv-grid">${cards}</div>
+        ${pdvsExibidos.length > 0 ? `<div class="dash-pdv-grid">${cards}</div>` : '<div class="empty">Nenhum PDV online nesta loja.</div>'}
       </div>
     `;
   }).join("");
 }
+
+let _dashUltimoEstado = null; // cache do ultimo cruzamento renderizado, para reagir ao checkbox sem novo fetch
+
+function alternarOcultarOffline() {
+  const checkbox = document.getElementById("dashOcultarOffline");
+  const ocultar = checkbox ? checkbox.checked : false;
+  localStorage.setItem("dashOcultarOffline", ocultar ? "1" : "0");
+  const elOnline = document.getElementById("dashOnlinePorLoja");
+  if (elOnline && _dashUltimoEstado) {
+    elOnline.innerHTML = renderLojasEPdvs(
+      _dashUltimoEstado.lojasCruzadas, _dashUltimoEstado.ultimaPorPdv, _dashUltimoEstado.erroErp, ocultar
+    );
+  }
+}
+window.alternarOcultarOffline = alternarOcultarOffline;
 
 async function statusOnlinePorLoja(lojasList) {
   const resultados = await Promise.all(
@@ -727,7 +743,12 @@ async function carregarDashboard() {
 
   const elOnline = document.getElementById("dashOnlinePorLoja");
   if (elOnline) {
-    elOnline.innerHTML = renderLojasEPdvs(lojasCruzadas, ultimaReplicacaoPorPdv(historico), pdvsAtivosErp.erro);
+    const ultimaPorPdv = ultimaReplicacaoPorPdv(historico);
+    const checkbox = document.getElementById("dashOcultarOffline");
+    const ocultarOffline = localStorage.getItem("dashOcultarOffline") === "1";
+    if (checkbox) checkbox.checked = ocultarOffline;
+    _dashUltimoEstado = { lojasCruzadas, ultimaPorPdv, erroErp: pdvsAtivosErp.erro };
+    elOnline.innerHTML = renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, pdvsAtivosErp.erro, ocultarOffline);
   }
 }
 

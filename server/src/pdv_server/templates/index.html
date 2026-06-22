@@ -91,7 +91,16 @@
           </div>
 
           <div class="card">
-            <div class="section-title">🏪 Lojas e PDVs (cadastro ativo no ERP x online)</div>
+            <div class="top-actions">
+              <div class="section-title">🏪 Lojas e PDVs (cadastro ativo no ERP x online)</div>
+              <label class="toggle-wrap" style="font-size:12px;">
+                <span class="toggle">
+                  <input type="checkbox" id="dashOcultarOffline" onchange="alternarOcultarOffline()">
+                  <span class="slider"></span>
+                </span>
+                Ocultar PDVs offline
+              </label>
+            </div>
             <div id="dashOnlinePorLoja"><div class="empty">Carregando...</div></div>
           </div>
 
