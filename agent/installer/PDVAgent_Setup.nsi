@@ -1,4 +1,4 @@
-; ===============================================================
+﻿; ===============================================================
 ;  PDVAgent_Setup.nsi
 ;  Instalador do PDV Agent
 ;  Compilar com: makensis PDVAgent_Setup.nsi
@@ -7,6 +7,8 @@
 ;    - status_pdv.exe
 ;    - nssm.exe
 ; ===============================================================
+
+Unicode true
 
 ;--------------------------------
 ; Configurações gerais
