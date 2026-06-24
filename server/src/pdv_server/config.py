@@ -23,6 +23,15 @@ REPLICACAO_DB = os.environ.get("PDV_REPLICACAO_DB", "pdv")
 # Porta do MongoDB local de cada PDV (acessado pelo IP do PDV, ex: 192.168.x.x:27018)
 PDV_LOCAL_MONGO_PORTA = int(os.environ.get("PDV_LOCAL_MONGO_PORTA", "27018"))
 
+# Site ID do Tailscale 4via6 (subnet router) para este cliente — necessario
+# quando a rede interna do cliente usa IPs fixos que nao podem ser alterados
+# (o replica set do Mongo referencia esse IP direto, ver discovery.py) e essa
+# faixa pode colidir com a de outro cliente na mesma tailnet. Deixe em branco
+# se este cliente usa Tailscale instalado direto em cada maquina (sem overlap
+# possivel, ip do replica set já é o IP Tailscale) — comportamento padrao,
+# sem nenhuma traducao de endereco.
+PDV_TAILSCALE_SITE_ID = os.environ.get("PDV_TAILSCALE_SITE_ID", "")
+
 # Onde ficam persistidos a configuracao de verificacao automatica e o historico
 REPLICACAO_DATA_DIR = os.environ.get("PDV_REPLICACAO_DATA_DIR", "/opt/pdv-server/replicacao")
 

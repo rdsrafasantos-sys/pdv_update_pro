@@ -12,7 +12,9 @@ from pdv_server.dispatch import (
     enviar_agente_para_pdvs, get_atualizacoes_loja, iniciar_envio_zip,
     reiniciar_mongo_pdv,
 )
-from pdv_server.discovery import encontrar_pdv, get_lojas, invalidar_cache
+from pdv_server.discovery import (
+    encontrar_pdv, endereco_alcancavel, get_lojas, invalidar_cache,
+)
 from pdv_server import erp_db, integrador, replication
 from pdv_server.versioning import eh_downgrade, extrair_versao
 
@@ -45,7 +47,7 @@ def api_ping(loja_id, pdv_id):
     if not pdv:
         return jsonify({"erro": "PDV não encontrado"}), 404
     try:
-        r = requests.get(f"http://{pdv['ip']}:5000/ping", timeout=3)
+        r = requests.get(f"http://{endereco_alcancavel(pdv['ip'])}:5000/ping", timeout=3)
         dados = r.json() if r.status_code == 200 else {}
         return jsonify({
             "online": r.status_code == 200,
@@ -67,7 +69,7 @@ def api_ping_loja(loja_id):
 
     def checar(pdv):
         try:
-            r = requests.get(f"http://{pdv['ip']}:5000/ping", timeout=3)
+            r = requests.get(f"http://{endereco_alcancavel(pdv['ip'])}:5000/ping", timeout=3)
             dados = r.json() if r.status_code == 200 else {}
             resultados[pdv["id"]] = {
                 "online": r.status_code == 200,

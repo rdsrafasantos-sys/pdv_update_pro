@@ -138,6 +138,46 @@ Isso reescreve regras de `iptables`, o que por sua vez pode quebrar o
 port-forward do Docker para o `pdv-server` — em seguida rode também
 `sudo systemctl restart docker` e confirme com `curl localhost:8888`.
 
+### Clientes com IP interno fixo (replica set do Mongo não pode mudar)
+
+Instalar o Tailscale direto em cada PDV/integrador (acima) só funciona quando
+você controla a identidade de rede de cada máquina desde o início. Em
+clientes existentes, o replica set do Mongo já referencia o IP interno da
+loja (`192.168.x.x`) e **isso nunca pode ser alterado** (`discovery.py`,
+`descobrir_pdvs_via_replicaset()`, le esse IP direto de
+`replSetGetStatus()`). Nesse caso, em vez de instalar Tailscale em cada
+máquina, uma única máquina dentro da rede do cliente (pode ser a do
+integrador) atua como **subnet router**, expondo a faixa toda sem mudar
+nenhum IP existente:
+
+```bash
+# Gera o prefixo IPv6 para cada faixa interna do cliente, com um Site ID
+# UNICO por cliente (necessario pois faixas como 192.168.1.0/24 se repetem
+# entre clientes diferentes — sem isso colide na mesma tailnet):
+tailscale debug via 7 192.168.1.0/24
+tailscale debug via 7 192.168.2.0/24
+
+# Anuncia as rotas (substitua pelos prefixos gerados acima):
+tailscale set --advertise-routes=<prefixo1>,<prefixo2> --advertise-tags=tag:server-bonna
+```
+
+Depois, no admin console: **aprovar a rota** (Machines → device → routes) e
+**adicionar o(s) prefixo(s) IPv6 gerado(s)** (não o CIDR IPv4 original!) ao
+`dst` do grant que libera esse cliente — esse foi o erro mais fácil de
+cometer durante os testes. No lado de quem vai *consumir* a rota (o
+`pdv-server`), é preciso `sudo tailscale set --accept-routes` — sem isso o
+Tailscale recebe a rota mas não a usa, e parece que nada está configurado
+quando na verdade só falta esse passo.
+
+Configure `PDV_TAILSCALE_SITE_ID` no `server/.env` do cliente com o mesmo
+Site ID usado no `tailscale debug via` — a partir disso, todo o código
+(`dispatch.py`, `replication.py`, `app.py`) traduz automaticamente o IP bruto
+do replica set para o formato MagicDNS exigido
+(`endereco_alcancavel()` em `discovery.py`), sem precisar mudar nada na UI —
+o IP exibido no painel continua sendo o IP real, só a chamada de rede em si
+usa o endereço traduzido. Clientes sem essa variável definida continuam
+funcionando exatamente como hoje (IP direto, sem tradução).
+
 ## Versionamento
 
 A versão do agente fica em `agent/src/pdv_agent/__init__.py` (`VERSION`) e é exposta em `/ping`. Ao lançar uma nova versão, atualize também `!define VERSAO` em `agent/installer/PDVAgent_Setup.nsi` para manter o instalador consistente.

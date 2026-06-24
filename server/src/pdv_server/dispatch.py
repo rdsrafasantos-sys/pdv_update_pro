@@ -5,7 +5,7 @@ import time
 import requests
 
 from pdv_server.config import TOKEN_SEGURANCA
-from pdv_server.discovery import encontrar_pdv, get_lojas
+from pdv_server.discovery import encontrar_pdv, endereco_alcancavel, get_lojas
 
 atualizacoes = {}
 lock = threading.Lock()
@@ -49,7 +49,7 @@ def enviar_agente_para_pdvs(caminho_exe, pdvs_alvo):
         try:
             with open(caminho_exe, "rb") as f:
                 r = requests.post(
-                    f"http://{pdv['ip']}:5000/atualizar_agente",
+                    f"http://{endereco_alcancavel(pdv['ip'])}:5000/atualizar_agente",
                     files={"arquivo": ("agente.exe", f, "application/octet-stream")},
                     headers={"X-Agent-Token": TOKEN_SEGURANCA},
                     timeout=60
@@ -80,7 +80,7 @@ def _enviar_para_pdv(loja_id, pdv, caminho_zip):
         })
         with open(caminho_zip, "rb") as f:
             r = requests.post(
-                f"http://{ip}:5000/atualizar",
+                f"http://{endereco_alcancavel(ip)}:5000/atualizar",
                 files={"arquivo": (os.path.basename(caminho_zip), f, "application/zip")},
                 headers={"X-Agent-Token": TOKEN_SEGURANCA},
                 timeout=120
@@ -107,7 +107,7 @@ def _enviar_para_pdv(loja_id, pdv, caminho_zip):
 def reiniciar_mongo_pdv(pdv):
     try:
         r = requests.post(
-            f"http://{pdv['ip']}:5000/reiniciar_mongo",
+            f"http://{endereco_alcancavel(pdv['ip'])}:5000/reiniciar_mongo",
             headers={"X-Agent-Token": TOKEN_SEGURANCA},
             timeout=40
         )
@@ -124,7 +124,7 @@ def _monitorar_pdv(loja_id, pdv_id, ip):
     falhas = 0
     while True:
         try:
-            r = requests.get(f"http://{ip}:5000/status", timeout=5)
+            r = requests.get(f"http://{endereco_alcancavel(ip)}:5000/status", timeout=5)
             dados = r.json()
             set_estado_pdv(loja_id, pdv_id, dados)
             if dados["status"] in ("success", "error"):

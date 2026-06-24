@@ -7,7 +7,7 @@ import time
 from pdv_server.config import (
     MONGO_URI, PDV_LOCAL_MONGO_PORTA, REPLICACAO_DATA_DIR, REPLICACAO_DB,
 )
-from pdv_server.discovery import get_lojas
+from pdv_server.discovery import endereco_alcancavel, get_lojas
 
 COLECOES = [
     "pessoas",
@@ -172,7 +172,8 @@ def comparar_pdv(pdv_ip, callback=None):
 
     try:
         cliente_pdv = MongoClient(
-            f"mongodb://{pdv_ip}:{PDV_LOCAL_MONGO_PORTA}", serverSelectionTimeoutMS=5000
+            f"mongodb://{endereco_alcancavel(pdv_ip)}:{PDV_LOCAL_MONGO_PORTA}",
+            serverSelectionTimeoutMS=5000
         )
         cliente_pdv.admin.command("ping")
     except PyMongoError as e:

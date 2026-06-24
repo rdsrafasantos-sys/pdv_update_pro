@@ -3,12 +3,24 @@ import time
 
 import requests
 
-from pdv_server.config import MONGO_URI, TOKEN_SEGURANCA
+from pdv_server.config import MONGO_URI, PDV_TAILSCALE_SITE_ID, TOKEN_SEGURANCA
 
 _CACHE_TTL = 60  # segundos
 
 _lojas_cache = []
 _lojas_cache_ts = 0
+
+
+def endereco_alcancavel(ip):
+    """Traduz o IP bruto do PDV (o mesmo usado no replica set do Mongo, que
+    nunca muda) para o formato MagicDNS "via" exigido por um subnet router
+    4via6, quando PDV_TAILSCALE_SITE_ID estiver configurado. Sem isso, retorna
+    o IP como esta (caso de cliente com Tailscale instalado direto em cada
+    maquina, sem rede sobreposta). Usar SEMPRE que for abrir uma conexao
+    (HTTP ou Mongo) com o PDV — para exibicao na UI, use o IP bruto."""
+    if not PDV_TAILSCALE_SITE_ID:
+        return ip
+    return f"{ip.replace('.', '-')}-via-{PDV_TAILSCALE_SITE_ID}"
 
 
 def get_mongo():
@@ -55,7 +67,7 @@ def descobrir_pdvs_via_replicaset():
         def consultar_agente(ip):
             try:
                 r = requests.get(
-                    f"http://{ip}:5000/info",
+                    f"http://{endereco_alcancavel(ip)}:5000/info",
                     timeout=3,
                     headers={"X-Agent-Token": TOKEN_SEGURANCA}
                 )
