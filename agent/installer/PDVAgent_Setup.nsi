@@ -6,9 +6,14 @@
 ;    - agente.exe
 ;    - status_pdv.exe
 ;    - nssm.exe
+;    - tailscale-setup-amd64.msi (baixe em https://pkgs.tailscale.com/stable/#windows)
 ; ===============================================================
 
 Unicode true
+
+!include "MUI2.nsh"
+!include "nsDialogs.nsh"
+!include "LogicLib.nsh"
 
 ;--------------------------------
 ; Configurações gerais
@@ -21,7 +26,13 @@ Unicode true
 !define EXE_AGENTE     "agente.exe"
 !define EXE_STATUS     "status_pdv.exe"
 !define EXE_NSSM       "nssm.exe"
+!define MSI_TAILSCALE  "tailscale-setup-amd64.msi"
 !define PORTA          "5000"
+
+Var TailscaleAuthKey
+Var TailscaleHostname
+Var hCtlTailscaleAuthKey
+Var hCtlTailscaleHostname
 
 Name "${PRODUTO} ${VERSAO}"
 OutFile "PDVAgent_Setup.exe"
@@ -33,8 +44,6 @@ SetCompressor /SOLID lzma
 ;--------------------------------
 ; Interface moderna
 ;--------------------------------
-!include "MUI2.nsh"
-
 !define MUI_ABORTWARNING
 !define MUI_ICON           "${NSISDIR}\Contrib\Graphics\Icons\modern-install.ico"
 !define MUI_UNICON         "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall.ico"
@@ -54,6 +63,7 @@ SetCompressor /SOLID lzma
 !define MUI_FINISHPAGE_NOAUTOCLOSE
 
 !insertmacro MUI_PAGE_WELCOME
+Page custom TailscalePageCreate TailscalePageLeave
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 
@@ -61,6 +71,34 @@ SetCompressor /SOLID lzma
 !insertmacro MUI_UNPAGE_INSTFILES
 
 !insertmacro MUI_LANGUAGE "PortugueseBR"
+
+;--------------------------------
+; Pagina customizada: Tailscale (opcional)
+;--------------------------------
+Function TailscalePageCreate
+  nsDialogs::Create 1018
+  Pop $0
+
+  ${NSD_CreateLabel} 0 0u 100% 30u "Tailscale (opcional): cole abaixo a auth key da rede deste cliente para conectar este PDV automaticamente a VPN. Deixe em branco para pular esta etapa (pode ser configurado depois)."
+  Pop $0
+
+  ${NSD_CreateLabel} 0 36u 100% 10u "Auth Key:"
+  Pop $0
+  ${NSD_CreateText} 0 47u 100% 12u ""
+  Pop $hCtlTailscaleAuthKey
+
+  ${NSD_CreateLabel} 0 64u 100% 10u "Nome deste PDV na rede Tailscale (opcional, ex: bonna-loja01-pdv03):"
+  Pop $0
+  ${NSD_CreateText} 0 75u 100% 12u ""
+  Pop $hCtlTailscaleHostname
+
+  nsDialogs::Show
+FunctionEnd
+
+Function TailscalePageLeave
+  ${NSD_GetText} $hCtlTailscaleAuthKey $TailscaleAuthKey
+  ${NSD_GetText} $hCtlTailscaleHostname $TailscaleHostname
+FunctionEnd
 
 ;--------------------------------
 ; Seção principal de instalação
@@ -109,6 +147,40 @@ Section "PDV Agent" SecPrincipal
   nsExec::ExecToLog 'netsh advfirewall firewall add rule name="PDV Agent" dir=in action=allow protocol=TCP localport=${PORTA}'
 
   DetailPrint "Firewall configurado."
+
+  ; ── 4b. Tailscale (opcional) ───────────────────
+  ${If} $TailscaleAuthKey != ""
+    IfFileExists "$PROGRAMFILES64\Tailscale\tailscale.exe" TailscaleJaInstalado TailscaleInstalar
+
+    TailscaleInstalar:
+      DetailPrint "Instalando Tailscale..."
+      File "${MSI_TAILSCALE}"
+      ExecWait 'msiexec /i "${PASTA_DESTINO}\${MSI_TAILSCALE}" TS_NOLAUNCH=1 TS_UNATTENDEDMODE=always /quiet /norestart' $0
+      Delete "${PASTA_DESTINO}\${MSI_TAILSCALE}"
+      DetailPrint "Tailscale instalado (codigo: $0)."
+      Goto TailscaleConectar
+
+    TailscaleJaInstalado:
+      DetailPrint "Tailscale ja esta instalado neste PDV — pulando instalacao."
+
+    TailscaleConectar:
+      DetailPrint "Conectando este PDV a rede Tailscale..."
+      ${If} $TailscaleHostname != ""
+        StrCpy $1 ' --hostname=$TailscaleHostname'
+      ${Else}
+        StrCpy $1 ''
+      ${EndIf}
+      ; nsExec::Exec (sem log) para nao expor a auth key na tela/log do instalador
+      nsExec::Exec '"$PROGRAMFILES64\Tailscale\tailscale.exe" up --auth-key=$TailscaleAuthKey --unattended$1'
+      Pop $0
+      ${If} $0 == 0
+        DetailPrint "Tailscale conectado com sucesso."
+      ${Else}
+        DetailPrint "AVISO: falha ao conectar ao Tailscale (codigo $0). Verifique a auth key e, se necessario, rode manualmente depois: tailscale up --auth-key=<key> --unattended"
+      ${EndIf}
+  ${Else}
+    DetailPrint "Auth key do Tailscale nao informada — pulando configuracao de VPN."
+  ${EndIf}
 
   ; ── 5. status_pdv.exe na inicialização ────────
   DetailPrint "Configurando inicialização automática..."

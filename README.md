@@ -109,6 +109,35 @@ pip install -r requirements.txt
 python main.py
 ```
 
+## Tailscale (VPN entre servidor e PDVs)
+
+Cada rede de cliente (ex: `TEST`, `BONNA`) é isolada das outras na mesma tailnet
+via um par de tags: `tag:pdv-<rede>` e `tag:server-<rede>`. O ACL (Access
+Controls, no admin console do Tailscale) só libera tráfego entre o par de tags
+de uma mesma rede — PDVs de redes diferentes nunca se enxergam. Ver o ACL atual
+comentado no admin console; para adicionar uma rede nova, copie o par de tags
+em `tagOwners` e o bloco de 2 `grants` correspondente. Lojas/PDVs novos
+*dentro* de uma rede já existente não exigem mudança no ACL.
+
+O instalador do agente (`PDVAgent_Setup.nsi`) tem uma tela opcional que pede a
+auth key da rede do cliente e instala/conecta o Tailscale automaticamente
+(`tailscale up --auth-key=... --unattended`). Requer o MSI oficial do
+Tailscale em `agent/installer/tailscale-setup-amd64.msi` (baixe em
+https://pkgs.tailscale.com/stable/#windows — não é versionado no git).
+
+**Antes de distribuir uma auth key**: confira no admin console (Settings →
+Keys) que ela foi gerada como **reutilizável**, **não-efêmera** e com a
+**tag certa** (`tag:pdv-<rede>`) marcada — é fácil esquecer o checkbox da tag
+ao gerar uma key, e nesse caso o PDV conecta mas fica sem tag, sem acesso a
+nada (nem ao próprio servidor).
+
+**Depois de qualquer mudança de tag/ACL em produção**: a propagação da nova
+política pode não valer imediatamente para conexões já estabelecidas — rode
+`sudo systemctl restart tailscaled` no servidor para forçar a releitura.
+Isso reescreve regras de `iptables`, o que por sua vez pode quebrar o
+port-forward do Docker para o `pdv-server` — em seguida rode também
+`sudo systemctl restart docker` e confirme com `curl localhost:8888`.
+
 ## Versionamento
 
 A versão do agente fica em `agent/src/pdv_agent/__init__.py` (`VERSION`) e é exposta em `/ping`. Ao lançar uma nova versão, atualize também `!define VERSAO` em `agent/installer/PDVAgent_Setup.nsi` para manter o instalador consistente.

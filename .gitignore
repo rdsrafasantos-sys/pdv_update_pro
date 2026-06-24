@@ -12,6 +12,7 @@ dist/
 # NSIS / instalador (artefatos de build, nao fonte)
 *.exe
 PDVAgent_Setup.exe
+*.msi
 
 # Logs e estado em runtime (gerados no PDV/servidor, nao no repo)
 *.log
