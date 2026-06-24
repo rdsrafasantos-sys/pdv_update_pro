@@ -10,6 +10,13 @@ services:
     # Com host networking, "localhost" dentro do container passa a ser o
     # proprio host (isso muda o default do PDV_SERVER_MONGO_URI abaixo).
     network_mode: host
+    dns:
+      # Docker reescreve /etc/resolv.conf do container mesmo em
+      # network_mode: host -- sem isto, ele usa 8.8.8.8/1.1.1.1 e nao
+      # resolve nomes "*-via-<site>" do MagicDNS do Tailscale.
+      # 100.100.100.100 e o resolvedor interno do Tailscale.
+      - 100.100.100.100
+      - 1.1.1.1
     environment:
       - PDV_SERVER_PORTA=8888
       - PDV_SERVER_TOKEN=${PDV_SERVER_TOKEN:-pdv-agent-2024}
