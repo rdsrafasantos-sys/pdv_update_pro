@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>PDV Updater — Redes</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="app-bg" data-theme="dark">
+<div class="shell" id="shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">VR</div>
+      <div class="brand-name">PDV <span>Updater</span></div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-title">Visão Geral</div>
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span class="nav-label">Redes</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21V12h6v9"/></svg>
+        <span class="nav-label">Unidades</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-title">Administração</div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        <span class="nav-label">Usuários</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/></svg>
+        <span class="nav-label">Perfis &amp; Permissões</span>
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-6"/></svg>
+        <span class="nav-label">Auditoria</span>
+        <span class="nav-badge">3</span>
+      </div>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="avatar">RS</div>
+      <div class="sidebar-foot-text">
+        <div class="name">Rafael Santos</div>
+        <div class="role">Super-admin</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="crumbs"><b>Início</b></div>
+      <div class="searchbar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        Buscar rede, loja ou PDV...
+        <kbd>⌘K</kbd>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" title="Tema">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z"/></svg>
+        </button>
+        <button class="icon-btn" title="Notificações">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Redes</div>
+          <div class="page-sub">9 redes ativas · 142 lojas · 1.024 PDVs monitorados</div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div class="ctx-switch">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13"/></svg>
+            Unidade: <b>Todas (super-admin)</b>
+          </div>
+          <button class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Nova rede
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-4" style="margin-bottom:24px;">
+        <div class="card">
+          <div class="kpi-label">PDVs online agora</div>
+          <div class="kpi-value">986<span style="color:var(--text-faint); font-size:16px;"> / 1024</span></div>
+          <div class="kpi-trend up">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M3 17l6-6 4 4 8-8"/></svg>
+            96,3% de disponibilidade
+          </div>
+        </div>
+        <div class="card">
+          <div class="kpi-label">Atualizações nas últimas 24h</div>
+          <div class="kpi-value">47</div>
+          <div class="kpi-trend up">44 com sucesso · 3 com erro</div>
+        </div>
+        <div class="card">
+          <div class="kpi-label">Divergências de replicação</div>
+          <div class="kpi-value" style="color:var(--amber)">5</div>
+          <div class="kpi-trend" style="color:var(--text-faint)">em 3 redes diferentes</div>
+        </div>
+        <div class="card">
+          <div class="kpi-label">Eventos de auditoria (24h)</div>
+          <div class="kpi-value">183</div>
+          <div class="kpi-trend" style="color:var(--text-faint)">0 acessos suspeitos</div>
+        </div>
+      </div>
+
+      <div class="filterbar">
+        <div class="field">
+          <label>Buscar rede</label>
+          <input placeholder="Nome da rede...">
+        </div>
+        <div class="field">
+          <label>Unidade</label>
+          <select><option>Todas</option><option>VR Recife</option><option>VR Matriz</option><option>VR Interior Paulista</option></select>
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select><option>Todos</option><option>Operacional</option><option>Atenção</option></select>
+        </div>
+      </div>
+
+      <div class="grid grid-3">
+
+        <div class="rede-card card-hover">
+          <div class="rede-card-head">
+            <div style="display:flex; gap:12px; align-items:center;">
+              <div class="rede-icon">CM</div>
+              <div>
+                <div class="rede-name">Compre Mais</div>
+                <div class="rede-unidade">Unidade VR Recife</div>
+              </div>
+            </div>
+            <span class="badge badge-green"><span class="badge-dot"></span>Operacional</span>
+          </div>
+          <div class="rede-stats">
+            <div class="rede-stat"><b>3</b>lojas</div>
+            <div class="rede-stat"><b>21</b>PDVs</div>
+            <div class="rede-stat"><b>19/21</b>online</div>
+          </div>
+        </div>
+
+        <div class="rede-card card-hover">
+          <div class="rede-card-head">
+            <div style="display:flex; gap:12px; align-items:center;">
+              <div class="rede-icon">TS</div>
+              <div>
+                <div class="rede-name">Toshiba</div>
+                <div class="rede-unidade">Unidade VR Matriz</div>
+              </div>
+            </div>
+            <span class="badge badge-amber"><span class="badge-dot"></span>Atenção</span>
+          </div>
+          <div class="rede-stats">
+            <div class="rede-stat"><b>2</b>lojas</div>
+            <div class="rede-stat"><b>20</b>PDVs</div>
+            <div class="rede-stat"><b>18/20</b>online</div>
+          </div>
+        </div>
+
+        <div class="rede-card card-hover">
+          <div class="rede-card-head">
+            <div style="display:flex; gap:12px; align-items:center;">
+              <div class="rede-icon">PC</div>
+              <div>
+                <div class="rede-name">Pacoal</div>
+                <div class="rede-unidade">Unidade VR Interior Paulista</div>
+              </div>
+            </div>
+            <span class="badge badge-green"><span class="badge-dot"></span>Operacional</span>
+          </div>
+          <div class="rede-stats">
+            <div class="rede-stat"><b>5</b>lojas</div>
+            <div class="rede-stat"><b>30</b>PDVs</div>
+            <div class="rede-stat"><b>30/30</b>online</div>
+          </div>
+        </div>
+
+        <div class="rede-card card-hover">
+          <div class="rede-card-head">
+            <div style="display:flex; gap:12px; align-items:center;">
+              <div class="rede-icon" style="color:var(--cyan)">BN</div>
+              <div>
+                <div class="rede-name">Bonna</div>
+                <div class="rede-unidade">Unidade VR Recife</div>
+              </div>
+            </div>
+            <span class="badge badge-green"><span class="badge-dot"></span>Operacional</span>
+          </div>
+          <div class="rede-stats">
+            <div class="rede-stat"><b>2</b>lojas</div>
+            <div class="rede-stat"><b>8</b>PDVs</div>
+            <div class="rede-stat"><b>8/8</b>online</div>
+          </div>
+        </div>
+
+        <div class="rede-card card-hover">
+          <div class="rede-card-head">
+            <div style="display:flex; gap:12px; align-items:center;">
+              <div class="rede-icon" style="color:var(--cyan)">TE</div>
+              <div>
+                <div class="rede-name">TEST</div>
+                <div class="rede-unidade">Unidade VR Matriz</div>
+              </div>
+            </div>
+            <span class="badge badge-gray"><span class="badge-dot" style="background:var(--text-faint)"></span>Sandbox</span>
+          </div>
+          <div class="rede-stats">
+            <div class="rede-stat"><b>2</b>lojas</div>
+            <div class="rede-stat"><b>6</b>PDVs</div>
+            <div class="rede-stat"><b>5/6</b>online</div>
+          </div>
+        </div>
+
+        <div class="rede-card card-hover" style="align-items:center; justify-content:center; border-style:dashed; color:var(--text-faint);">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          <div style="font-size:13px; font-weight:600;">Cadastrar nova rede</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
