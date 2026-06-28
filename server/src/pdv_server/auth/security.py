@@ -47,7 +47,11 @@ def verificar_totp(secret, codigo):
 
 
 def gerar_qr_svg(dados):
-    img = qrcode.make(dados, image_factory=qrcode.image.svg.SvgImage)
+    """Gera o QR como <svg> "puro" (path unico, sem prefixo de namespace e
+    sem o prolog <?xml ...?>) para poder ser embutido direto no HTML."""
+    img = qrcode.make(dados, image_factory=qrcode.image.svg.SvgPathImage)
     buf = io.BytesIO()
     img.save(buf)
-    return buf.getvalue().decode()
+    svg = buf.getvalue().decode()
+    svg = svg.split("?>", 1)[-1].strip()  # remove o prolog <?xml ...?>
+    return svg
