@@ -47,3 +47,21 @@ ERP_DB_DATA_DIR = os.environ.get("PDV_ERP_DB_DATA_DIR", "/opt/pdv-server/erp_db"
 # Onde fica persistida a configuracao de conexao com o integrador (ip/porta) e
 # com o MongoDB que ele alimenta
 INTEGRADOR_DATA_DIR = os.environ.get("PDV_INTEGRADOR_DATA_DIR", "/opt/pdv-server/integrador")
+
+# ──────────────────────────────────────────────
+# AUTENTICACAO / PAINEL ADMINISTRATIVO (usuarios, redes, auditoria)
+# ──────────────────────────────────────────────
+# Onde fica o banco SQLite local do painel (usuarios, unidades, redes,
+# auditoria) — nao tem relacao com o MongoDB do integrador.
+AUTH_DATA_DIR = os.environ.get("PDV_AUTH_DATA_DIR", "/opt/pdv-server/auth")
+
+# Chave mestra usada para criptografar segredos em repouso (token/Mongo URI
+# de cada rede) com Fernet. OBRIGATORIA em producao — gere uma com:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Sem ela definida, o processo nao sobe (ver app.py). Nunca commitar este
+# valor — fica so no .env de cada instalacao.
+MASTER_KEY = os.environ.get("PDV_MASTER_KEY", "")
+
+# Chave de sessao do Flask (assinatura do cookie). Tambem obrigatoria em
+# producao, gere com: python -c "import secrets; print(secrets.token_hex(32))"
+SECRET_KEY = os.environ.get("PDV_SECRET_KEY", "")

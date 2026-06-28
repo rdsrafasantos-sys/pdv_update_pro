@@ -41,6 +41,15 @@
       </span>
       ☀️
     </label>
+    <div style="display:flex; align-items:center; gap:14px; margin-left:14px; font-size:13px;">
+      <span class="text-muted">{{ usuario_atual.nome }}</span>
+      {% if not usuario_atual.totp_habilitado %}
+      <a href="{{ url_for('auth.configurar_2fa') }}" style="color:var(--vr-orange);">⚠️ Configurar 2FA</a>
+      {% endif %}
+      <form method="post" action="{{ url_for('auth.logout') }}" style="display:inline;">
+        <button type="submit" class="text-muted" style="background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;font-size:13px;">Sair</button>
+      </form>
+    </div>
   </div>
 
   <div class="shell">

@@ -58,11 +58,19 @@ if [ ! -f .env ]; then
   read -rp "Token compartilhado com os agentes dos PDVs [pdv-agent-2024]: " TOKEN
   TOKEN="${TOKEN:-pdv-agent-2024}"
 
+  # Chaves de seguranca obrigatorias -- uma por instalacao, nunca
+  # reaproveitar entre clientes/servidores.
+  MASTER_KEY=$(openssl rand -base64 32 | tr '+/' '-_')
+  SECRET_KEY=$(openssl rand -hex 32)
+
   cat > .env <<EOF
 PDV_SERVER_MONGO_URI=mongodb://${MONGO_HOST}:${MONGO_PORT}
 PDV_SERVER_TOKEN=${TOKEN}
+PDV_MASTER_KEY=${MASTER_KEY}
+PDV_SECRET_KEY=${SECRET_KEY}
 EOF
   echo ".env criado em $DEST/server/.env"
+  PRECISA_CRIAR_ADMIN=1
 else
   echo ""
   echo ".env ja existe, mantendo a configuracao atual ($DEST/server/.env)."
@@ -70,12 +78,20 @@ else
   echo "  cd $DEST/server && $DC up -d --build"
 fi
 
-mkdir -p data/uploads data/replicacao data/erp_db data/integrador
+mkdir -p data/uploads data/replicacao data/erp_db data/integrador data/auth
 
 # ── 4. Sobe o container ────────────────────────────────────
 echo ""
 echo "Construindo e iniciando o container..."
 $DC up -d --build
+
+# ── 5. Primeiro super-admin (so na primeira instalacao) ────
+if [ "$PRECISA_CRIAR_ADMIN" = "1" ]; then
+  echo ""
+  echo "--- Primeiro acesso ao painel ---"
+  echo "Cadastre o super-admin (voce vai usar isso pra fazer login):"
+  $DC exec pdv-server python -m pdv_server.seed_admin
+fi
 
 IP=$(hostname -I | awk '{print $1}')
 echo ""

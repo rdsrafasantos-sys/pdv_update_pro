@@ -5,9 +5,12 @@ import time
 
 import requests
 from flask import Flask, Response, jsonify, render_template, request
+from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
-from pdv_server.config import TOKEN_SEGURANCA, UPLOAD_DIR
+from pdv_server.auth.models import init_db
+from pdv_server.auth.routes import auth_bp, limiter, login_manager
+from pdv_server.config import MASTER_KEY, SECRET_KEY, TOKEN_SEGURANCA, UPLOAD_DIR
 from pdv_server.dispatch import (
     enviar_agente_para_pdvs, get_atualizacoes_loja, iniciar_envio_zip,
     reiniciar_mongo_pdv,
@@ -18,13 +21,46 @@ from pdv_server.discovery import (
 from pdv_server import erp_db, integrador, replication
 from pdv_server.versioning import eh_downgrade, extrair_versao
 
+if not SECRET_KEY:
+    raise RuntimeError(
+        "PDV_SECRET_KEY nao configurada. Gere uma com: "
+        "python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
+if not MASTER_KEY:
+    raise RuntimeError(
+        "PDV_MASTER_KEY nao configurada. Gere uma com: "
+        "python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+    )
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
+app.secret_key = SECRET_KEY
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+init_db()
+
+login_manager.init_app(app)
+limiter.init_app(app)
+app.register_blueprint(auth_bp)
+
+
+@app.before_request
+def exigir_login():
+    rota = request.endpoint or ""
+    if rota.startswith("auth.") or rota == "static":
+        return None
+    if not current_user.is_authenticated:
+        return login_manager.unauthorized()
+    return None
+
+
+@app.context_processor
+def injetar_usuario():
+    return {"usuario_atual": current_user}
 
 
 @app.route("/")
+@login_required
 def index():
     return render_template("index.html")
 

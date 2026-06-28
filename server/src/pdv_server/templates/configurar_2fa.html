@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV Updater — Configurar 2FA</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
+<style>
+  body.login-bg {
+    display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    background:
+      radial-gradient(900px 500px at 18% -10%, rgba(255,122,26,0.10), transparent 60%),
+      radial-gradient(700px 500px at 100% 100%, rgba(52,214,224,0.07), transparent 60%),
+      var(--bg);
+  }
+  .login-card { width: 400px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 30px 32px; box-shadow: var(--shadow-soft); text-align: center; }
+  .login-title { font-size: 16px; font-weight: 700; }
+  .login-sub { font-size: 12px; color: var(--text-faint); margin: 6px 0 20px; }
+  .qr-box { background: #fff; padding: 14px; border-radius: 12px; display: inline-block; margin-bottom: 16px; }
+  .qr-box img, .qr-box svg { display: block; width: 180px; height: 180px; }
+  .segredo {
+    font-family: var(--font-mono); font-size: 12.5px; background: var(--bg-elevated);
+    border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 8px 10px;
+    word-break: break-all; margin-bottom: 18px; color: var(--text-dim);
+  }
+  .codigo-input {
+    width: 100%; text-align: center; font-family: var(--font-mono); font-size: 22px;
+    letter-spacing: 6px; padding: 12px; border-radius: var(--radius-sm);
+    background: var(--bg-elevated); border: 1px solid var(--border-strong); color: var(--text);
+  }
+  .login-card .btn-primary { width: 100%; justify-content: center; padding: 11px; margin-top: 14px; border: none; font-size: 13.5px; }
+  .flash { font-size: 12.5px; border-radius: var(--radius-sm); padding: 9px 12px; margin-bottom: 14px; }
+  .flash-erro { background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,92,114,.3); }
+</style>
+</head>
+<body class="login-bg" data-theme="dark">
+  <div class="login-card">
+    {% if ja_habilitado %}
+      <div class="login-title">2FA já está habilitado</div>
+      <div class="login-sub">Sua conta já está protegida com verificação em duas etapas.</div>
+      <a class="btn btn-ghost" href="{{ url_for('index') }}" style="width:100%; justify-content:center;">Voltar ao painel</a>
+    {% else %}
+      <div class="login-title">Configurar verificação em duas etapas</div>
+      <div class="login-sub">Escaneie o QR com Google Authenticator, Authy ou similar</div>
+
+      {% with mensagens = get_flashed_messages(with_categories=true) %}
+        {% for categoria, msg in mensagens %}
+          <div class="flash flash-{{ categoria }}">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <div class="qr-box">{{ qr_svg | safe }}</div>
+      <div class="segredo">Não consegue escanear? Digite manualmente: {{ segredo }}</div>
+
+      <form method="post" action="{{ url_for('auth.configurar_2fa') }}">
+        <input class="codigo-input" type="text" name="codigo" inputmode="numeric" pattern="[0-9]*"
+               maxlength="6" placeholder="000000" autofocus required>
+        <button class="btn btn-primary" type="submit">Confirmar e ativar</button>
+      </form>
+    {% endif %}
+  </div>
+</body>
+</html>

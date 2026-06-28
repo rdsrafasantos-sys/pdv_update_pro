@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV Updater — Login</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
+<style>
+  body.login-bg {
+    display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    background:
+      radial-gradient(900px 500px at 18% -10%, rgba(255,122,26,0.10), transparent 60%),
+      radial-gradient(700px 500px at 100% 100%, rgba(52,214,224,0.07), transparent 60%),
+      var(--bg);
+  }
+  .login-card {
+    width: 380px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 34px 32px 28px; box-shadow: var(--shadow-soft);
+  }
+  .login-brand { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 26px; }
+  .login-mark {
+    width: 46px; height: 46px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--orange), #ff9a4d);
+    box-shadow: 0 0 0 1px var(--orange-glow), 0 8px 24px var(--orange-dim);
+    display: flex; align-items: center; justify-content: center; font-weight: 800; color: #1a0f00; font-size: 19px;
+  }
+  .login-title { font-size: 16px; font-weight: 700; }
+  .login-sub { font-size: 12px; color: var(--text-faint); margin-top: -6px; }
+  .field { margin-bottom: 14px; }
+  .login-card .btn-primary { width: 100%; justify-content: center; padding: 11px; margin-top: 6px; border: none; font-size: 13.5px; }
+  .login-foot { text-align: center; margin-top: 22px; font-size: 11.5px; color: var(--text-faint); }
+  .login-foot .lock { display:inline-flex; align-items:center; gap:5px; }
+  .flash { font-size: 12.5px; border-radius: var(--radius-sm); padding: 9px 12px; margin-bottom: 14px; }
+  .flash-erro { background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,92,114,.3); }
+  .flash-ok { background: var(--green-dim); color: var(--green); border: 1px solid rgba(43,213,118,.3); }
+</style>
+</head>
+<body class="login-bg" data-theme="dark">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-mark">VR</div>
+      <div class="login-title">PDV <span style="color:var(--orange)">Updater</span></div>
+      <div class="login-sub">Painel central de redes, lojas e PDVs</div>
+    </div>
+
+    {% with mensagens = get_flashed_messages(with_categories=true) %}
+      {% for categoria, msg in mensagens %}
+        <div class="flash flash-{{ categoria }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="post" action="{{ url_for('auth.login') }}">
+      <input type="hidden" name="proximo" value="{{ request.args.get('proximo', '') }}">
+      <div class="field">
+        <label>E-mail corporativo</label>
+        <input type="email" name="email" placeholder="seu.nome@vrsoft.com.br" autofocus required>
+      </div>
+      <div class="field">
+        <label>Senha</label>
+        <input type="password" name="senha" placeholder="••••••••••••" required>
+      </div>
+      <button class="btn btn-primary" type="submit">Entrar</button>
+    </form>
+
+    <div class="login-foot">
+      <span class="lock">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        Conexão segura · sessão protegida por cookie criptografado
+      </span>
+    </div>
+  </div>
+</body>
+</html>

@@ -21,8 +21,15 @@ services:
       - PDV_SERVER_PORTA=8888
       - PDV_SERVER_TOKEN=${PDV_SERVER_TOKEN:-pdv-agent-2024}
       - PDV_SERVER_MONGO_URI=${PDV_SERVER_MONGO_URI:-mongodb://localhost:27016}
+      # Obrigatorias -- sem elas o processo nao sobe (ver auth/ e app.py).
+      # Gere uma vez por instalacao e NUNCA reaproveite entre clientes:
+      #   PDV_MASTER_KEY: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+      #   PDV_SECRET_KEY: python -c "import secrets; print(secrets.token_hex(32))"
+      - PDV_MASTER_KEY=${PDV_MASTER_KEY}
+      - PDV_SECRET_KEY=${PDV_SECRET_KEY}
     volumes:
       - ./data/uploads:/opt/pdv-server/uploads
       - ./data/replicacao:/opt/pdv-server/replicacao
       - ./data/erp_db:/opt/pdv-server/erp_db
       - ./data/integrador:/opt/pdv-server/integrador
+      - ./data/auth:/opt/pdv-server/auth

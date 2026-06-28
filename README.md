@@ -16,6 +16,8 @@ agent/
   installer/           instalador NSIS + script PowerShell
 server/
   src/pdv_server/      pacote Python do servidor (config, descoberta MongoDB, despacho de updates, rotas Flask)
+    auth/                login, 2FA, modelos (usuarios/redes/auditoria), criptografia de segredos
+    seed_admin.py         cria o primeiro super-admin (linha de comando, uma vez)
   main.py               entrypoint do servidor
   Dockerfile / docker-compose.yml   instalação via Docker (recomendado)
   installer/             instalador Docker (recomendado) + script systemd legado
@@ -36,10 +38,49 @@ Nenhum segredo deve ser commitado. Os componentes leem config de variáveis de a
 | `PDV_REPLICACAO_DB` | server | `pdv` | Banco que contém as coleções replicadas (mesmo nome nos dois lados) |
 | `PDV_LOCAL_MONGO_PORTA` | server | `27018` | Porta do MongoDB local de cada PDV, acessado pelo IP do PDV |
 | `PDV_REPLICACAO_DATA_DIR` | server | `/opt/pdv-server/replicacao` | Onde fica a config da verificação automática e o histórico |
+| `PDV_MASTER_KEY` | server | _(obrigatória, sem default)_ | Chave Fernet para cifrar segredos em repouso (Mongo URI/token de cada rede). O processo não sobe sem ela. |
+| `PDV_SECRET_KEY` | server | _(obrigatória, sem default)_ | Chave de assinatura da sessão (cookie de login). O processo não sobe sem ela. |
+| `PDV_AUTH_DATA_DIR` | server | `/opt/pdv-server/auth` | Onde fica o banco SQLite do painel (usuários, redes, auditoria) |
 
 Rodando via Docker (recomendado), `PDV_SERVER_TOKEN` e `PDV_SERVER_MONGO_URI` são lidos do `server/.env` (ver `.env.example`); os diretórios (`UPLOAD_DIR`, `REPLICACAO_DATA_DIR`, etc.) já vêm mapeados como volumes no `docker-compose.yml` e não precisam ser sobrescritos.
 
 Em produção, defina `PDV_AGENT_TOKEN`/`PDV_SERVER_TOKEN` com um valor forte e igual nos dois lados (no agente isso normalmente é feito configurando a variável de ambiente do serviço NSSM; no servidor rodando via Docker, num arquivo `server/.env` — ver `server/.env.example` e a seção "Server — instalação" abaixo).
+
+## Autenticação e segurança do painel
+
+O painel inteiro fica atrás de login (sessão via `flask-login`, sem nenhuma
+rota acessível sem autenticação além de `/login` e `/login/2fa`). Dados de
+usuário (senha, segredos de cada rede, auditoria) ficam num banco SQLite
+próprio em `PDV_AUTH_DATA_DIR`, separado do MongoDB do integrador.
+
+- **Senhas**: hash com Argon2id (`argon2-cffi`), nunca texto puro.
+- **2FA (TOTP)**: opcional por usuário, mas fortemente recomendado — ative em
+  "⚠️ Configurar 2FA" no topo do painel após o primeiro login. Compatível com
+  Google Authenticator, Authy, 1Password, etc.
+- **Rate limit**: `/login` e `/login/2fa` aceitam no máximo 8 tentativas por
+  minuto por IP (`flask-limiter`), para dificultar força-bruta.
+- **Auditoria**: toda tentativa de login (sucesso/falha), 2FA e logout é
+  registrada (usuário, ação, IP, data/hora) — consulta via
+  `pdv_server.auth.audit.listar_auditoria()` (tela própria no painel é uma
+  fase futura).
+- **Segredos em repouso**: Mongo URI/token de cada rede são cifrados com
+  Fernet (`cryptography`) usando `PDV_MASTER_KEY` antes de ir para o banco —
+  nunca gravados em texto puro.
+
+### Primeiro acesso (criar o super-admin)
+
+Não existe cadastro de usuário pela tela ainda (vem numa fase futura) — o
+primeiro usuário é criado por linha de comando, uma única vez (o comando se
+recusa a rodar se já existir algum usuário):
+
+```bash
+# dentro do container (instalação via Docker):
+docker compose exec pdv-server python -m pdv_server.seed_admin
+# ou passando os dados direto: python -m pdv_server.seed_admin email senha "Nome"
+```
+
+O `instalar_servidor_docker.sh` já chama isso automaticamente na primeira
+instalação.
 
 ## Verificação de replicação
 

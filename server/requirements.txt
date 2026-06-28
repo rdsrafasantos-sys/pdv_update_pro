@@ -2,3 +2,10 @@ flask
 requests
 pymongo
 psycopg2-binary
+flask-login
+flask-limiter
+argon2-cffi
+pyotp
+qrcode
+cryptography
+SQLAlchemy
