@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV Updater — Unidades</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
+<style>
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none;
+    align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal-overlay.aberto { display: flex; }
+  .modal-card {
+    width: 380px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 24px; box-shadow: var(--shadow-soft);
+  }
+  .modal-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+  .modal-card .field { margin-bottom: 12px; }
+  .modal-card .field label { font-size: 11.5px; color: var(--text-faint); font-weight: 650; display:block; margin-bottom:5px; }
+  .modal-card input {
+    width: 100%; background: var(--bg-elevated); border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 13px;
+  }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  .erro-msg { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
+</style>
+</head>
+<body class="app-bg" data-theme="dark">
+<div class="shell" id="shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">VR</div>
+      <div class="brand-name">PDV <span>Updater</span></div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-title">Visão Geral</div>
+      <a class="nav-item" href="{{ url_for('painel.redes') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span class="nav-label">Redes</span>
+      </a>
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21V12h6v9"/></svg>
+        <span class="nav-label">Unidades</span>
+      </div>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="avatar">{{ usuario_atual.nome[:2].upper() }}</div>
+      <div class="sidebar-foot-text">
+        <div class="name">{{ usuario_atual.nome }}</div>
+        <div class="role">{{ "Super-admin" if usuario_atual.is_super_admin else "Usuário" }}</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="crumbs"><span>Redes</span> <span>›</span> <b>Unidades</b></div>
+      <div class="topbar-right">
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <button type="submit" class="btn btn-ghost btn-sm">Sair</button>
+        </form>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Unidades</div>
+          <div class="page-sub">Filiais/escritórios da VR Software — cada rede de cliente pertence a uma só.</div>
+        </div>
+        <button class="btn btn-primary" onclick="abrirModalNovaUnidade()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Nova unidade
+        </button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nome</th><th>Redes vinculadas</th><th></th></tr></thead>
+          <tbody id="tabelaUnidades">
+            <tr><td colspan="3" class="text-muted">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalUnidade">
+  <div class="modal-card">
+    <div class="modal-title" id="modalTitulo">Nova unidade</div>
+    <input type="hidden" id="unidadeId">
+    <div class="field">
+      <label>Nome</label>
+      <input id="campoNome" placeholder="Ex: VR Recife">
+    </div>
+    <div class="erro-msg" id="modalErro"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarUnidade()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+async function carregarUnidades() {
+  const r = await fetch('/api/unidades');
+  const unidades = await r.json();
+  const tbody = document.getElementById('tabelaUnidades');
+  if (unidades.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="text-muted">Nenhuma unidade cadastrada ainda.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = unidades.map(u => `
+    <tr>
+      <td class="strong">${u.nome}</td>
+      <td>${u.total_redes}</td>
+      <td style="text-align:right;">
+        <button class="btn btn-ghost btn-sm" onclick="editarUnidade(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">Editar</button>
+        <button class="btn btn-ghost btn-sm" onclick="excluirUnidade(${u.id})">Excluir</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function abrirModalNovaUnidade() {
+  document.getElementById('modalTitulo').textContent = 'Nova unidade';
+  document.getElementById('unidadeId').value = '';
+  document.getElementById('campoNome').value = '';
+  document.getElementById('modalErro').style.display = 'none';
+  document.getElementById('modalUnidade').classList.add('aberto');
+}
+
+function editarUnidade(id, nome) {
+  document.getElementById('modalTitulo').textContent = 'Editar unidade';
+  document.getElementById('unidadeId').value = id;
+  document.getElementById('campoNome').value = nome;
+  document.getElementById('modalErro').style.display = 'none';
+  document.getElementById('modalUnidade').classList.add('aberto');
+}
+
+function fecharModal() {
+  document.getElementById('modalUnidade').classList.remove('aberto');
+}
+
+async function salvarUnidade() {
+  const id = document.getElementById('unidadeId').value;
+  const nome = document.getElementById('campoNome').value;
+  const url = id ? `/api/unidades/${id}` : '/api/unidades';
+  const r = await fetch(url, {
+    method: id ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nome }),
+  });
+  const dados = await r.json();
+  if (dados.erro) {
+    const erroEl = document.getElementById('modalErro');
+    erroEl.textContent = dados.erro;
+    erroEl.style.display = 'block';
+    return;
+  }
+  fecharModal();
+  carregarUnidades();
+}
+
+async function excluirUnidade(id) {
+  if (!confirm('Excluir esta unidade?')) return;
+  const r = await fetch(`/api/unidades/${id}`, { method: 'DELETE' });
+  const dados = await r.json();
+  if (dados.erro) { alert(dados.erro); return; }
+  carregarUnidades();
+}
+
+carregarUnidades();
+</script>
+</body>
+</html>

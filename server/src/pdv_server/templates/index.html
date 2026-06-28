@@ -42,6 +42,9 @@
       ☀️
     </label>
     <div style="display:flex; align-items:center; gap:14px; margin-left:14px; font-size:13px;">
+      {% if usuario_atual.is_super_admin %}
+      <a href="{{ url_for('painel.redes') }}">🌐 Redes</a>
+      {% endif %}
       <span class="text-muted">{{ usuario_atual.nome }}</span>
       {% if not usuario_atual.totp_habilitado %}
       <a href="{{ url_for('auth.configurar_2fa') }}" style="color:var(--vr-orange);">⚠️ Configurar 2FA</a>

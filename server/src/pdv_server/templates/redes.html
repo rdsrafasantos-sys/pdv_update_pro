@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV Updater — Redes</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
+<style>
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none;
+    align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal-overlay.aberto { display: flex; }
+  .modal-card {
+    width: 460px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 24px; box-shadow: var(--shadow-soft);
+  }
+  .modal-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+  .modal-card .field { margin-bottom: 12px; }
+  .modal-card .field label { font-size: 11.5px; color: var(--text-faint); font-weight: 650; display:block; margin-bottom:5px; }
+  .modal-card input, .modal-card select {
+    width: 100%; background: var(--bg-elevated); border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 13px;
+  }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  .erro-msg { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
+  .text-muted { color: var(--text-faint); }
+</style>
+</head>
+<body class="app-bg" data-theme="dark">
+<div class="shell" id="shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">VR</div>
+      <div class="brand-name">PDV <span>Updater</span></div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-title">Visão Geral</div>
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span class="nav-label">Redes</span>
+      </div>
+      <a class="nav-item" href="{{ url_for('painel.unidades_pagina') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21V12h6v9"/></svg>
+        <span class="nav-label">Unidades</span>
+      </a>
+      <a class="nav-item" href="{{ url_for('index') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        <span class="nav-label">Painel (atual)</span>
+      </a>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="avatar">{{ usuario_atual.nome[:2].upper() }}</div>
+      <div class="sidebar-foot-text">
+        <div class="name">{{ usuario_atual.nome }}</div>
+        <div class="role">{{ "Super-admin" if usuario_atual.is_super_admin else "Usuário" }}</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="crumbs"><b>Redes</b></div>
+      <div class="topbar-right">
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <button type="submit" class="btn btn-ghost btn-sm">Sair</button>
+        </form>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Redes</div>
+          <div class="page-sub" id="resumo">Carregando...</div>
+        </div>
+        <button class="btn btn-primary" onclick="abrirModalNovaRede()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Nova rede
+        </button>
+      </div>
+
+      <div id="redesContainer" class="grid grid-3">
+        <div class="card skeleton" style="height:140px;"></div>
+        <div class="card skeleton" style="height:140px;"></div>
+        <div class="card skeleton" style="height:140px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalRede">
+  <div class="modal-card">
+    <div class="modal-title" id="modalTitulo">Nova rede</div>
+    <input type="hidden" id="redeId">
+    <div class="field">
+      <label>Nome da rede</label>
+      <input id="campoNome" placeholder="Ex: Compre Mais">
+    </div>
+    <div class="field">
+      <label>Unidade</label>
+      <select id="campoUnidade"></select>
+    </div>
+    <div class="field">
+      <label>Mongo URI do integrador</label>
+      <input id="campoMongoUri" placeholder="mongodb://192.168.1.20:27016">
+    </div>
+    <div class="field">
+      <label>Token compartilhado com os agentes</label>
+      <input id="campoToken" placeholder="token-secreto">
+    </div>
+    <div class="field">
+      <label>Tailscale Site ID <span class="text-muted">(opcional — só se o IP do cliente não pode mudar)</span></label>
+      <input id="campoSiteId" placeholder="">
+    </div>
+    <div class="erro-msg" id="modalErro"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarRede()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let unidadesCache = [];
+
+async function carregarTudo() {
+  const [redes, unidades] = await Promise.all([
+    fetch('/api/redes').then(r => r.json()),
+    fetch('/api/unidades').then(r => r.json()),
+  ]);
+  unidadesCache = unidades;
+
+  const totalRedes = redes.length;
+  const totalAtivas = redes.filter(r => r.ativa).length;
+  document.getElementById('resumo').textContent =
+    `${totalRedes} rede(s) cadastrada(s) · ${totalAtivas} ativa(s) · ${unidades.length} unidade(s)`;
+
+  const sel = document.getElementById('campoUnidade');
+  sel.innerHTML = unidades.map(u => `<option value="${u.id}">${u.nome}</option>`).join('')
+    || '<option value="">Cadastre uma unidade primeiro</option>';
+
+  const cont = document.getElementById('redesContainer');
+  if (redes.length === 0) {
+    cont.innerHTML = '<div class="card" style="grid-column: 1/-1;"><div class="text-muted">Nenhuma rede cadastrada ainda. Clique em "Nova rede" para começar.</div></div>';
+    return;
+  }
+
+  cont.innerHTML = redes.map(r => `
+    <div class="rede-card">
+      <div class="rede-card-head">
+        <div style="display:flex; gap:12px; align-items:center;">
+          <div class="rede-icon">${r.nome.slice(0,2).toUpperCase()}</div>
+          <div>
+            <div class="rede-name">${r.nome}</div>
+            <div class="rede-unidade">${r.unidade_nome || '—'}</div>
+          </div>
+        </div>
+        <span class="badge ${r.ativa ? 'badge-green' : 'badge-gray'}">
+          <span class="badge-dot"></span>${r.ativa ? 'Ativa' : 'Desativada'}
+        </span>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="editarRede(${r.id})">Editar</button>
+        <button class="btn btn-ghost btn-sm" onclick="alternarRede(${r.id}, ${!r.ativa})">${r.ativa ? 'Desativar' : 'Ativar'}</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function abrirModalNovaRede() {
+  document.getElementById('modalTitulo').textContent = 'Nova rede';
+  document.getElementById('redeId').value = '';
+  document.getElementById('campoNome').value = '';
+  document.getElementById('campoMongoUri').value = '';
+  document.getElementById('campoToken').value = '';
+  document.getElementById('campoSiteId').value = '';
+  document.getElementById('modalErro').style.display = 'none';
+  document.getElementById('modalRede').classList.add('aberto');
+}
+
+async function editarRede(id) {
+  const r = await fetch(`/api/redes/${id}`);
+  const dados = await r.json();
+  if (dados.erro) { alert(dados.erro); return; }
+  document.getElementById('modalTitulo').textContent = `Editar — ${dados.nome}`;
+  document.getElementById('redeId').value = dados.id;
+  document.getElementById('campoNome').value = dados.nome;
+  document.getElementById('campoUnidade').value = dados.unidade_id;
+  document.getElementById('campoMongoUri').value = dados.mongo_uri;
+  document.getElementById('campoToken').value = dados.token;
+  document.getElementById('campoSiteId').value = dados.tailscale_site_id || '';
+  document.getElementById('modalErro').style.display = 'none';
+  document.getElementById('modalRede').classList.add('aberto');
+}
+
+function fecharModal() {
+  document.getElementById('modalRede').classList.remove('aberto');
+}
+
+async function salvarRede() {
+  const id = document.getElementById('redeId').value;
+  const corpo = {
+    nome: document.getElementById('campoNome').value,
+    unidade_id: parseInt(document.getElementById('campoUnidade').value, 10),
+    mongo_uri: document.getElementById('campoMongoUri').value,
+    token: document.getElementById('campoToken').value,
+    tailscale_site_id: document.getElementById('campoSiteId').value,
+  };
+  const url = id ? `/api/redes/${id}` : '/api/redes';
+  const r = await fetch(url, {
+    method: id ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corpo),
+  });
+  const dados = await r.json();
+  if (dados.erro) {
+    const erroEl = document.getElementById('modalErro');
+    erroEl.textContent = dados.erro;
+    erroEl.style.display = 'block';
+    return;
+  }
+  fecharModal();
+  carregarTudo();
+}
+
+async function alternarRede(id, ativa) {
+  await fetch(`/api/redes/${id}/ativa`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ativa }),
+  });
+  carregarTudo();
+}
+
+carregarTudo();
+</script>
+</body>
+</html>

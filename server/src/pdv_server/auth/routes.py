@@ -1,3 +1,5 @@
+from functools import wraps
+
 from flask import (
     Blueprint, current_app, flash, jsonify, redirect, render_template,
     request, session, url_for,
@@ -28,6 +30,20 @@ auth_bp = Blueprint("auth", __name__)
 
 def _ip_cliente():
     return request.headers.get("X-Forwarded-For", request.remote_addr or "")
+
+
+def exigir_super_admin(view):
+    """So permite a view se o usuario logado for super-admin. Provisorio
+    até a Fase 1 trazer perfis/permissoes granulares de verdade."""
+    @wraps(view)
+    @login_required
+    def wrapper(*args, **kwargs):
+        if not current_user.is_super_admin:
+            if request.path.startswith("/api/"):
+                return jsonify({"erro": "Apenas super-admin pode fazer isso"}), 403
+            return redirect(url_for("painel.redes"))
+        return view(*args, **kwargs)
+    return wrapper
 
 
 class UsuarioLogado(UserMixin):
@@ -62,7 +78,7 @@ def nao_autorizado():
 @limiter.limit("8 per minute", methods=["POST"])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("index"))
+        return redirect(url_for("painel.redes"))
 
     if request.method == "GET":
         return render_template("login.html")
@@ -82,13 +98,13 @@ def login():
 
         if usuario.totp_habilitado:
             session["pre_2fa_usuario_id"] = usuario.id
-            session["pre_2fa_proximo"] = request.form.get("proximo") or url_for("index")
+            session["pre_2fa_proximo"] = request.form.get("proximo") or url_for("painel.redes")
             registrar_auditoria(usuario.email, "login_aguardando_2fa", ip=ip)
             return redirect(url_for("auth.verificar_2fa"))
 
         login_user(UsuarioLogado(usuario))
         registrar_auditoria(usuario.email, "login_sucesso", detalhes="sem 2FA habilitado", ip=ip)
-        return redirect(request.form.get("proximo") or url_for("index"))
+        return redirect(request.form.get("proximo") or url_for("painel.redes"))
     finally:
         db.close()
 
@@ -120,7 +136,7 @@ def verificar_2fa():
             return render_template("login_2fa.html"), 401
 
         session.pop("pre_2fa_usuario_id", None)
-        proximo = session.pop("pre_2fa_proximo", url_for("index"))
+        proximo = session.pop("pre_2fa_proximo", url_for("painel.redes"))
         login_user(UsuarioLogado(usuario))
         registrar_auditoria(usuario.email, "login_sucesso", detalhes="com 2FA", ip=ip)
         return redirect(proximo)
@@ -159,7 +175,7 @@ def configurar_2fa():
         session.pop("novo_totp_secret", None)
         registrar_auditoria(usuario.email, "2fa_habilitado", ip=_ip_cliente())
         flash("2FA habilitado com sucesso.", "ok")
-        return redirect(url_for("index"))
+        return redirect(url_for("painel.redes"))
     finally:
         db.close()
 

@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 from pdv_server.auth.models import init_db
 from pdv_server.auth.routes import auth_bp, limiter, login_manager
 from pdv_server.config import MASTER_KEY, SECRET_KEY, TOKEN_SEGURANCA, UPLOAD_DIR
+from pdv_server.painel.routes import painel_bp
 from pdv_server.dispatch import (
     enviar_agente_para_pdvs, get_atualizacoes_loja, iniciar_envio_zip,
     reiniciar_mongo_pdv,
@@ -42,6 +43,7 @@ init_db()
 login_manager.init_app(app)
 limiter.init_app(app)
 app.register_blueprint(auth_bp)
+app.register_blueprint(painel_bp)
 
 
 @app.before_request
