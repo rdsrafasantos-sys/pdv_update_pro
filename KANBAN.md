@@ -1,63 +1,34 @@
 # Kanban — Painel Multi-Tenant (Redes / Unidades / RBAC / Redesign)
 
-> Acompanhamento das fases da reestruturação do `pdv-server` em um painel
-> central multi-tenant (Unidade → Rede → Loja → PDV), com login/RBAC e novo
-> visual. Atualizado a cada sessão — não editar manualmente o histórico de
-> "Concluído", só mover cards entre colunas.
+> O board de verdade vive no GitHub Projects (drag-and-drop, issues
+> reais, histórico de mudanças). Este arquivo é só um ponteiro + legenda.
 
-Protótipo visual aprovado em `design/preview/` (login, redes, dashboard de
-rede, usuários/perfis) — referência de direção pra todo o trabalho visual
-abaixo.
+## 📋 Board
 
----
+**https://github.com/users/rdsrafasantos-sys/projects/1**
 
-## 🟦 Backlog
+5 colunas: `Backlog` → `A Fazer` → `Em Andamento` → `Em Revisão` → `Concluído`.
 
-### Fase 0 — Fundamentos de segurança & dados
-- [ ] Modelo de dados: `Unidade`, `Rede`, `Loja`, `PDV` como entidades reais (hoje "rede" só existe como `.env` por deployment)
-- [ ] Login com sessão segura (cookie `httponly`+`secure`+`samesite`, expiração/renovação)
-- [ ] Hash de senha com Argon2id
-- [ ] 2FA (TOTP)
-- [ ] Rate limit no login (anti força-bruta)
-- [ ] Log de auditoria (quem fez o quê, quando — toda ação sensível)
-- [ ] Segredos por rede (Mongo URI, token, Tailscale Site ID) criptografados em repouso
+## 🏷️ Labels (uma por fase)
 
-### Fase 1 — Usuários & Perfis (RBAC)
-- [ ] CRUD de Usuários
-- [ ] CRUD de Perfis (permissões reutilizáveis, não codificadas no usuário)
-- [ ] Permissão escopada por Unidade e/ou por Rede específica
-- [ ] Tela "Usuários" + "Perfis" (baseado no protótipo)
+| Label | Fase |
+|---|---|
+| `fase-0-seguranca` | Fundamentos de segurança & dados (login, 2FA, auditoria, criptografia de segredos) |
+| `fase-1-rbac` | Usuários & Perfis (RBAC) |
+| `fase-2-redes` | Unidades & Redes via painel (substitui `.env` manual) |
+| `fase-3-multitenant` | Refatoração multi-tenant do core (`discovery.py`/`dispatch.py`/etc.) |
+| `fase-4-visual` | Redesign visual (aplicar `design/preview/`) |
+| `fase-5-infra` | Infra para produção em nuvem |
 
-### Fase 2 — Unidades & Redes (cadastro via painel)
-- [ ] CRUD de Unidades
-- [ ] CRUD de Redes pela tela (substitui editar `.env` manualmente)
-- [ ] Tela "Redes" como nova home (cards por rede, agrupado por Unidade)
+## Como isso é mantido
 
-### Fase 3 — Refatoração multi-tenant do core
-- [ ] `discovery.py` / `dispatch.py` / `replication.py` / `erp_db.py` / `integrador.py` parametrizados por rede (sem globais fixas)
-- [ ] Rotas `/api/<rede_id>/...`
-- [ ] Migrar dados/configs existentes (TEST, BONNA, produção real do PDV-215) pro novo modelo, sem perder histórico
+Cada tarefa é uma *issue* do repositório, adicionada ao board. Conforme a
+gente avança numa sessão, eu movo a issue de coluna (`gh project item-edit`)
+e fecho quando concluída — não edito mais checkbox aqui, o board é a fonte
+da verdade. Pra ver o estado atual rápido sem abrir o navegador:
 
-### Fase 4 — Redesign visual (aplicar o protótipo aprovado)
-- [ ] Novo design system em `app.css` (substitui o tema atual)
-- [ ] Sidebar/topbar novos, com indicador fixo de Unidade/Rede ativa
-- [ ] Redesenhar páginas existentes (Dashboard, Atualização de Agente/PDV, Check Replicação, Configurações) no novo visual
+```bash
+gh project item-list 1 --owner rdsrafasantos-sys
+```
 
-### Fase 5 — Infra para produção em nuvem
-- [ ] Deploy do painel central único (substitui "uma instalação por cliente")
-- [ ] Servidor central com múltiplas tags Tailscale (uma por rede atendida)
-- [ ] HTTPS/TLS na frente do painel
-- [ ] Backup do banco de configuração (usuários, redes, auditoria)
-
----
-
-## 🟨 Em Andamento
-
-_(vazio)_
-
----
-
-## 🟩 Concluído
-
-- [x] Protótipo visual aprovado (`design/preview/`: login, redes, dashboard de rede, usuários/perfis)
-- [x] Decisão de arquitetura: hierarquia `Unidade → Rede → Loja → PDV`, multi-usuário com permissão por rede, cadastro de rede via formulário
+Protótipo visual aprovado (referência da Fase 4): `design/preview/`.
