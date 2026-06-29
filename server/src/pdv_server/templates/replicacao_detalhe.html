@@ -61,6 +61,7 @@ body.dark .diff-new { background: rgba(34,197,94,.12); }
   </div>
 
 <script>
+const redeId = {{ rede_id|tojson }};
 const lojaId = {{ loja_id|tojson }};
 const pdvId = {{ pdv_id|tojson }};
 const colecao = {{ colecao|tojson }};
@@ -164,7 +165,7 @@ function renderConteudo() {
 }
 
 async function carregar() {
-  const r = await fetch(`/api/replicacao/status/${lojaId}/${pdvId}`);
+  const r = await fetch(`/api/${redeId}/replicacao/status/${lojaId}/${pdvId}`);
   const dados = await r.json();
   const colecoes = (dados.resultado || {}).colecoes || {};
   dadosColecao = colecoes[colecao];

@@ -1,31 +1,31 @@
 import json
 import os
 
-from pdv_server.config import ERP_DB_DATA_DIR
-
-os.makedirs(ERP_DB_DATA_DIR, exist_ok=True)
-ARQUIVO_CONFIG = os.path.join(ERP_DB_DATA_DIR, "config.json")
-
 CONFIG_PADRAO = {"host": "", "porta": 5432, "usuario": "", "senha": "", "banco": ""}
 
 CAMPOS_CONFIG = ("host", "porta", "usuario", "senha", "banco")
 
 
-def carregar_config():
-    if not os.path.exists(ARQUIVO_CONFIG):
+def _arquivo_config(contexto):
+    return os.path.join(contexto.erp_db_dir, "config.json")
+
+
+def carregar_config(contexto):
+    arquivo = _arquivo_config(contexto)
+    if not os.path.exists(arquivo):
         return dict(CONFIG_PADRAO)
     try:
-        with open(ARQUIVO_CONFIG, "r", encoding="utf-8") as f:
+        with open(arquivo, "r", encoding="utf-8") as f:
             cfg = json.load(f)
         return {**CONFIG_PADRAO, **cfg}
     except Exception:
         return dict(CONFIG_PADRAO)
 
 
-def salvar_config(alteracoes):
-    atual = carregar_config()
+def salvar_config(contexto, alteracoes):
+    atual = carregar_config(contexto)
     atual.update({k: v for k, v in alteracoes.items() if k in CAMPOS_CONFIG})
-    with open(ARQUIVO_CONFIG, "w", encoding="utf-8") as f:
+    with open(_arquivo_config(contexto), "w", encoding="utf-8") as f:
         json.dump(atual, f, ensure_ascii=False)
     return atual
 
@@ -42,10 +42,10 @@ def _conectar(cfg):
     )
 
 
-def testar_conexao():
+def testar_conexao(contexto):
     """Tenta conectar no Postgres do ERP com timeout curto, a partir da
-    configuracao salva. Nunca expoe a senha no resultado."""
-    cfg = carregar_config()
+    configuracao salva desta rede. Nunca expoe a senha no resultado."""
+    cfg = carregar_config(contexto)
     if not cfg.get("host") or not cfg.get("banco"):
         return {"online": False, "erro": "Conexao com o banco do ERP ainda nao configurada."}
     try:
@@ -56,12 +56,12 @@ def testar_conexao():
         return {"online": False, "erro": str(e)}
 
 
-def listar_pdvs_ativos():
+def listar_pdvs_ativos(contexto):
     """Consulta no ERP os PDVs cadastrados como ativos (situacao de cadastro = 1),
     agrupados por loja. Esta lista e a "fonte da verdade" de quais PDVs deveriam
     existir em cada loja -- nao indica se o PDV esta de fato ligado/online, isso
     e cruzado depois com a verificacao de ping nos agentes."""
-    cfg = carregar_config()
+    cfg = carregar_config(contexto)
     if not cfg.get("host") or not cfg.get("banco"):
         return {"erro": "Conexao com o banco do ERP ainda nao configurada.", "lojas": []}
     try:

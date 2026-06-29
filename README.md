@@ -82,9 +82,37 @@ docker compose exec pdv-server python -m pdv_server.seed_admin
 O `instalar_servidor_docker.sh` já chama isso automaticamente na primeira
 instalação.
 
+## Multi-tenant: Unidades e Redes (Fase 3)
+
+Um único painel atende várias **Redes** (clientes), cada uma pertencente a
+uma **Unidade** (filial da VR Software) — ver telas `/redes` e `/unidades`.
+Cada Rede tem seu próprio Mongo URI/token/Tailscale Site ID (cifrados no
+banco, cadastrados pela tela, não mais em `.env`) e seus próprios dados
+(`uploads/<rede_id>/`, `replicacao/<rede_id>/`, etc. — `contexto.py`).
+
+- O painel de uma rede fica em `/r/<rede_id>/` (mesma tela de sempre — Dashboard,
+  Atualização de Agente/PDV, Check Replicação, Configurações — só que escopada).
+- Toda rota de API é prefixada: `/api/<rede_id>/...`.
+- `PDV_SERVER_MONGO_URI`/`PDV_SERVER_TOKEN`/`PDV_TAILSCALE_SITE_ID` no `.env`
+  **não são mais lidos em tempo de execução** — servem só de origem pro
+  script de migração único (próximo item). Para uma rede nova, cadastre
+  direto na tela `/redes`.
+
+**Migrar uma instalação antiga (anterior à Fase 3) para o novo modelo:**
+
+```bash
+docker compose exec -e PYTHONPATH=/opt/pdv-server/src pdv-server \
+  python -m pdv_server.migrar_rede_unica "Nome da Unidade" "Nome da Rede"
+```
+
+Cria a Unidade/Rede a partir do `.env` atual e move os dados já existentes
+(`uploads`, histórico de replicação, config do ERP/integrador) para dentro
+da pasta daquela rede. Só funciona se ainda não existir nenhuma rede
+cadastrada (não reexecutar).
+
 ## Verificação de replicação
 
-O painel web compara, sob demanda ou em agenda configurável, as coleções `pessoas`, `produtos`, `produtoscodigobarras`, `produtosimpostos`, `promocoes`, `promocoesconnectsimdepor`, `promocoesdepor` e `promocoeslevepor` entre o MongoDB da integradora (`PDV_SERVER_MONGO_URI`) e o MongoDB local de cada PDV (`<ip-do-pdv>:PDV_LOCAL_MONGO_PORTA`). Isso exige que o Service Manager tenha rota de rede livre até essa porta em cada PDV.
+O painel web compara, sob demanda ou em agenda configurável, as coleções `pessoas`, `produtos`, `produtoscodigobarras`, `produtosimpostos`, `promocoes`, `promocoesconnectsimdepor`, `promocoesdepor` e `promocoeslevepor` entre o MongoDB da integradora (Mongo URI cadastrado na Rede) e o MongoDB local de cada PDV (`<ip-do-pdv>:PDV_LOCAL_MONGO_PORTA`). Isso exige que o Service Manager tenha rota de rede livre até essa porta em cada PDV.
 
 A comparação é por documento completo (via `_id`), reportando:
 - **faltando no PDV** — não replicou;
@@ -210,14 +238,14 @@ cometer durante os testes. No lado de quem vai *consumir* a rota (o
 Tailscale recebe a rota mas não a usa, e parece que nada está configurado
 quando na verdade só falta esse passo.
 
-Configure `PDV_TAILSCALE_SITE_ID` no `server/.env` do cliente com o mesmo
-Site ID usado no `tailscale debug via` — a partir disso, todo o código
-(`dispatch.py`, `replication.py`, `app.py`) traduz automaticamente o IP bruto
-do replica set para o formato MagicDNS exigido
+Cadastre o mesmo Site ID usado no `tailscale debug via` no campo "Tailscale
+Site ID" da Rede (tela `/redes`, fica cifrado no banco) — a partir disso,
+todo o código (`dispatch.py`, `replication.py`, `app.py`) traduz
+automaticamente o IP bruto do replica set para o formato MagicDNS exigido
 (`endereco_alcancavel()` em `discovery.py`), sem precisar mudar nada na UI —
 o IP exibido no painel continua sendo o IP real, só a chamada de rede em si
-usa o endereço traduzido. Clientes sem essa variável definida continuam
-funcionando exatamente como hoje (IP direto, sem tradução).
+usa o endereço traduzido. Redes sem esse campo preenchido continuam
+funcionando normalmente (IP direto, sem tradução).
 
 ## Versionamento
 

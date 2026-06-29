@@ -33,6 +33,7 @@
       </div>
       <div class="logo-name">PDV <span>Updater</span></div>
     </div>
+    <div class="text-muted" style="font-size:12px; margin-left:10px;">🌐 {{ rede_nome }}</div>
     <label class="toggle-wrap">
       🌙
       <span class="toggle">
@@ -289,6 +290,7 @@
   </div>
 </div>
 
+<script>window.REDE_ID = {{ rede_id|tojson }};</script>
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

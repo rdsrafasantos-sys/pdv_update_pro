@@ -2,15 +2,17 @@ import json
 import os
 import threading
 import time
+from functools import wraps
 
 import requests
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
 from pdv_server.auth.models import init_db
 from pdv_server.auth.routes import auth_bp, limiter, login_manager
-from pdv_server.config import MASTER_KEY, SECRET_KEY, TOKEN_SEGURANCA, UPLOAD_DIR
+from pdv_server.config import MASTER_KEY, SECRET_KEY
+from pdv_server.contexto import RedeInativa, RedeNaoEncontrada, obter_contexto
 from pdv_server.painel.routes import painel_bp
 from pdv_server.dispatch import (
     enviar_agente_para_pdvs, get_atualizacoes_loja, iniciar_envio_zip,
@@ -37,7 +39,6 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
 app.secret_key = SECRET_KEY
 
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 init_db()
 
 login_manager.init_app(app)
@@ -61,31 +62,64 @@ def injetar_usuario():
     return {"usuario_atual": current_user}
 
 
+def com_rede(view):
+    """Carrega o RedeContexto a partir do <rede_id> da URL e injeta como
+    primeiro argumento da view. Nao checa ainda permissao por usuario --
+    isso fica pra Fase 1 (RBAC); por enquanto qualquer usuario logado pode
+    acessar qualquer rede, igual era antes de existir o conceito de rede."""
+    @wraps(view)
+    def wrapper(rede_id, *args, **kwargs):
+        try:
+            contexto = obter_contexto(rede_id)
+        except RedeNaoEncontrada:
+            if request.path.startswith("/api/"):
+                return jsonify({"erro": "Rede nao encontrada"}), 404
+            return redirect(url_for("painel.redes"))
+        except RedeInativa as e:
+            if request.path.startswith("/api/"):
+                return jsonify({"erro": str(e)}), 403
+            return redirect(url_for("painel.redes"))
+        return view(contexto, *args, **kwargs)
+    return wrapper
+
+
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html")
+    return redirect(url_for("painel.redes"))
 
 
-@app.route("/api/lojas", methods=["GET"])
-def api_lojas():
-    return jsonify(get_lojas())
+@app.route("/r/<int:rede_id>/")
+@com_rede
+def painel_rede(contexto):
+    return render_template("index.html", rede_id=contexto.rede_id, rede_nome=contexto.nome)
 
 
-@app.route("/api/lojas/atualizar", methods=["POST"])
-def api_lojas_atualizar():
+@app.route("/api/<int:rede_id>/lojas", methods=["GET"])
+@com_rede
+def api_lojas(contexto):
+    return jsonify(get_lojas(contexto))
+
+
+@app.route("/api/<int:rede_id>/lojas/atualizar", methods=["POST"])
+@com_rede
+def api_lojas_atualizar(contexto):
     """Força redescoberta dos PDVs via replica set."""
-    invalidar_cache()
-    return jsonify({"mensagem": "Cache invalidado", "lojas": get_lojas()})
+    invalidar_cache(contexto.rede_id)
+    return jsonify({"mensagem": "Cache invalidado", "lojas": get_lojas(contexto)})
 
 
-@app.route("/api/ping/<loja_id>/<pdv_id>", methods=["GET"])
-def api_ping(loja_id, pdv_id):
-    pdv = encontrar_pdv(loja_id, pdv_id)
+@app.route("/api/<int:rede_id>/ping/<loja_id>/<pdv_id>", methods=["GET"])
+@com_rede
+def api_ping(contexto, loja_id, pdv_id):
+    pdv = encontrar_pdv(contexto, loja_id, pdv_id)
     if not pdv:
         return jsonify({"erro": "PDV não encontrado"}), 404
     try:
-        r = requests.get(f"http://{endereco_alcancavel(pdv['ip'])}:5000/ping", timeout=3)
+        r = requests.get(
+            f"http://{endereco_alcancavel(pdv['ip'], contexto.tailscale_site_id)}:5000/ping",
+            timeout=3
+        )
         dados = r.json() if r.status_code == 200 else {}
         return jsonify({
             "online": r.status_code == 200,
@@ -96,9 +130,10 @@ def api_ping(loja_id, pdv_id):
         return jsonify({"online": False, "ip": pdv["ip"], "versao_agente": "—"})
 
 
-@app.route("/api/ping_loja/<loja_id>", methods=["GET"])
-def api_ping_loja(loja_id):
-    loja = next((l for l in get_lojas() if l["id"] == loja_id), None)
+@app.route("/api/<int:rede_id>/ping_loja/<loja_id>", methods=["GET"])
+@com_rede
+def api_ping_loja(contexto, loja_id):
+    loja = next((l for l in get_lojas(contexto) if l["id"] == loja_id), None)
     if not loja:
         return jsonify({"erro": "Loja não encontrada"}), 404
 
@@ -107,7 +142,10 @@ def api_ping_loja(loja_id):
 
     def checar(pdv):
         try:
-            r = requests.get(f"http://{endereco_alcancavel(pdv['ip'])}:5000/ping", timeout=3)
+            r = requests.get(
+                f"http://{endereco_alcancavel(pdv['ip'], contexto.tailscale_site_id)}:5000/ping",
+                timeout=3
+            )
             dados = r.json() if r.status_code == 200 else {}
             resultados[pdv["id"]] = {
                 "online": r.status_code == 200,
@@ -127,24 +165,26 @@ def api_ping_loja(loja_id):
     return jsonify(resultados)
 
 
-@app.route("/api/pdv/<loja_id>/<pdv_id>/reiniciar_mongo", methods=["POST"])
-def api_reiniciar_mongo(loja_id, pdv_id):
-    pdv = encontrar_pdv(loja_id, pdv_id)
+@app.route("/api/<int:rede_id>/pdv/<loja_id>/<pdv_id>/reiniciar_mongo", methods=["POST"])
+@com_rede
+def api_reiniciar_mongo(contexto, loja_id, pdv_id):
+    pdv = encontrar_pdv(contexto, loja_id, pdv_id)
     if not pdv:
         return jsonify({"erro": "PDV não encontrado"}), 404
-    resultado = reiniciar_mongo_pdv(pdv)
+    resultado = reiniciar_mongo_pdv(contexto, pdv)
     return jsonify(resultado)
 
 
-@app.route("/api/upload", methods=["POST"])
-def api_upload():
+@app.route("/api/<int:rede_id>/upload", methods=["POST"])
+@com_rede
+def api_upload(contexto):
     if "arquivo" not in request.files:
         return jsonify({"erro": "Nenhum arquivo enviado"}), 400
     arquivo = request.files["arquivo"]
     if not arquivo.filename.endswith(".zip"):
         return jsonify({"erro": "Apenas arquivos .zip são aceitos"}), 400
     nome = secure_filename(arquivo.filename)
-    caminho = os.path.join(UPLOAD_DIR, nome)
+    caminho = os.path.join(contexto.upload_dir, nome)
     arquivo.save(caminho)
     tamanho = os.path.getsize(caminho)
     return jsonify({
@@ -154,12 +194,13 @@ def api_upload():
     })
 
 
-@app.route("/api/arquivos", methods=["GET"])
-def api_arquivos():
+@app.route("/api/<int:rede_id>/arquivos", methods=["GET"])
+@com_rede
+def api_arquivos(contexto):
     arquivos = []
-    for f in os.listdir(UPLOAD_DIR):
+    for f in os.listdir(contexto.upload_dir):
         if f.endswith(".zip"):
-            caminho = os.path.join(UPLOAD_DIR, f)
+            caminho = os.path.join(contexto.upload_dir, f)
             arquivos.append({
                 "nome": f,
                 "tamanho_mb": round(os.path.getsize(caminho) / 1024 / 1024, 2),
@@ -171,34 +212,37 @@ def api_arquivos():
     return jsonify(arquivos)
 
 
-@app.route("/api/arquivos/<nome>", methods=["DELETE"])
-def api_deletar_arquivo(nome):
-    caminho = os.path.join(UPLOAD_DIR, secure_filename(nome))
+@app.route("/api/<int:rede_id>/arquivos/<nome>", methods=["DELETE"])
+@com_rede
+def api_deletar_arquivo(contexto, nome):
+    caminho = os.path.join(contexto.upload_dir, secure_filename(nome))
     if os.path.exists(caminho):
         os.remove(caminho)
         return jsonify({"mensagem": f"{nome} removido"})
     return jsonify({"erro": "Arquivo não encontrado"}), 404
 
 
-@app.route("/api/arquivos/limpar", methods=["DELETE"])
-def api_limpar_arquivos():
+@app.route("/api/<int:rede_id>/arquivos/limpar", methods=["DELETE"])
+@com_rede
+def api_limpar_arquivos(contexto):
     removidos = 0
-    for f in os.listdir(UPLOAD_DIR):
+    for f in os.listdir(contexto.upload_dir):
         if f.endswith(".zip"):
-            os.remove(os.path.join(UPLOAD_DIR, f))
+            os.remove(os.path.join(contexto.upload_dir, f))
             removidos += 1
     return jsonify({"mensagem": f"{removidos} arquivo(s) removido(s)"})
 
 
-@app.route("/api/upload_agente", methods=["POST"])
-def api_upload_agente():
+@app.route("/api/<int:rede_id>/upload_agente", methods=["POST"])
+@com_rede
+def api_upload_agente(contexto):
     """Recebe o novo agente.exe e salva no servidor."""
     if "arquivo" not in request.files:
         return jsonify({"erro": "Nenhum arquivo enviado"}), 400
     arquivo = request.files["arquivo"]
     if not arquivo.filename.endswith(".exe"):
         return jsonify({"erro": "Apenas arquivos .exe sao aceitos"}), 400
-    caminho = os.path.join(UPLOAD_DIR, "agente.exe")
+    caminho = os.path.join(contexto.upload_dir, "agente.exe")
     arquivo.save(caminho)
     tamanho = os.path.getsize(caminho)
     return jsonify({
@@ -207,10 +251,11 @@ def api_upload_agente():
     })
 
 
-@app.route("/api/versao_agente", methods=["GET"])
-def api_versao_agente():
+@app.route("/api/<int:rede_id>/versao_agente", methods=["GET"])
+@com_rede
+def api_versao_agente(contexto):
     """Verifica se existe agente.exe disponivel para distribuicao."""
-    caminho = os.path.join(UPLOAD_DIR, "agente.exe")
+    caminho = os.path.join(contexto.upload_dir, "agente.exe")
     if os.path.exists(caminho):
         return jsonify({
             "disponivel": True,
@@ -221,18 +266,19 @@ def api_versao_agente():
     return jsonify({"disponivel": False})
 
 
-@app.route("/api/atualizar_agente", methods=["POST"])
-def api_atualizar_agente():
+@app.route("/api/<int:rede_id>/atualizar_agente", methods=["POST"])
+@com_rede
+def api_atualizar_agente(contexto):
     """Envia novo agente.exe para PDVs selecionados."""
     dados = request.json
     loja_id = dados.get("loja_id")
     pdv_ids = dados.get("pdv_ids", [])
 
-    caminho_exe = os.path.join(UPLOAD_DIR, "agente.exe")
+    caminho_exe = os.path.join(contexto.upload_dir, "agente.exe")
     if not os.path.exists(caminho_exe):
         return jsonify({"erro": "Nenhum agente.exe disponivel. Faca upload primeiro."}), 404
 
-    loja = next((l for l in get_lojas() if l["id"] == loja_id), None)
+    loja = next((l for l in get_lojas(contexto) if l["id"] == loja_id), None)
     if not loja:
         return jsonify({"erro": "Loja nao encontrada"}), 404
 
@@ -242,12 +288,13 @@ def api_atualizar_agente():
     if not pdvs_alvo:
         return jsonify({"erro": "Nenhum PDV selecionado"}), 400
 
-    resultados = enviar_agente_para_pdvs(caminho_exe, pdvs_alvo)
+    resultados = enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo)
     return jsonify({"resultados": resultados})
 
 
-@app.route("/api/atualizar", methods=["POST"])
-def api_atualizar():
+@app.route("/api/<int:rede_id>/atualizar", methods=["POST"])
+@com_rede
+def api_atualizar(contexto):
     dados = request.json
     loja_id = dados.get("loja_id")
     pdv_ids = dados.get("pdv_ids", [])
@@ -259,11 +306,11 @@ def api_atualizar():
     if pdv_ids == "todos" or len(pdv_ids) != 1:
         return jsonify({"erro": "Selecione exatamente um PDV por vez para atualizar."}), 400
 
-    caminho_zip = os.path.join(UPLOAD_DIR, arquivo)
+    caminho_zip = os.path.join(contexto.upload_dir, arquivo)
     if not os.path.exists(caminho_zip):
         return jsonify({"erro": f"Arquivo {arquivo} não encontrado"}), 404
 
-    loja = next((l for l in get_lojas() if l["id"] == loja_id), None)
+    loja = next((l for l in get_lojas(contexto) if l["id"] == loja_id), None)
     if not loja:
         return jsonify({"erro": "Loja não encontrada"}), 404
 
@@ -287,7 +334,7 @@ def api_atualizar():
                     f"permitido (risco de corromper o banco)."
         }), 409
 
-    iniciar_envio_zip(loja_id, pdv, caminho_zip)
+    iniciar_envio_zip(contexto, loja_id, pdv, caminho_zip)
 
     return jsonify({
         "mensagem": f"Atualização iniciada para {pdv['id']}",
@@ -295,17 +342,21 @@ def api_atualizar():
     })
 
 
-@app.route("/api/status/<loja_id>", methods=["GET"])
-def api_status_loja(loja_id):
-    return jsonify(get_atualizacoes_loja(loja_id))
+@app.route("/api/<int:rede_id>/status/<loja_id>", methods=["GET"])
+@com_rede
+def api_status_loja(contexto, loja_id):
+    return jsonify(get_atualizacoes_loja(contexto.rede_id, loja_id))
 
 
-@app.route("/api/status_stream/<loja_id>")
-def api_status_stream(loja_id):
+@app.route("/api/<int:rede_id>/status_stream/<loja_id>")
+@com_rede
+def api_status_stream(contexto, loja_id):
+    rede_id = contexto.rede_id
+
     def gerar():
         ultimo = None
         while True:
-            atual = json.dumps(get_atualizacoes_loja(loja_id))
+            atual = json.dumps(get_atualizacoes_loja(rede_id, loja_id))
             if atual != ultimo:
                 ultimo = atual
                 yield f"data: {atual}\n\n"
@@ -317,13 +368,14 @@ def api_status_stream(loja_id):
 # ──────────────────────────────────────────────
 # VERIFICACAO DE REPLICACAO
 # ──────────────────────────────────────────────
-@app.route("/api/replicacao/verificar", methods=["POST"])
-def api_replicacao_verificar():
+@app.route("/api/<int:rede_id>/replicacao/verificar", methods=["POST"])
+@com_rede
+def api_replicacao_verificar(contexto):
     dados = request.json or {}
     loja_id = dados.get("loja_id")
     pdv_ids = dados.get("pdv_ids", [])
 
-    loja = next((l for l in get_lojas() if l["id"] == loja_id), None)
+    loja = next((l for l in get_lojas(contexto) if l["id"] == loja_id), None)
     if not loja:
         return jsonify({"erro": "Loja nao encontrada"}), 404
 
@@ -332,7 +384,7 @@ def api_replicacao_verificar():
     if not pdvs_alvo:
         return jsonify({"erro": "Nenhum PDV selecionado"}), 400
 
-    replication.iniciar_verificacao_lote(loja_id, pdvs_alvo, tipo="manual")
+    replication.iniciar_verificacao_lote(contexto, loja_id, pdvs_alvo, tipo="manual")
 
     return jsonify({
         "mensagem": f"Verificacao de replicacao iniciada para {len(pdvs_alvo)} PDV(s)",
@@ -340,75 +392,88 @@ def api_replicacao_verificar():
     })
 
 
-@app.route("/api/replicacao/status/<loja_id>/<pdv_id>", methods=["GET"])
-def api_replicacao_status(loja_id, pdv_id):
-    return jsonify(replication.get_estado(loja_id, pdv_id))
+@app.route("/api/<int:rede_id>/replicacao/status/<loja_id>/<pdv_id>", methods=["GET"])
+@com_rede
+def api_replicacao_status(contexto, loja_id, pdv_id):
+    return jsonify(replication.get_estado(contexto.rede_id, loja_id, pdv_id))
 
 
-@app.route("/api/replicacao/config", methods=["GET"])
-def api_replicacao_config_get():
-    return jsonify(replication.carregar_config_auto())
+@app.route("/api/<int:rede_id>/replicacao/config", methods=["GET"])
+@com_rede
+def api_replicacao_config_get(contexto):
+    return jsonify(replication.carregar_config_auto(contexto))
 
 
-@app.route("/api/replicacao/config", methods=["POST"])
-def api_replicacao_config_set():
+@app.route("/api/<int:rede_id>/replicacao/config", methods=["POST"])
+@com_rede
+def api_replicacao_config_set(contexto):
     dados = request.json or {}
     alteracoes = {k: dados[k] for k in ("habilitado", "intervalo_minutos", "pdvs") if k in dados}
-    return jsonify(replication.salvar_config_auto(alteracoes))
+    return jsonify(replication.salvar_config_auto(contexto, alteracoes))
 
 
-@app.route("/api/replicacao/historico", methods=["GET"])
-def api_replicacao_historico():
-    return jsonify(replication.obter_historico())
+@app.route("/api/<int:rede_id>/replicacao/historico", methods=["GET"])
+@com_rede
+def api_replicacao_historico(contexto):
+    return jsonify(replication.obter_historico(contexto))
 
 
-@app.route("/replicacao/detalhe/<loja_id>/<pdv_id>/<colecao>")
-def replicacao_detalhe(loja_id, pdv_id, colecao):
+@app.route("/r/<int:rede_id>/replicacao/detalhe/<loja_id>/<pdv_id>/<colecao>")
+@com_rede
+def replicacao_detalhe(contexto, loja_id, pdv_id, colecao):
     """Pagina em aba separada com o conteudo completo dos documentos
-    divergentes de uma colecao (consome o mesmo /api/replicacao/status)."""
+    divergentes de uma colecao (consome o mesmo /api/.../replicacao/status)."""
     return render_template(
-        "replicacao_detalhe.html", loja_id=loja_id, pdv_id=pdv_id, colecao=colecao
+        "replicacao_detalhe.html", rede_id=contexto.rede_id,
+        loja_id=loja_id, pdv_id=pdv_id, colecao=colecao
     )
 
 
 # ──────────────────────────────────────────────
 # BANCO DE DADOS DO ERP (PostgreSQL) — Configuracoes
 # ──────────────────────────────────────────────
-@app.route("/api/erp_db/config", methods=["GET"])
-def api_erp_db_config_get():
-    return jsonify(erp_db.carregar_config())
+@app.route("/api/<int:rede_id>/erp_db/config", methods=["GET"])
+@com_rede
+def api_erp_db_config_get(contexto):
+    return jsonify(erp_db.carregar_config(contexto))
 
 
-@app.route("/api/erp_db/config", methods=["POST"])
-def api_erp_db_config_set():
+@app.route("/api/<int:rede_id>/erp_db/config", methods=["POST"])
+@com_rede
+def api_erp_db_config_set(contexto):
     dados = request.json or {}
-    return jsonify(erp_db.salvar_config(dados))
+    return jsonify(erp_db.salvar_config(contexto, dados))
 
 
-@app.route("/api/erp_db/status", methods=["GET"])
-def api_erp_db_status():
-    return jsonify(erp_db.testar_conexao())
+@app.route("/api/<int:rede_id>/erp_db/status", methods=["GET"])
+@com_rede
+def api_erp_db_status(contexto):
+    return jsonify(erp_db.testar_conexao(contexto))
 
 
-@app.route("/api/erp_db/pdvs_ativos", methods=["GET"])
-def api_erp_db_pdvs_ativos():
-    return jsonify(erp_db.listar_pdvs_ativos())
+@app.route("/api/<int:rede_id>/erp_db/pdvs_ativos", methods=["GET"])
+@com_rede
+def api_erp_db_pdvs_ativos(contexto):
+    return jsonify(erp_db.listar_pdvs_ativos(contexto))
 
 
 # ──────────────────────────────────────────────
 # INTEGRADOR VR — Configuracoes
 # ──────────────────────────────────────────────
-@app.route("/api/integrador/config", methods=["GET"])
-def api_integrador_config_get():
-    return jsonify(integrador.carregar_config())
+@app.route("/api/<int:rede_id>/integrador/config", methods=["GET"])
+@com_rede
+def api_integrador_config_get(contexto):
+    return jsonify(integrador.carregar_config(contexto))
 
 
-@app.route("/api/integrador/config", methods=["POST"])
-def api_integrador_config_set():
+@app.route("/api/<int:rede_id>/integrador/config", methods=["POST"])
+@com_rede
+def api_integrador_config_set(contexto):
     dados = request.json or {}
-    return jsonify(integrador.salvar_config(dados))
+    return jsonify(integrador.salvar_config(contexto, dados))
 
 
-@app.route("/api/integrador/status", methods=["GET"])
-def api_integrador_status():
-    return jsonify(integrador.testar_status())
+@app.route("/api/<int:rede_id>/integrador/status", methods=["GET"])
+@com_rede
+def api_integrador_status(contexto):
+    return jsonify(integrador.testar_status(contexto))

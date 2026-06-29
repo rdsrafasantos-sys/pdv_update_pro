@@ -3,41 +3,39 @@ import time
 
 import requests
 
-from pdv_server.config import MONGO_URI, PDV_TAILSCALE_SITE_ID, TOKEN_SEGURANCA
-
 _CACHE_TTL = 60  # segundos
 
-_lojas_cache = []
-_lojas_cache_ts = 0
+# Cache por rede -- {rede_id: {"lojas": [...], "ts": float}}
+_cache = {}
+_cache_lock = threading.Lock()
 
 
-def endereco_alcancavel(ip):
+def endereco_alcancavel(ip, tailscale_site_id=""):
     """Traduz o IP bruto do PDV (o mesmo usado no replica set do Mongo, que
     nunca muda) para o formato MagicDNS "via" exigido por um subnet router
-    4via6, quando PDV_TAILSCALE_SITE_ID estiver configurado. Sem isso, retorna
-    o IP como esta (caso de cliente com Tailscale instalado direto em cada
-    maquina, sem rede sobreposta). Usar SEMPRE que for abrir uma conexao
-    (HTTP ou Mongo) com o PDV — para exibicao na UI, use o IP bruto."""
-    if not PDV_TAILSCALE_SITE_ID:
+    4via6, quando a rede tiver um Tailscale Site ID configurado. Sem isso,
+    retorna o IP como esta (Tailscale instalado direto em cada maquina, sem
+    rede sobreposta). Usar SEMPRE que for abrir uma conexao (HTTP ou Mongo)
+    com o PDV -- para exibicao na UI, use o IP bruto."""
+    if not tailscale_site_id:
         return ip
-    return f"{ip.replace('.', '-')}-via-{PDV_TAILSCALE_SITE_ID}"
+    return f"{ip.replace('.', '-')}-via-{tailscale_site_id}"
 
 
-def get_mongo():
+def _get_mongo(contexto):
     from pymongo import MongoClient
-    return MongoClient(MONGO_URI)
+    return MongoClient(contexto.mongo_uri)
 
 
-def descobrir_pdvs_via_replicaset():
+def descobrir_pdvs_via_replicaset(contexto):
     """
-    Consulta o replica set do MongoDB para obter IPs online,
+    Consulta o replica set do MongoDB desta rede para obter IPs online,
     depois chama /info em cada agente para cruzar com o banco pdv.
     Retorna lista de lojas com seus PDVs.
     """
     try:
-        client = get_mongo()
+        client = _get_mongo(contexto)
 
-        # Busca membros do replica set
         try:
             rs_status = client.admin.command("replSetGetStatus")
             membros = rs_status.get("members", [])
@@ -49,27 +47,24 @@ def descobrir_pdvs_via_replicaset():
                     ip = name.split(":")[0]
                     ips_online.append(ip)
         except Exception:
-            # Se não tiver replica set, tenta pegar conexões ativas
             ips_online = []
 
         db = client["pdv"]
         lojas_col = db["lojas"]
         pdvs_col = db["pdvs"]
 
-        # Busca todas as lojas e PDVs ativos do banco
         lojas_db = {l["_id"]: l for l in lojas_col.find({})}
         pdvs_db = list(pdvs_col.find({"ativo": True}))
 
-        # Para cada IP online, consulta o agente /info
         resultados = {}
         threads = []
 
         def consultar_agente(ip):
             try:
                 r = requests.get(
-                    f"http://{endereco_alcancavel(ip)}:5000/info",
+                    f"http://{endereco_alcancavel(ip, contexto.tailscale_site_id)}:5000/info",
                     timeout=3,
-                    headers={"X-Agent-Token": TOKEN_SEGURANCA}
+                    headers={"X-Agent-Token": contexto.token}
                 )
                 if r.status_code == 200:
                     dados = r.json()
@@ -86,7 +81,6 @@ def descobrir_pdvs_via_replicaset():
         for t in threads:
             t.join(timeout=5)
 
-        # Cruza IP + info agente com dados do MongoDB
         lojas_resultado = {}
 
         for ip, info_agente in resultados.items():
@@ -96,7 +90,6 @@ def descobrir_pdvs_via_replicaset():
             if not numero_pdv or not id_loja:
                 continue
 
-            # Busca dados completos do PDV no banco
             pdv_db = next(
                 (p for p in pdvs_db if p.get("numeroPdv") == numero_pdv and p.get("idLoja") == id_loja),
                 None
@@ -123,7 +116,6 @@ def descobrir_pdvs_via_replicaset():
                 "versao": pdv_db.get("versao", "")
             })
 
-        # Ordena PDVs por numeroPdv dentro de cada loja
         for loja in lojas_resultado.values():
             loja["pdvs"].sort(key=lambda p: p["id"])
 
@@ -131,26 +123,30 @@ def descobrir_pdvs_via_replicaset():
         return list(lojas_resultado.values())
 
     except Exception as e:
-        print(f"Erro ao descobrir PDVs: {e}")
+        print(f"Erro ao descobrir PDVs da rede {contexto.nome}: {e}")
         return []
 
 
-def get_lojas():
-    global _lojas_cache, _lojas_cache_ts
+def get_lojas(contexto):
+    with _cache_lock:
+        entrada = _cache.get(contexto.rede_id)
     agora = time.time()
-    if agora - _lojas_cache_ts > _CACHE_TTL:
-        _lojas_cache = descobrir_pdvs_via_replicaset()
-        _lojas_cache_ts = agora
-    return _lojas_cache
+    if not entrada or agora - entrada["ts"] > _CACHE_TTL:
+        lojas = descobrir_pdvs_via_replicaset(contexto)
+        with _cache_lock:
+            _cache[contexto.rede_id] = {"lojas": lojas, "ts": agora}
+        return lojas
+    return entrada["lojas"]
 
 
-def invalidar_cache():
-    global _lojas_cache_ts
-    _lojas_cache_ts = 0
+def invalidar_cache(rede_id):
+    with _cache_lock:
+        if rede_id in _cache:
+            _cache[rede_id]["ts"] = 0
 
 
-def encontrar_pdv(loja_id, pdv_id):
-    loja = next((l for l in get_lojas() if l["id"] == loja_id), None)
+def encontrar_pdv(contexto, loja_id, pdv_id):
+    loja = next((l for l in get_lojas(contexto) if l["id"] == loja_id), None)
     if not loja:
         return None
     return next((p for p in loja["pdvs"] if p["id"] == pdv_id), None)

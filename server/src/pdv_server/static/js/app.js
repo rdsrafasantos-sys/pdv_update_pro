@@ -1,4 +1,11 @@
 // ──────────────────────────────────────────────
+// API (escopada pela rede ativa -- window.REDE_ID injetado pelo template)
+// ──────────────────────────────────────────────
+function API(caminho) {
+  return `/api/${window.REDE_ID}${caminho}`;
+}
+
+// ──────────────────────────────────────────────
 // ESTADO GLOBAL
 // ──────────────────────────────────────────────
 let lojas = [];
@@ -157,7 +164,7 @@ async function verificarOnline(key) {
   loja.pdvs.forEach(pdv => { seletores[key].ping[pdv.id] = { online: false, checking: true }; });
   renderPDVs(key);
   try {
-    const r = await fetch(`/api/ping_loja/${loja.id}`);
+    const r = await fetch(API(`/ping_loja/${loja.id}`));
     const dados = await r.json();
     for (const pdv of loja.pdvs) {
       seletores[key].ping[pdv.id] = dados[pdv.id] || { online: false };
@@ -168,13 +175,13 @@ async function verificarOnline(key) {
 window.verificarOnline = verificarOnline;
 
 async function carregarLojas() {
-  const r = await fetch("/api/lojas");
+  const r = await fetch(API("/lojas"));
   lojas = await r.json();
   for (const key of KEYS) renderLojaTabs(key);
 }
 
 async function redescobrir() {
-  await fetch("/api/lojas/atualizar", { method: "POST" });
+  await fetch(API("/lojas/atualizar"), { method: "POST" });
   await carregarLojas();
 }
 window.redescobrir = redescobrir;
@@ -183,7 +190,7 @@ window.redescobrir = redescobrir;
 // ATUALIZACAO DE AGENTE (view "agente")
 // ──────────────────────────────────────────────
 async function verificarAgenteDisponivel() {
-  const r = await fetch("/api/versao_agente");
+  const r = await fetch(API("/versao_agente"));
   const dados = await r.json();
   const badge = document.getElementById("agenteBadge");
   const info = document.getElementById("agenteInfoTexto");
@@ -204,7 +211,7 @@ async function uploadAgente(input) {
   if (!arquivo) return;
   const fd = new FormData();
   fd.append("arquivo", arquivo);
-  await fetch("/api/upload_agente", { method: "POST", body: fd });
+  await fetch(API("/upload_agente"), { method: "POST", body: fd });
   input.value = "";
   await verificarAgenteDisponivel();
 }
@@ -220,7 +227,7 @@ async function iniciarAtualizacaoAgente() {
   const loja_id = seletores.agente.lojaAtiva;
   const pdv_ids = Array.from(seletores.agente.selecionados);
   if (!loja_id || pdv_ids.length === 0) return;
-  const r = await fetch("/api/atualizar_agente", {
+  const r = await fetch(API("/atualizar_agente"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ loja_id, pdv_ids }),
   });
@@ -237,13 +244,13 @@ async function fazerUpload(file) {
   fd.append("arquivo", file);
   const progEl = document.getElementById("uploadProgress");
   if (progEl) progEl.style.display = "block";
-  await fetch("/api/upload", { method: "POST", body: fd });
+  await fetch(API("/upload"), { method: "POST", body: fd });
   if (progEl) progEl.style.display = "none";
   await carregarArquivos();
 }
 
 async function carregarArquivos() {
-  const r = await fetch("/api/arquivos");
+  const r = await fetch(API("/arquivos"));
   const arquivos = await r.json();
   arquivosPorNome = {};
   arquivos.forEach(a => { arquivosPorNome[a.nome] = a; });
@@ -274,7 +281,7 @@ function selecionarArquivo(nome) {
 window.selecionarArquivo = selecionarArquivo;
 
 async function deletarArquivo(nome) {
-  await fetch(`/api/arquivos/${encodeURIComponent(nome)}`, { method: "DELETE" });
+  await fetch(API(`/arquivos/${encodeURIComponent(nome)}`), { method: "DELETE" });
   if (arquivoSelecionado === nome) arquivoSelecionado = null;
   await carregarArquivos();
 }
@@ -282,7 +289,7 @@ window.deletarArquivo = deletarArquivo;
 
 async function limparTodos() {
   if (!confirm("Remover todos os arquivos enviados?")) return;
-  await fetch("/api/arquivos/limpar", { method: "DELETE" });
+  await fetch(API("/arquivos/limpar"), { method: "DELETE" });
   arquivoSelecionado = null;
   await carregarArquivos();
 }
@@ -341,7 +348,7 @@ async function iniciarAtualizacao() {
   const pdv_ids = Array.from(seletores.pdv.selecionados);
   if (!loja_id || !arquivoSelecionado || pdv_ids.length === 0) return;
 
-  const r = await fetch("/api/atualizar", {
+  const r = await fetch(API("/atualizar"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ loja_id, pdv_ids, arquivo: arquivoSelecionado }),
   });
@@ -349,7 +356,7 @@ async function iniciarAtualizacao() {
   if (dados.erro) { alert(dados.erro); return; }
 
   if (eventSource) eventSource.close();
-  eventSource = new EventSource(`/api/status_stream/${loja_id}`);
+  eventSource = new EventSource(API(`/status_stream/${loja_id}`));
   eventSource.onmessage = (ev) => {
     const dados = JSON.parse(ev.data);
     statusPDVs = dados;
@@ -383,7 +390,7 @@ function linhaColecao(pdvId, nome, c) {
   if (!c.tem_divergencia) {
     return `<div class="text-muted" style="text-decoration:line-through;opacity:.5;font-size:12px;">✔ ${nome} — sem divergência</div>`;
   }
-  const link = `/replicacao/detalhe/${seletores.replicacao.lojaAtiva}/${pdvId}/${nome}`;
+  const link = `/r/${window.REDE_ID}/replicacao/detalhe/${seletores.replicacao.lojaAtiva}/${pdvId}/${nome}`;
   return `
     <div style="font-size:12px;">
       <strong>⚠️ ${nome}</strong> —
@@ -419,7 +426,7 @@ async function verificarReplicacaoSelecionados() {
   const pdv_ids = Array.from(seletores.replicacao.selecionados);
   if (!loja_id || pdv_ids.length === 0) return;
 
-  const r = await fetch("/api/replicacao/verificar", {
+  const r = await fetch(API("/replicacao/verificar"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ loja_id, pdv_ids }),
   });
@@ -445,7 +452,7 @@ async function pollReplicacao(pdvIds) {
   const loja_id = seletores.replicacao.lojaAtiva;
   let todosConcluidos = true;
   for (const pdvId of pdvIds) {
-    const r = await fetch(`/api/replicacao/status/${loja_id}/${pdvId}`);
+    const r = await fetch(API(`/replicacao/status/${loja_id}/${pdvId}`));
     const dados = await r.json();
     atualizarBlocoReplicacao(pdvId, dados);
     if (dados.status === "executando" || dados.status === "idle") todosConcluidos = false;
@@ -463,7 +470,7 @@ async function reiniciarMongoPdv(pdvId) {
   if (out) out.innerHTML = '<span class="text-muted">Reiniciando o Mongo do PDV, aguarde (pode levar ~30s)...</span>';
 
   try {
-    const r = await fetch(`/api/pdv/${loja_id}/${pdvId}/reiniciar_mongo`, { method: "POST" });
+    const r = await fetch(API(`/pdv/${loja_id}/${pdvId}/reiniciar_mongo`), { method: "POST" });
     const dados = await r.json();
     if (out) {
       out.innerHTML = dados.ok
@@ -477,7 +484,7 @@ async function reiniciarMongoPdv(pdvId) {
 window.reiniciarMongoPdv = reiniciarMongoPdv;
 
 async function carregarConfigReplicacaoAuto() {
-  const r = await fetch("/api/replicacao/config");
+  const r = await fetch(API("/replicacao/config"));
   const cfg = await r.json();
   const hab = document.getElementById("repAutoHabilitado");
   const intervalo = document.getElementById("repAutoIntervalo");
@@ -488,7 +495,7 @@ async function carregarConfigReplicacaoAuto() {
 async function salvarConfigReplicacaoAuto() {
   const hab = document.getElementById("repAutoHabilitado");
   const intervalo = document.getElementById("repAutoIntervalo");
-  await fetch("/api/replicacao/config", {
+  await fetch(API("/replicacao/config"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       habilitado: hab ? hab.checked : false,
@@ -500,7 +507,7 @@ async function salvarConfigReplicacaoAuto() {
 window.salvarConfigReplicacaoAuto = salvarConfigReplicacaoAuto;
 
 async function carregarHistoricoReplicacao() {
-  const r = await fetch("/api/replicacao/historico");
+  const r = await fetch(API("/replicacao/historico"));
   const historico = await r.json();
   const el = document.getElementById("repHistorico");
   if (!el) return;
@@ -520,7 +527,7 @@ async function carregarHistoricoReplicacao() {
 // CONFIGURACOES: BANCO DE DADOS DO ERP (PostgreSQL)
 // ──────────────────────────────────────────────
 async function carregarConfigErpDb() {
-  const r = await fetch("/api/erp_db/config");
+  const r = await fetch(API("/erp_db/config"));
   const cfg = await r.json();
   const host = document.getElementById("erpDbHost");
   const porta = document.getElementById("erpDbPorta");
@@ -542,7 +549,7 @@ async function salvarConfigErpDb() {
     senha: document.getElementById("erpDbSenha").value,
     banco: document.getElementById("erpDbBanco").value.trim(),
   };
-  await fetch("/api/erp_db/config", {
+  await fetch(API("/erp_db/config"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(dados),
   });
@@ -554,7 +561,7 @@ window.salvarConfigErpDb = salvarConfigErpDb;
 async function testarConexaoErpDb() {
   const el = document.getElementById("erpDbResultado");
   if (el) { el.textContent = "Testando conexão..."; el.style.color = ""; }
-  const r = await fetch("/api/erp_db/status");
+  const r = await fetch(API("/erp_db/status"));
   const dados = await r.json();
   if (el) {
     el.textContent = dados.online ? "✔ Conexão bem-sucedida." : `✖ Falha na conexão: ${dados.erro || "erro desconhecido"}`;
@@ -574,7 +581,7 @@ function atualizarKpiErpDb(dados) {
 // CONFIGURACOES: INTEGRADOR VR
 // ──────────────────────────────────────────────
 async function carregarConfigIntegrador() {
-  const r = await fetch("/api/integrador/config");
+  const r = await fetch(API("/integrador/config"));
   const cfg = await r.json();
   const ip = document.getElementById("integradorIp");
   const porta = document.getElementById("integradorPorta");
@@ -593,7 +600,7 @@ async function salvarConfigIntegrador() {
     mongo_ip: document.getElementById("integradorMongoIp").value.trim(),
     mongo_porta: parseInt(document.getElementById("integradorMongoPorta").value, 10) || 27016,
   };
-  await fetch("/api/integrador/config", {
+  await fetch(API("/integrador/config"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(dados),
   });
@@ -620,7 +627,7 @@ async function testarStatusIntegrador() {
   const el = document.getElementById("integradorResultado");
   const colEl = document.getElementById("integradorColecoes");
   if (el) { el.textContent = "Verificando..."; el.style.color = ""; }
-  const dados = await fetch("/api/integrador/status").then(r => r.json());
+  const dados = await fetch(API("/integrador/status")).then(r => r.json());
   if (el) { el.textContent = textoStatusIntegrador(dados); el.style.color = corStatusIntegrador(dados.status); }
   if (colEl) {
     const linhas = Object.entries(dados.colecoes || {});
@@ -851,7 +858,7 @@ window.alternarOcultarOffline = alternarOcultarOffline;
 
 async function statusOnlinePorLoja(lojasList) {
   const resultados = await Promise.all(
-    lojasList.map(l => fetch(`/api/ping_loja/${l.id}`).then(r => r.json()).catch(() => ({})))
+    lojasList.map(l => fetch(API(`/ping_loja/${l.id}`)).then(r => r.json()).catch(() => ({})))
   );
   const mapa = {};
   lojasList.forEach((loja, i) => { mapa[loja.id] = resultados[i]; });
@@ -860,11 +867,11 @@ async function statusOnlinePorLoja(lojasList) {
 
 async function carregarDashboard() {
   const [lojasResp, historico, erpDbStatus, integradorStatus, pdvsAtivosErp] = await Promise.all([
-    fetch("/api/lojas").then(r => r.json()).catch(() => []),
-    fetch("/api/replicacao/historico").then(r => r.json()).catch(() => []),
-    fetch("/api/erp_db/status").then(r => r.json()).catch(() => ({ online: false })),
-    fetch("/api/integrador/status").then(r => r.json()).catch(() => ({ status: "erro", erro: "Falha ao consultar." })),
-    fetch("/api/erp_db/pdvs_ativos").then(r => r.json()).catch(() => ({ erro: "Falha ao consultar.", lojas: [] })),
+    fetch(API("/lojas")).then(r => r.json()).catch(() => []),
+    fetch(API("/replicacao/historico")).then(r => r.json()).catch(() => []),
+    fetch(API("/erp_db/status")).then(r => r.json()).catch(() => ({ online: false })),
+    fetch(API("/integrador/status")).then(r => r.json()).catch(() => ({ status: "erro", erro: "Falha ao consultar." })),
+    fetch(API("/erp_db/pdvs_ativos")).then(r => r.json()).catch(() => ({ erro: "Falha ao consultar.", lojas: [] })),
   ]);
   lojas = lojasResp;
   atualizarKpiErpDb(erpDbStatus);

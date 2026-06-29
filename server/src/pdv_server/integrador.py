@@ -3,11 +3,8 @@ import os
 import socket
 from datetime import datetime, timezone
 
-from pdv_server.config import INTEGRADOR_DATA_DIR, REPLICACAO_DB
+from pdv_server.config import REPLICACAO_DB
 from pdv_server.replication import COLECOES
-
-os.makedirs(INTEGRADOR_DATA_DIR, exist_ok=True)
-ARQUIVO_CONFIG = os.path.join(INTEGRADOR_DATA_DIR, "config.json")
 
 CONFIG_PADRAO = {"ip": "", "porta": 0, "mongo_ip": "", "mongo_porta": 27016}
 CAMPOS_CONFIG = ("ip", "porta", "mongo_ip", "mongo_porta")
@@ -18,21 +15,26 @@ CAMPOS_CONFIG = ("ip", "porta", "mongo_ip", "mongo_porta")
 HORAS_LIMITE_SEM_ATIVIDADE = 24
 
 
-def carregar_config():
-    if not os.path.exists(ARQUIVO_CONFIG):
+def _arquivo_config(contexto):
+    return os.path.join(contexto.integrador_dir, "config.json")
+
+
+def carregar_config(contexto):
+    arquivo = _arquivo_config(contexto)
+    if not os.path.exists(arquivo):
         return dict(CONFIG_PADRAO)
     try:
-        with open(ARQUIVO_CONFIG, "r", encoding="utf-8") as f:
+        with open(arquivo, "r", encoding="utf-8") as f:
             cfg = json.load(f)
         return {**CONFIG_PADRAO, **cfg}
     except Exception:
         return dict(CONFIG_PADRAO)
 
 
-def salvar_config(alteracoes):
-    atual = carregar_config()
+def salvar_config(contexto, alteracoes):
+    atual = carregar_config(contexto)
     atual.update({k: v for k, v in alteracoes.items() if k in CAMPOS_CONFIG})
-    with open(ARQUIVO_CONFIG, "w", encoding="utf-8") as f:
+    with open(_arquivo_config(contexto), "w", encoding="utf-8") as f:
         json.dump(atual, f, ensure_ascii=False)
     return atual
 
@@ -45,12 +47,13 @@ def _porta_aberta(ip, porta, timeout=3):
         return False
 
 
-def testar_status():
-    """Verifica se o integrador esta de fato funcionando: nao basta a porta
-    responder (processo pode estar startado e travado) -- confere tambem se as
-    colecoes que ele alimenta no MongoDB tem dados e seguem recebendo
-    insercoes recentes (usa o timestamp embutido no ObjectId)."""
-    cfg = carregar_config()
+def testar_status(contexto):
+    """Verifica se o integrador desta rede esta de fato funcionando: nao
+    basta a porta responder (processo pode estar startado e travado) --
+    confere tambem se as colecoes que ele alimenta no MongoDB tem dados e
+    seguem recebendo insercoes recentes (usa o timestamp embutido no
+    ObjectId)."""
+    cfg = carregar_config(contexto)
     if not cfg.get("ip") or not cfg.get("porta") or not cfg.get("mongo_ip"):
         return {
             "status": "nao_configurado",

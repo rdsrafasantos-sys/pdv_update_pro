@@ -4,9 +4,7 @@ import os
 import threading
 import time
 
-from pdv_server.config import (
-    MONGO_URI, PDV_LOCAL_MONGO_PORTA, REPLICACAO_DATA_DIR, REPLICACAO_DB,
-)
+from pdv_server.config import PDV_LOCAL_MONGO_PORTA, REPLICACAO_DB
 from pdv_server.discovery import endereco_alcancavel, get_lojas
 
 COLECOES = [
@@ -34,10 +32,6 @@ CAMPOS_IGNORADOS_DIFF = set()
 
 MAX_HISTORICO = 50
 
-os.makedirs(REPLICACAO_DATA_DIR, exist_ok=True)
-ARQUIVO_CONFIG_AUTO = os.path.join(REPLICACAO_DATA_DIR, "config_automatico.json")
-ARQUIVO_HISTORICO = os.path.join(REPLICACAO_DATA_DIR, "historico.json")
-
 CONFIG_PADRAO = {
     "habilitado": False,
     "intervalo_minutos": 60,
@@ -45,23 +39,31 @@ CONFIG_PADRAO = {
     "ultima_execucao": None,
 }
 
-_estado_verificacoes = {}  # (loja_id, pdv_id) -> dict
+_estado_verificacoes = {}  # (rede_id, loja_id, pdv_id) -> dict
 _estado_lock = threading.Lock()
 # RLock: salvar_config_auto() chama carregar_config_auto() enquanto detem o lock.
 _config_lock = threading.RLock()
 
 
+def _arquivo_config_auto(contexto):
+    return os.path.join(contexto.replicacao_dir, "config_automatico.json")
+
+
+def _arquivo_historico(contexto):
+    return os.path.join(contexto.replicacao_dir, "historico.json")
+
+
 # ──────────────────────────────────────────────
 # ESTADO POR PDV (consultado pela UI durante o polling)
 # ──────────────────────────────────────────────
-def get_estado(loja_id, pdv_id):
+def get_estado(rede_id, loja_id, pdv_id):
     with _estado_lock:
-        return _estado_verificacoes.get((loja_id, pdv_id), {"status": "idle"})
+        return _estado_verificacoes.get((rede_id, loja_id, pdv_id), {"status": "idle"})
 
 
-def _set_estado(loja_id, pdv_id, dados):
+def _set_estado(rede_id, loja_id, pdv_id, dados):
     with _estado_lock:
-        _estado_verificacoes[(loja_id, pdv_id)] = dados
+        _estado_verificacoes[(rede_id, loja_id, pdv_id)] = dados
 
 
 # ──────────────────────────────────────────────
@@ -151,11 +153,10 @@ def _comparar_colecao_com_retry(col_integradora, col_pdv, tentativas=2):
     return {"erro": f"Falha ao ler colecao (provavel replicacao em andamento): {ultimo_erro}"}
 
 
-def comparar_pdv(pdv_ip, callback=None):
-    """Compara as colecoes da integradora com as do PDV em pdv_ip.
-
-    Conecta direto no MongoDB do PDV (porta PDV_LOCAL_MONGO_PORTA) -- exige
-    rota de rede livre do Service Manager até essa porta em cada PDV.
+def comparar_pdv(contexto, pdv_ip, callback=None):
+    """Compara as colecoes da integradora desta rede com as do PDV em
+    pdv_ip. Conecta direto no MongoDB do PDV (porta PDV_LOCAL_MONGO_PORTA)
+    -- exige rota de rede livre do Service Manager até essa porta.
 
     Se "callback" for informado, e chamado como callback(nome, resultado)
     logo apos cada colecao terminar, para a UI poder exibir o resultado
@@ -165,14 +166,15 @@ def comparar_pdv(pdv_ip, callback=None):
     from pymongo.errors import PyMongoError
 
     try:
-        cliente_integradora = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        cliente_integradora = MongoClient(contexto.mongo_uri, serverSelectionTimeoutMS=5000)
         cliente_integradora.admin.command("ping")
     except PyMongoError as e:
         return {"ok": False, "erro": f"Sem conexao com a integradora: {e}"}
 
+    endereco_pdv = endereco_alcancavel(pdv_ip, contexto.tailscale_site_id)
     try:
         cliente_pdv = MongoClient(
-            f"mongodb://{endereco_alcancavel(pdv_ip)}:{PDV_LOCAL_MONGO_PORTA}",
+            f"mongodb://{endereco_pdv}:{PDV_LOCAL_MONGO_PORTA}",
             serverSelectionTimeoutMS=5000
         )
         cliente_pdv.admin.command("ping")
@@ -206,29 +208,30 @@ def comparar_pdv(pdv_ip, callback=None):
         cliente_pdv.close()
 
 
-def _concluir_verificacao(loja_id, pdv_id, resultado):
+def _concluir_verificacao(rede_id, loja_id, pdv_id, resultado):
     if resultado.get("ok"):
-        _set_estado(loja_id, pdv_id, {
+        _set_estado(rede_id, loja_id, pdv_id, {
             "status": "concluido", "fim": time.strftime("%Y-%m-%d %H:%M:%S"),
             "resultado": resultado, "erro": "",
         })
     else:
-        _set_estado(loja_id, pdv_id, {
+        _set_estado(rede_id, loja_id, pdv_id, {
             "status": "erro", "fim": time.strftime("%Y-%m-%d %H:%M:%S"),
             "resultado": None, "erro": resultado.get("erro", "Erro desconhecido"),
         })
 
 
-def _comparar_pdv_com_progresso(loja_id, pdv_id, pdv_ip):
+def _comparar_pdv_com_progresso(contexto, loja_id, pdv_id, pdv_ip):
     """Roda comparar_pdv atualizando o estado a cada colecao concluida, para
     a UI exibir os resultados em sequencia em vez de tudo de uma vez no final."""
     inicio = time.strftime("%Y-%m-%d %H:%M:%S")
     colecoes_parciais = {}
+    rede_id = contexto.rede_id
 
     def ao_concluir_colecao(nome, resultado_colecao):
         colecoes_parciais[nome] = resultado_colecao
         tem_div = any(c.get("tem_divergencia") for c in colecoes_parciais.values())
-        _set_estado(loja_id, pdv_id, {
+        _set_estado(rede_id, loja_id, pdv_id, {
             "status": "executando", "inicio": inicio, "fim": None,
             "resultado": {
                 "ok": True, "tem_divergencia": tem_div,
@@ -237,17 +240,18 @@ def _comparar_pdv_com_progresso(loja_id, pdv_id, pdv_ip):
             "erro": "",
         })
 
-    resultado = comparar_pdv(pdv_ip, callback=ao_concluir_colecao)
-    _concluir_verificacao(loja_id, pdv_id, resultado)
+    resultado = comparar_pdv(contexto, pdv_ip, callback=ao_concluir_colecao)
+    _concluir_verificacao(rede_id, loja_id, pdv_id, resultado)
     return resultado
 
 
-def iniciar_verificacao_lote(loja_id, pdvs, tipo="manual"):
+def iniciar_verificacao_lote(contexto, loja_id, pdvs, tipo="manual"):
     """Dispara a comparacao para varios PDVs selecionados na UI, em sequencia
     numa unica thread (assim como a verificacao automatica), registrando um
     unico item consolidado no historico quando todos terminarem."""
+    rede_id = contexto.rede_id
     for pdv in pdvs:
-        _set_estado(loja_id, pdv["id"], {
+        _set_estado(rede_id, loja_id, pdv["id"], {
             "status": "executando", "inicio": time.strftime("%Y-%m-%d %H:%M:%S"),
             "fim": None, "resultado": None, "erro": "",
         })
@@ -256,7 +260,7 @@ def iniciar_verificacao_lote(loja_id, pdvs, tipo="manual"):
         detalhes = {}
         divergencia_geral = False
         for pdv in pdvs:
-            resultado = _comparar_pdv_com_progresso(loja_id, pdv["id"], pdv["ip"])
+            resultado = _comparar_pdv_com_progresso(contexto, loja_id, pdv["id"], pdv["ip"])
             ok = resultado.get("ok", False)
             tem_div = resultado.get("tem_divergencia") if ok else None
             detalhes[pdv["id"]] = {
@@ -266,7 +270,7 @@ def iniciar_verificacao_lote(loja_id, pdvs, tipo="manual"):
             if tem_div:
                 divergencia_geral = True
 
-        _registrar_historico({
+        _registrar_historico(contexto, {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "tipo": tipo,
             "tem_divergencia": divergencia_geral,
@@ -277,33 +281,34 @@ def iniciar_verificacao_lote(loja_id, pdvs, tipo="manual"):
 
 
 # ──────────────────────────────────────────────
-# CONFIGURACAO DA VERIFICACAO AUTOMATICA (persistida em disco)
+# CONFIGURACAO DA VERIFICACAO AUTOMATICA (persistida em disco, por rede)
 # ──────────────────────────────────────────────
-def carregar_config_auto():
+def carregar_config_auto(contexto):
     with _config_lock:
-        if not os.path.exists(ARQUIVO_CONFIG_AUTO):
+        arquivo = _arquivo_config_auto(contexto)
+        if not os.path.exists(arquivo):
             return dict(CONFIG_PADRAO)
         try:
-            with open(ARQUIVO_CONFIG_AUTO, "r", encoding="utf-8") as f:
+            with open(arquivo, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
             return {**CONFIG_PADRAO, **cfg}
         except Exception:
             return dict(CONFIG_PADRAO)
 
 
-def salvar_config_auto(alteracoes):
+def salvar_config_auto(contexto, alteracoes):
     with _config_lock:
-        atual = carregar_config_auto()
+        atual = carregar_config_auto(contexto)
         atual.update(alteracoes)
-        with open(ARQUIVO_CONFIG_AUTO, "w", encoding="utf-8") as f:
+        with open(_arquivo_config_auto(contexto), "w", encoding="utf-8") as f:
             json.dump(atual, f, ensure_ascii=False)
         return atual
 
 
-def _resolver_pdvs_alvo(cfg):
+def _resolver_pdvs_alvo(contexto, cfg):
     alvo = cfg.get("pdvs", "todos")
     resultado = []
-    for loja in get_lojas():
+    for loja in get_lojas(contexto):
         for pdv in loja["pdvs"]:
             incluido = alvo == "todos" or any(
                 a.get("loja_id") == loja["id"] and a.get("pdv_id") == pdv["id"] for a in alvo
@@ -314,38 +319,39 @@ def _resolver_pdvs_alvo(cfg):
 
 
 # ──────────────────────────────────────────────
-# HISTORICO (persistido em disco -- serve de "notificacao" no painel)
+# HISTORICO (persistido em disco, por rede -- serve de "notificacao" no painel)
 # ──────────────────────────────────────────────
-def obter_historico():
-    if not os.path.exists(ARQUIVO_HISTORICO):
+def obter_historico(contexto):
+    arquivo = _arquivo_historico(contexto)
+    if not os.path.exists(arquivo):
         return []
     try:
-        with open(ARQUIVO_HISTORICO, "r", encoding="utf-8") as f:
+        with open(arquivo, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return []
 
 
-def _registrar_historico(entrada):
+def _registrar_historico(contexto, entrada):
     with _config_lock:
-        historico = obter_historico()
+        historico = obter_historico(contexto)
         historico.insert(0, entrada)
         historico = historico[:MAX_HISTORICO]
-        with open(ARQUIVO_HISTORICO, "w", encoding="utf-8") as f:
+        with open(_arquivo_historico(contexto), "w", encoding="utf-8") as f:
             json.dump(historico, f, ensure_ascii=False)
 
 
 # ──────────────────────────────────────────────
-# LOOP AUTOMATICO
+# LOOP AUTOMATICO (percorre todas as redes ativas)
 # ──────────────────────────────────────────────
-def _executar_verificacao_automatica():
-    cfg = carregar_config_auto()
-    pdvs_alvo = _resolver_pdvs_alvo(cfg)
+def _executar_verificacao_automatica(contexto):
+    cfg = carregar_config_auto(contexto)
+    pdvs_alvo = _resolver_pdvs_alvo(contexto, cfg)
     detalhes = {}
     divergencia_geral = False
 
     for loja_id, pdv in pdvs_alvo:
-        resultado = _comparar_pdv_com_progresso(loja_id, pdv["id"], pdv["ip"])
+        resultado = _comparar_pdv_com_progresso(contexto, loja_id, pdv["id"], pdv["ip"])
         ok = resultado.get("ok", False)
         tem_div = resultado.get("tem_divergencia") if ok else None
         detalhes[pdv["id"]] = {
@@ -355,22 +361,35 @@ def _executar_verificacao_automatica():
         if tem_div:
             divergencia_geral = True
 
-    _registrar_historico({
+    _registrar_historico(contexto, {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         "tipo": "automatico",
         "tem_divergencia": divergencia_geral,
         "pdvs": detalhes,
     })
-    salvar_config_auto({"ultima_execucao": time.strftime("%Y-%m-%d %H:%M:%S")})
+    salvar_config_auto(contexto, {"ultima_execucao": time.strftime("%Y-%m-%d %H:%M:%S")})
 
 
 def loop_automatico():
-    """Roda para sempre em uma thread daemon, checando a cada 30s se e hora
-    de disparar a verificacao automatica configurada pela UI."""
+    """Roda para sempre em uma thread daemon, checando a cada 30s, para
+    CADA rede ativa, se e hora de disparar a verificacao automatica
+    configurada pela UI daquela rede."""
+    from pdv_server.auth.gestao import listar_redes
+    from pdv_server.contexto import obter_contexto
+
     while True:
         try:
-            cfg = carregar_config_auto()
-            if cfg.get("habilitado"):
+            for resumo in listar_redes():
+                if not resumo["ativa"]:
+                    continue
+                try:
+                    contexto = obter_contexto(resumo["id"])
+                except Exception:
+                    continue
+
+                cfg = carregar_config_auto(contexto)
+                if not cfg.get("habilitado"):
+                    continue
                 ultima = cfg.get("ultima_execucao")
                 intervalo = cfg.get("intervalo_minutos", 60)
                 if ultima is None:
@@ -381,7 +400,7 @@ def loop_automatico():
                     ) / 60
                     deve_rodar = minutos_passados >= intervalo
                 if deve_rodar:
-                    _executar_verificacao_automatica()
+                    _executar_verificacao_automatica(contexto)
         except Exception:
             pass
         time.sleep(30)
