@@ -67,11 +67,30 @@ próprio em `PDV_AUTH_DATA_DIR`, separado do MongoDB do integrador.
   Fernet (`cryptography`) usando `PDV_MASTER_KEY` antes de ir para o banco —
   nunca gravados em texto puro.
 
+### Usuários e Perfis (RBAC) — tela `/usuarios`
+
+Cada usuário tem um **Perfil** (capacidades: `pode_gerenciar_redes`,
+`pode_gerenciar_usuarios`, `somente_leitura`) e um **escopo de acesso**
+(`acesso_total`, ou listas específicas de Unidades/Redes). O super-admin
+(criado via `seed_admin`) ignora tudo isso e sempre vê/pode tudo — é o
+"break glass" da conta, não um perfil.
+
+- `/redes` e toda a API `/api/<rede_id>/...` só mostram/permitem o que o
+  usuário tem acesso (`auth/gestao.py: redes_visiveis_para`,
+  `usuario_pode_acessar_rede`) — confirmado nos testes: usuário sem acesso a
+  uma rede recebe 403 na API e é redirecionado para `/redes` na tela.
+- Perfil com `somente_leitura=True` bloqueia qualquer ação de escrita
+  (atualizar PDV/agente, reiniciar Mongo, disparar replicação, salvar
+  configurações) com 403, mas continua lendo normalmente.
+- Cadastro de Unidades continua restrito a super-admin (estrutura interna da
+  VR Software); cadastro de Redes é liberado para quem tem
+  `pode_gerenciar_redes`, limitado às Unidades que esse usuário já acessa.
+
 ### Primeiro acesso (criar o super-admin)
 
-Não existe cadastro de usuário pela tela ainda (vem numa fase futura) — o
-primeiro usuário é criado por linha de comando, uma única vez (o comando se
-recusa a rodar se já existir algum usuário):
+O primeiro usuário (super-admin) é criado por linha de comando, uma única
+vez (o comando se recusa a rodar se já existir algum usuário) — depois
+disso, use a tela `/usuarios` para cadastrar os demais:
 
 ```bash
 # dentro do container (instalação via Docker):

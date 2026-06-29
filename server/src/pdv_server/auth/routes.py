@@ -13,6 +13,7 @@ from flask_login import (
 
 from pdv_server.auth.audit import registrar_auditoria
 from pdv_server.auth.crypto import cifrar, decifrar
+from pdv_server.auth.gestao import flags_de_perfil
 from pdv_server.auth.models import SessionLocal, Usuario
 from pdv_server.auth.security import (
     gerar_qr_svg, gerar_totp_secret, totp_uri, verificar_senha,
@@ -33,8 +34,8 @@ def _ip_cliente():
 
 
 def exigir_super_admin(view):
-    """So permite a view se o usuario logado for super-admin. Provisorio
-    até a Fase 1 trazer perfis/permissoes granulares de verdade."""
+    """So permite a view se o usuario logado for super-admin -- usado nas
+    poucas coisas que ficam restritas mesmo com RBAC (gestao de Unidades)."""
     @wraps(view)
     @login_required
     def wrapper(*args, **kwargs):
@@ -46,6 +47,34 @@ def exigir_super_admin(view):
     return wrapper
 
 
+def exigir_permissao(flag):
+    """Decorator factory: exigir_permissao('pode_gerenciar_redes') etc.
+    Usa as flags resolvidas em UsuarioLogado (perfil + super-admin)."""
+    def decorator(view):
+        @wraps(view)
+        @login_required
+        def wrapper(*args, **kwargs):
+            if not getattr(current_user, flag, False):
+                if request.path.startswith("/api/"):
+                    return jsonify({"erro": "Sem permissao para isso"}), 403
+                return redirect(url_for("painel.redes"))
+            return view(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def exigir_escrita(view):
+    """Bloqueia mutacoes (POST/PUT/DELETE) para usuarios com perfil
+    somente_leitura. Super-admin nunca tem essa flag (ver flags_de_perfil)."""
+    @wraps(view)
+    @login_required
+    def wrapper(*args, **kwargs):
+        if getattr(current_user, "somente_leitura", False):
+            return jsonify({"erro": "Seu perfil e somente leitura"}), 403
+        return view(*args, **kwargs)
+    return wrapper
+
+
 class UsuarioLogado(UserMixin):
     def __init__(self, usuario):
         self.id = str(usuario.id)
@@ -53,6 +82,11 @@ class UsuarioLogado(UserMixin):
         self.nome = usuario.nome
         self.is_super_admin = usuario.is_super_admin
         self.totp_habilitado = usuario.totp_habilitado
+        self.acesso_total = bool(usuario.acesso_total) or usuario.is_super_admin
+        self.unidade_ids = {u.id for u in usuario.unidades}
+        self.rede_ids = {r.id for r in usuario.redes}
+        for chave, valor in flags_de_perfil(usuario).items():
+            setattr(self, chave, valor)
 
 
 @login_manager.user_loader

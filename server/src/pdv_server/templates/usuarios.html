@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV Updater — Usuários</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
+<style>
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none;
+    align-items: center; justify-content: center; z-index: 50; overflow-y: auto; padding: 30px 0;
+  }
+  .modal-overlay.aberto { display: flex; }
+  .modal-card {
+    width: 460px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 24px; box-shadow: var(--shadow-soft); max-height: 90vh; overflow-y: auto;
+  }
+  .modal-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+  .modal-card .field { margin-bottom: 12px; }
+  .modal-card .field label { font-size: 11.5px; color: var(--text-faint); font-weight: 650; display:block; margin-bottom:5px; }
+  .modal-card input, .modal-card select {
+    width: 100%; background: var(--bg-elevated); border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 13px;
+  }
+  .modal-card select[multiple] { height: 90px; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin-bottom: 10px; }
+  .checkbox-row input { width: auto; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  .erro-msg { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
+</style>
+</head>
+<body class="app-bg" data-theme="dark">
+<div class="shell" id="shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">VR</div>
+      <div class="brand-name">PDV <span>Updater</span></div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-title">Visão Geral</div>
+      <a class="nav-item" href="{{ url_for('painel.redes') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span class="nav-label">Redes</span>
+      </a>
+      {% if usuario_atual.is_super_admin %}
+      <a class="nav-item" href="{{ url_for('painel.unidades_pagina') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21V12h6v9"/></svg>
+        <span class="nav-label">Unidades</span>
+      </a>
+      {% endif %}
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        <span class="nav-label">Usuários</span>
+      </div>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="avatar">{{ usuario_atual.nome[:2].upper() }}</div>
+      <div class="sidebar-foot-text">
+        <div class="name">{{ usuario_atual.nome }}</div>
+        <div class="role">{{ "Super-admin" if usuario_atual.is_super_admin else "Usuário" }}</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="crumbs"><b>Usuários</b></div>
+      <div class="topbar-right">
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <button type="submit" class="btn btn-ghost btn-sm">Sair</button>
+        </form>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Usuários</div>
+          <div class="page-sub" id="resumoUsuarios">Carregando...</div>
+        </div>
+        <button class="btn btn-primary" onclick="abrirModalNovoUsuario()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Cadastrar usuário
+        </button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Usuário</th><th>Perfil</th><th>Acesso</th><th>2FA</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tabelaUsuarios"><tr><td colspan="6" class="text-muted">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="page-head">
+        <div>
+          <div class="page-title" style="font-size:17px;">Perfis & Permissões</div>
+          <div class="page-sub">defina o que cada perfil pode fazer — atribuído a usuários, não codificado</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="abrirModalNovoPerfil()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Novo perfil
+        </button>
+      </div>
+
+      <div id="gridPerfis" class="grid grid-4"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Usuario -->
+<div class="modal-overlay" id="modalUsuario">
+  <div class="modal-card">
+    <div class="modal-title" id="modalUsuarioTitulo">Cadastrar usuário</div>
+    <input type="hidden" id="usuarioId">
+    <div class="field"><label>Nome</label><input id="campoNomeUsuario"></div>
+    <div class="field"><label>E-mail</label><input id="campoEmailUsuario" type="email"></div>
+    <div class="field"><label id="labelSenha">Senha (mínimo 8 caracteres)</label><input id="campoSenhaUsuario" type="password"></div>
+    <div class="field">
+      <label>Perfil</label>
+      <select id="campoPerfilUsuario"><option value="">Sem perfil (sem permissões)</option></select>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="campoAcessoTotal" onchange="atualizarVisibilidadeAcesso()">
+      <label style="margin:0;">Acesso total (vê todas as unidades e redes)</label>
+    </div>
+    <div id="blocoAcessoEspecifico">
+      <div class="field">
+        <label>Unidades (acesso a todas as redes delas)</label>
+        <select id="campoUnidadesUsuario" multiple></select>
+      </div>
+      <div class="field">
+        <label>Redes específicas</label>
+        <select id="campoRedesUsuario" multiple></select>
+      </div>
+    </div>
+    <div class="checkbox-row" id="linhaAtivo" style="display:none;">
+      <input type="checkbox" id="campoAtivoUsuario">
+      <label style="margin:0;">Usuário ativo</label>
+    </div>
+    <div class="erro-msg" id="erroUsuario"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="fecharModalUsuario()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarUsuario()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Perfil -->
+<div class="modal-overlay" id="modalPerfil">
+  <div class="modal-card">
+    <div class="modal-title" id="modalPerfilTitulo">Novo perfil</div>
+    <input type="hidden" id="perfilId">
+    <div class="field"><label>Nome</label><input id="campoNomePerfil" placeholder="Ex: Operador"></div>
+    <div class="field"><label>Descrição</label><input id="campoDescPerfil" placeholder="Opcional"></div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeRedes"><label style="margin:0;">Pode cadastrar/editar redes</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeUsuarios"><label style="margin:0;">Pode gerenciar usuários e perfis</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="campoSomenteLeitura"><label style="margin:0;">Somente leitura (não pode disparar ações)</label></div>
+    <div class="erro-msg" id="erroPerfil"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="fecharModalPerfil()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarPerfil()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let unidadesCache = [];
+let redesCache = [];
+let perfisCache = [];
+
+function atualizarVisibilidadeAcesso() {
+  document.getElementById('blocoAcessoEspecifico').style.display =
+    document.getElementById('campoAcessoTotal').checked ? 'none' : 'block';
+}
+
+async function carregarTudo() {
+  const [usuarios, perfis, unidades, redes] = await Promise.all([
+    fetch('/api/usuarios').then(r => r.json()),
+    fetch('/api/perfis').then(r => r.json()),
+    fetch('/api/unidades').then(r => r.ok ? r.json() : []).catch(() => []),
+    fetch('/api/redes').then(r => r.json()),
+  ]);
+  perfisCache = perfis;
+  unidadesCache = unidades;
+  redesCache = redes;
+
+  document.getElementById('resumoUsuarios').textContent =
+    `${usuarios.length} usuário(s) · ${perfis.length} perfil(is)`;
+
+  const selPerfil = document.getElementById('campoPerfilUsuario');
+  selPerfil.innerHTML = '<option value="">Sem perfil (sem permissões)</option>' +
+    perfis.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
+
+  const selUnidades = document.getElementById('campoUnidadesUsuario');
+  selUnidades.innerHTML = unidades.map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
+
+  const selRedes = document.getElementById('campoRedesUsuario');
+  selRedes.innerHTML = redes.map(r => `<option value="${r.id}">${r.nome}</option>`).join('');
+
+  renderUsuarios(usuarios);
+  renderPerfis(perfis);
+}
+
+function renderUsuarios(usuarios) {
+  const tbody = document.getElementById('tabelaUsuarios');
+  if (usuarios.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-muted">Nenhum usuário cadastrado ainda.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = usuarios.map(u => {
+    const acesso = u.is_super_admin || u.acesso_total
+      ? 'Todas as unidades/redes'
+      : ([...u.unidades_nomes, ...u.redes_nomes].join(', ') || 'Nenhum acesso configurado');
+    return `
+    <tr>
+      <td>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <div class="avatar" style="width:28px;height:28px;font-size:11px;">${u.nome.slice(0,2).toUpperCase()}</div>
+          <div><div class="strong" style="color:var(--text);">${u.nome}</div><div style="font-size:11.5px; color:var(--text-faint);">${u.email}</div></div>
+        </div>
+      </td>
+      <td>${u.is_super_admin ? '<span class="badge badge-gray">Super-admin</span>' : (u.perfil_nome ? `<span class="badge badge-gray">${u.perfil_nome}</span>` : '<span class="text-muted">—</span>')}</td>
+      <td style="color:var(--text-faint); font-size:12px;">${acesso}</td>
+      <td>${u.totp_habilitado ? '<span class="badge badge-green"><span class="badge-dot"></span>Ativo</span>' : '<span class="badge badge-amber"><span class="badge-dot"></span>Pendente</span>'}</td>
+      <td>${u.ativo ? '<span class="badge badge-green"><span class="badge-dot"></span>Ativo</span>' : '<span class="badge badge-red"><span class="badge-dot"></span>Inativo</span>'}</td>
+      <td style="text-align:right;">
+        ${u.is_super_admin ? '' : `
+          <button class="btn btn-ghost btn-sm" onclick="editarUsuario(${u.id})">Editar</button>
+          <button class="btn btn-ghost btn-sm" onclick="excluirUsuario(${u.id})">Excluir</button>
+        `}
+      </td>
+    </tr>
+  `;
+  }).join('');
+}
+
+function renderPerfis(perfis) {
+  const grid = document.getElementById('gridPerfis');
+  if (perfis.length === 0) {
+    grid.innerHTML = '<div class="card text-muted" style="grid-column:1/-1;">Nenhum perfil cadastrado ainda.</div>';
+    return;
+  }
+  grid.innerHTML = perfis.map(p => `
+    <div class="card">
+      <div style="font-weight:650;">${p.nome}</div>
+      <div style="font-size:11.5px; color:var(--text-faint); margin:4px 0 12px;">${p.total_usuarios} usuário(s)</div>
+      <div style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--text-dim); margin-bottom:12px;">
+        <div>${p.pode_gerenciar_redes ? '✔' : '✕'} Gerenciar redes</div>
+        <div>${p.pode_gerenciar_usuarios ? '✔' : '✕'} Gerenciar usuários</div>
+        <div>${p.somente_leitura ? '✔ Somente leitura' : '✔ Pode disparar ações'}</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="editarPerfil(${p.id})">Editar</button>
+        <button class="btn btn-ghost btn-sm" onclick="excluirPerfil(${p.id})">Excluir</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Usuario: modal ──
+function abrirModalNovoUsuario() {
+  document.getElementById('modalUsuarioTitulo').textContent = 'Cadastrar usuário';
+  document.getElementById('usuarioId').value = '';
+  document.getElementById('campoNomeUsuario').value = '';
+  document.getElementById('campoEmailUsuario').value = '';
+  document.getElementById('campoSenhaUsuario').value = '';
+  document.getElementById('labelSenha').textContent = 'Senha (mínimo 8 caracteres)';
+  document.getElementById('campoPerfilUsuario').value = '';
+  document.getElementById('campoAcessoTotal').checked = false;
+  document.getElementById('linhaAtivo').style.display = 'none';
+  Array.from(document.getElementById('campoUnidadesUsuario').options).forEach(o => o.selected = false);
+  Array.from(document.getElementById('campoRedesUsuario').options).forEach(o => o.selected = false);
+  atualizarVisibilidadeAcesso();
+  document.getElementById('erroUsuario').style.display = 'none';
+  document.getElementById('modalUsuario').classList.add('aberto');
+}
+
+async function editarUsuario(id) {
+  const r = await fetch(`/api/usuarios/${id}`);
+  const u = await r.json();
+  if (u.erro) { alert(u.erro); return; }
+  document.getElementById('modalUsuarioTitulo').textContent = `Editar — ${u.nome}`;
+  document.getElementById('usuarioId').value = u.id;
+  document.getElementById('campoNomeUsuario').value = u.nome;
+  document.getElementById('campoEmailUsuario').value = u.email;
+  document.getElementById('campoEmailUsuario').disabled = true;
+  document.getElementById('campoSenhaUsuario').value = '';
+  document.getElementById('labelSenha').textContent = 'Nova senha (deixe em branco para manter)';
+  document.getElementById('campoPerfilUsuario').value = u.perfil_id || '';
+  document.getElementById('campoAcessoTotal').checked = u.acesso_total;
+  document.getElementById('linhaAtivo').style.display = 'flex';
+  document.getElementById('campoAtivoUsuario').checked = u.ativo;
+  Array.from(document.getElementById('campoUnidadesUsuario').options).forEach(o => o.selected = u.unidade_ids.includes(parseInt(o.value, 10)));
+  Array.from(document.getElementById('campoRedesUsuario').options).forEach(o => o.selected = u.rede_ids.includes(parseInt(o.value, 10)));
+  atualizarVisibilidadeAcesso();
+  document.getElementById('erroUsuario').style.display = 'none';
+  document.getElementById('modalUsuario').classList.add('aberto');
+}
+
+function fecharModalUsuario() {
+  document.getElementById('modalUsuario').classList.remove('aberto');
+  document.getElementById('campoEmailUsuario').disabled = false;
+}
+
+async function salvarUsuario() {
+  const id = document.getElementById('usuarioId').value;
+  const unidadeIds = Array.from(document.getElementById('campoUnidadesUsuario').selectedOptions).map(o => parseInt(o.value, 10));
+  const redeIds = Array.from(document.getElementById('campoRedesUsuario').selectedOptions).map(o => parseInt(o.value, 10));
+  const perfilVal = document.getElementById('campoPerfilUsuario').value;
+
+  let corpo, url, metodo;
+  if (id) {
+    corpo = {
+      nome: document.getElementById('campoNomeUsuario').value,
+      perfil_id: perfilVal ? parseInt(perfilVal, 10) : null,
+      acesso_total: document.getElementById('campoAcessoTotal').checked,
+      unidade_ids: unidadeIds, rede_ids: redeIds,
+      ativo: document.getElementById('campoAtivoUsuario').checked,
+      nova_senha: document.getElementById('campoSenhaUsuario').value || null,
+    };
+    url = `/api/usuarios/${id}`; metodo = 'PUT';
+  } else {
+    corpo = {
+      nome: document.getElementById('campoNomeUsuario').value,
+      email: document.getElementById('campoEmailUsuario').value,
+      senha: document.getElementById('campoSenhaUsuario').value,
+      perfil_id: perfilVal ? parseInt(perfilVal, 10) : null,
+      acesso_total: document.getElementById('campoAcessoTotal').checked,
+      unidade_ids: unidadeIds, rede_ids: redeIds,
+    };
+    url = '/api/usuarios'; metodo = 'POST';
+  }
+
+  const r = await fetch(url, { method: metodo, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+  const dados = await r.json();
+  if (dados.erro) {
+    const el = document.getElementById('erroUsuario');
+    el.textContent = dados.erro; el.style.display = 'block';
+    return;
+  }
+  fecharModalUsuario();
+  carregarTudo();
+}
+
+async function excluirUsuario(id) {
+  if (!confirm('Excluir este usuário?')) return;
+  const r = await fetch(`/api/usuarios/${id}`, { method: 'DELETE' });
+  const dados = await r.json();
+  if (dados.erro) { alert(dados.erro); return; }
+  carregarTudo();
+}
+
+// ── Perfil: modal ──
+function abrirModalNovoPerfil() {
+  document.getElementById('modalPerfilTitulo').textContent = 'Novo perfil';
+  document.getElementById('perfilId').value = '';
+  document.getElementById('campoNomePerfil').value = '';
+  document.getElementById('campoDescPerfil').value = '';
+  document.getElementById('campoPodeRedes').checked = false;
+  document.getElementById('campoPodeUsuarios').checked = false;
+  document.getElementById('campoSomenteLeitura').checked = false;
+  document.getElementById('erroPerfil').style.display = 'none';
+  document.getElementById('modalPerfil').classList.add('aberto');
+}
+
+function editarPerfil(id) {
+  const p = perfisCache.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('modalPerfilTitulo').textContent = `Editar — ${p.nome}`;
+  document.getElementById('perfilId').value = p.id;
+  document.getElementById('campoNomePerfil').value = p.nome;
+  document.getElementById('campoDescPerfil').value = p.descricao || '';
+  document.getElementById('campoPodeRedes').checked = p.pode_gerenciar_redes;
+  document.getElementById('campoPodeUsuarios').checked = p.pode_gerenciar_usuarios;
+  document.getElementById('campoSomenteLeitura').checked = p.somente_leitura;
+  document.getElementById('erroPerfil').style.display = 'none';
+  document.getElementById('modalPerfil').classList.add('aberto');
+}
+
+function fecharModalPerfil() {
+  document.getElementById('modalPerfil').classList.remove('aberto');
+}
+
+async function salvarPerfil() {
+  const id = document.getElementById('perfilId').value;
+  const corpo = {
+    nome: document.getElementById('campoNomePerfil').value,
+    descricao: document.getElementById('campoDescPerfil').value,
+    pode_gerenciar_redes: document.getElementById('campoPodeRedes').checked,
+    pode_gerenciar_usuarios: document.getElementById('campoPodeUsuarios').checked,
+    somente_leitura: document.getElementById('campoSomenteLeitura').checked,
+  };
+  const url = id ? `/api/perfis/${id}` : '/api/perfis';
+  const r = await fetch(url, { method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+  const dados = await r.json();
+  if (dados.erro) {
+    const el = document.getElementById('erroPerfil');
+    el.textContent = dados.erro; el.style.display = 'block';
+    return;
+  }
+  fecharModalPerfil();
+  carregarTudo();
+}
+
+async function excluirPerfil(id) {
+  if (!confirm('Excluir este perfil?')) return;
+  const r = await fetch(`/api/perfis/${id}`, { method: 'DELETE' });
+  const dados = await r.json();
+  if (dados.erro) { alert(dados.erro); return; }
+  carregarTudo();
+}
+
+carregarTudo();
+</script>
+</body>
+</html>

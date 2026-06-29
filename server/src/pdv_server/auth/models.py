@@ -63,6 +63,13 @@ class Perfil(Base):
     id = Column(Integer, primary_key=True)
     nome = Column(String(80), nullable=False, unique=True)
     descricao = Column(String(255), nullable=True)
+
+    # Capacidades do perfil -- escopo (quais unidades/redes) fica no usuario,
+    # nao no perfil (ver Usuario.unidades/redes/acesso_total).
+    pode_gerenciar_redes = Column(Boolean, default=False)
+    pode_gerenciar_usuarios = Column(Boolean, default=False)
+    somente_leitura = Column(Boolean, default=False)
+
     criado_em = Column(DateTime, default=datetime.datetime.utcnow)
 
     usuarios = relationship("Usuario", back_populates="perfil")
@@ -112,3 +119,26 @@ SessionLocal = scoped_session(sessionmaker(bind=engine))
 
 def init_db():
     Base.metadata.create_all(engine)
+    _migrar_colunas_novas()
+
+
+def _migrar_colunas_novas():
+    """create_all() so cria TABELAS que faltam, nao COLUNAS novas em tabelas
+    que ja existem -- instalacoes anteriores a Fase 1 ja tem "perfis" sem as
+    colunas de permissao. Adiciona com ALTER TABLE, idempotente."""
+    import sqlalchemy as sa
+
+    colunas_novas = {
+        "perfis": {
+            "pode_gerenciar_redes": "BOOLEAN DEFAULT 0",
+            "pode_gerenciar_usuarios": "BOOLEAN DEFAULT 0",
+            "somente_leitura": "BOOLEAN DEFAULT 0",
+        },
+    }
+    with engine.connect() as conn:
+        for tabela, colunas in colunas_novas.items():
+            existentes = {row[1] for row in conn.execute(sa.text(f"PRAGMA table_info({tabela})"))}
+            for nome, tipo in colunas.items():
+                if nome not in existentes:
+                    conn.execute(sa.text(f"ALTER TABLE {tabela} ADD COLUMN {nome} {tipo}"))
+        conn.commit()

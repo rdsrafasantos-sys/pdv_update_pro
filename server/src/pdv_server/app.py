@@ -9,8 +9,9 @@ from flask import Flask, Response, jsonify, redirect, render_template, request, 
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
+from pdv_server.auth.gestao import usuario_pode_acessar_rede
 from pdv_server.auth.models import init_db
-from pdv_server.auth.routes import auth_bp, limiter, login_manager
+from pdv_server.auth.routes import auth_bp, exigir_escrita, limiter, login_manager
 from pdv_server.config import MASTER_KEY, SECRET_KEY
 from pdv_server.contexto import RedeInativa, RedeNaoEncontrada, obter_contexto
 from pdv_server.painel.routes import painel_bp
@@ -64,11 +65,17 @@ def injetar_usuario():
 
 def com_rede(view):
     """Carrega o RedeContexto a partir do <rede_id> da URL e injeta como
-    primeiro argumento da view. Nao checa ainda permissao por usuario --
-    isso fica pra Fase 1 (RBAC); por enquanto qualquer usuario logado pode
-    acessar qualquer rede, igual era antes de existir o conceito de rede."""
+    primeiro argumento da view, depois de confirmar que o usuario logado
+    tem acesso a essa rede (super-admin, acesso_total, ou rede/unidade
+    especificamente atribuida a ele -- ver auth/gestao.py)."""
     @wraps(view)
     def wrapper(rede_id, *args, **kwargs):
+        if not current_user.is_authenticated:
+            return login_manager.unauthorized()
+        if not usuario_pode_acessar_rede(int(current_user.id), rede_id):
+            if request.path.startswith("/api/"):
+                return jsonify({"erro": "Sem acesso a esta rede"}), 403
+            return redirect(url_for("painel.redes"))
         try:
             contexto = obter_contexto(rede_id)
         except RedeNaoEncontrada:
@@ -167,6 +174,7 @@ def api_ping_loja(contexto, loja_id):
 
 @app.route("/api/<int:rede_id>/pdv/<loja_id>/<pdv_id>/reiniciar_mongo", methods=["POST"])
 @com_rede
+@exigir_escrita
 def api_reiniciar_mongo(contexto, loja_id, pdv_id):
     pdv = encontrar_pdv(contexto, loja_id, pdv_id)
     if not pdv:
@@ -177,6 +185,7 @@ def api_reiniciar_mongo(contexto, loja_id, pdv_id):
 
 @app.route("/api/<int:rede_id>/upload", methods=["POST"])
 @com_rede
+@exigir_escrita
 def api_upload(contexto):
     if "arquivo" not in request.files:
         return jsonify({"erro": "Nenhum arquivo enviado"}), 400
@@ -214,6 +223,7 @@ def api_arquivos(contexto):
 
 @app.route("/api/<int:rede_id>/arquivos/<nome>", methods=["DELETE"])
 @com_rede
+@exigir_escrita
 def api_deletar_arquivo(contexto, nome):
     caminho = os.path.join(contexto.upload_dir, secure_filename(nome))
     if os.path.exists(caminho):
@@ -224,6 +234,7 @@ def api_deletar_arquivo(contexto, nome):
 
 @app.route("/api/<int:rede_id>/arquivos/limpar", methods=["DELETE"])
 @com_rede
+@exigir_escrita
 def api_limpar_arquivos(contexto):
     removidos = 0
     for f in os.listdir(contexto.upload_dir):
@@ -235,6 +246,7 @@ def api_limpar_arquivos(contexto):
 
 @app.route("/api/<int:rede_id>/upload_agente", methods=["POST"])
 @com_rede
+@exigir_escrita
 def api_upload_agente(contexto):
     """Recebe o novo agente.exe e salva no servidor."""
     if "arquivo" not in request.files:
@@ -268,6 +280,7 @@ def api_versao_agente(contexto):
 
 @app.route("/api/<int:rede_id>/atualizar_agente", methods=["POST"])
 @com_rede
+@exigir_escrita
 def api_atualizar_agente(contexto):
     """Envia novo agente.exe para PDVs selecionados."""
     dados = request.json
@@ -294,6 +307,7 @@ def api_atualizar_agente(contexto):
 
 @app.route("/api/<int:rede_id>/atualizar", methods=["POST"])
 @com_rede
+@exigir_escrita
 def api_atualizar(contexto):
     dados = request.json
     loja_id = dados.get("loja_id")
@@ -370,6 +384,7 @@ def api_status_stream(contexto, loja_id):
 # ──────────────────────────────────────────────
 @app.route("/api/<int:rede_id>/replicacao/verificar", methods=["POST"])
 @com_rede
+@exigir_escrita
 def api_replicacao_verificar(contexto):
     dados = request.json or {}
     loja_id = dados.get("loja_id")
@@ -406,6 +421,7 @@ def api_replicacao_config_get(contexto):
 
 @app.route("/api/<int:rede_id>/replicacao/config", methods=["POST"])
 @com_rede
+@exigir_escrita
 def api_replicacao_config_set(contexto):
     dados = request.json or {}
     alteracoes = {k: dados[k] for k in ("habilitado", "intervalo_minutos", "pdvs") if k in dados}
@@ -440,6 +456,7 @@ def api_erp_db_config_get(contexto):
 
 @app.route("/api/<int:rede_id>/erp_db/config", methods=["POST"])
 @com_rede
+@exigir_escrita
 def api_erp_db_config_set(contexto):
     dados = request.json or {}
     return jsonify(erp_db.salvar_config(contexto, dados))
@@ -468,6 +485,7 @@ def api_integrador_config_get(contexto):
 
 @app.route("/api/<int:rede_id>/integrador/config", methods=["POST"])
 @com_rede
+@exigir_escrita
 def api_integrador_config_set(contexto):
     dados = request.json or {}
     return jsonify(integrador.salvar_config(contexto, dados))
