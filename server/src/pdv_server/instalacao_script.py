@@ -41,7 +41,7 @@ fi
 # 2. Conecta -- a tag (tag:pdv-service-manager) ja vem da auth key, nao
 # precisa de --advertise-tags aqui.
 echo "Conectando ao Tailscale..."
-tailscale up --authkey="$AUTH_KEY" --unattended --hostname="$HOSTNAME_TS" \
+tailscale up --authkey="$AUTH_KEY" --hostname="$HOSTNAME_TS" \
   || erro_fatal "Falha ao conectar ao Tailscale (auth key invalida/expirada?)."
 
 TS_IP=$(tailscale ip -4 2>/dev/null | head -1)

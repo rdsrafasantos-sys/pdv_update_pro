@@ -4,6 +4,7 @@ de ir para o banco -- ver auth/crypto.py. Quem usa: rotas em
 painel/routes.py e app.py (resolucao de permissao)."""
 import re
 import secrets
+import threading
 
 from pdv_server import tailscale_api
 from pdv_server.auth.crypto import cifrar, decifrar
@@ -390,15 +391,39 @@ def processar_callback_instalacao(token_callback, payload):
             registro.tailscale_hostname = payload.get("tailscale_hostname") or registro.tailscale_hostname
             registro.faixas_detectadas = payload.get("faixas")
             registro.prefixos_ipv6 = payload.get("prefixos")
+            registro.status = "concluido"
             db.commit()
-            _finalizar_automacao_instalacao(registro)
-            db.commit()
+            # Automacao (aprovacao de rotas + ACL) roda em background para
+            # nao bloquear o callback -- o script recebe a resposta
+            # imediatamente, o browser verifica o status final via polling.
+            instalacao_id = registro.id
+            threading.Thread(
+                target=_finalizar_automacao_em_background,
+                args=(instalacao_id,),
+                daemon=True,
+            ).start()
             return _instalacao_para_dict(registro)
         else:
             registro.status = "iniciando"
 
         db.commit()
         return _instalacao_para_dict(registro)
+    finally:
+        db.close()
+
+
+def _finalizar_automacao_em_background(instalacao_id):
+    """Roda em daemon thread -- abre a propria sessao de DB, atualiza o
+    status final apos aprovacao de rotas e ACL via Tailscale API."""
+    db = SessionLocal()
+    try:
+        registro = db.get(InstalacaoSiteId, instalacao_id)
+        if not registro:
+            return
+        _finalizar_automacao_instalacao(registro)
+        db.commit()
+    except Exception:
+        pass
     finally:
         db.close()
 
