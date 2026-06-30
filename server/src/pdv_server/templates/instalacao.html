@@ -244,7 +244,9 @@ async function gerarScript() {
     return;
   }
   document.getElementById('scriptTexto').value = dados.script;
-  document.getElementById('scriptResultado').style.display = 'block';
+  const resultadoEl = document.getElementById('scriptResultado');
+  resultadoEl.style.display = 'block';
+  resultadoEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   iniciarPolling();
   carregarHistorico();
 }
