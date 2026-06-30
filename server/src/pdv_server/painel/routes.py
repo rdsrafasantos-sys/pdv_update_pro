@@ -5,10 +5,13 @@ from pdv_server.auth.gestao import (
     alternar_ativa_rede, criar_perfil, criar_rede, criar_unidade,
     criar_usuario, editar_perfil, editar_rede, editar_unidade,
     editar_usuario, excluir_perfil, excluir_unidade, excluir_usuario,
-    listar_perfis, listar_redes, listar_unidades, listar_usuarios,
-    obter_rede, obter_usuario, redes_visiveis_para, usuario_pode_acessar_rede,
+    gerar_proximo_site_id, gerar_script_instalacao, listar_perfis,
+    listar_redes, listar_site_ids_instalacao, listar_unidades,
+    listar_usuarios, obter_instalacao, obter_rede, obter_usuario,
+    processar_callback_instalacao, redes_visiveis_para,
+    usuario_pode_acessar_rede,
 )
-from pdv_server.auth.routes import exigir_permissao, exigir_super_admin
+from pdv_server.auth.routes import exigir_permissao, exigir_super_admin, limiter
 
 painel_bp = Blueprint("painel", __name__)
 
@@ -29,6 +32,12 @@ def unidades_pagina():
 @exigir_permissao("pode_gerenciar_usuarios")
 def usuarios_pagina():
     return render_template("usuarios.html")
+
+
+@painel_bp.route("/instalacao")
+@exigir_permissao("pode_gerenciar_redes")
+def instalacao_pagina():
+    return render_template("instalacao.html")
 
 
 # ── API: Unidades (gestao da VR -- so super-admin) ─────────────
@@ -102,6 +111,7 @@ def api_criar_rede():
             mongo_uri=dados.get("mongo_uri"),
             token=dados.get("token"),
             tailscale_site_id=dados.get("tailscale_site_id", ""),
+            cnpj=dados.get("cnpj", ""),
         ))
     except ValueError as e:
         return jsonify({"erro": str(e)}), 400
@@ -121,6 +131,7 @@ def api_editar_rede(rede_id):
             mongo_uri=dados.get("mongo_uri"),
             token=dados.get("token"),
             tailscale_site_id=dados.get("tailscale_site_id"),
+            cnpj=dados.get("cnpj"),
         ))
     except ValueError as e:
         return jsonify({"erro": str(e)}), 400
@@ -136,6 +147,63 @@ def api_alternar_rede(rede_id):
         return jsonify(alternar_ativa_rede(rede_id, dados.get("ativa", True)))
     except ValueError as e:
         return jsonify({"erro": str(e)}), 400
+
+
+# ── API: Instalacao (alocacao de Tailscale Site ID) ─────────────
+
+@painel_bp.route("/api/instalacao/site-ids", methods=["GET"])
+@exigir_permissao("pode_gerenciar_redes")
+def api_listar_site_ids():
+    return jsonify(listar_site_ids_instalacao())
+
+
+@painel_bp.route("/api/instalacao/site-ids", methods=["POST"])
+@exigir_permissao("pode_gerenciar_redes")
+def api_gerar_site_id():
+    dados = request.json or {}
+    try:
+        registro = gerar_proximo_site_id(
+            cliente_cnpj=dados.get("cliente_cnpj", ""),
+            cliente_nome=dados.get("cliente_nome", ""),
+            usuario_email=current_user.email,
+        )
+        return jsonify(registro)
+    except ValueError as e:
+        return jsonify({"erro": str(e)}), 400
+
+
+@painel_bp.route("/api/instalacao/<int:instalacao_id>", methods=["GET"])
+@exigir_permissao("pode_gerenciar_redes")
+def api_obter_instalacao(instalacao_id):
+    try:
+        return jsonify(obter_instalacao(instalacao_id))
+    except ValueError as e:
+        return jsonify({"erro": str(e)}), 404
+
+
+@painel_bp.route("/api/instalacao/<int:instalacao_id>/script", methods=["POST"])
+@exigir_permissao("pode_gerenciar_redes")
+def api_gerar_script_instalacao(instalacao_id):
+    dados = request.json or {}
+    try:
+        script = gerar_script_instalacao(instalacao_id, erp_ip=dados.get("erp_ip", ""))
+        return jsonify({"script": script, "instalacao": obter_instalacao(instalacao_id)})
+    except ValueError as e:
+        return jsonify({"erro": str(e)}), 400
+
+
+# Callback do script rodando no service manager do cliente -- sem login,
+# autenticado pelo token de uso unico gerado junto com o script (ver
+# gerar_script_instalacao). Rate limit por seguranca extra, ja que e o
+# unico endpoint deste blueprint sem sessao por tras.
+@painel_bp.route("/api/instalacao/callback/<token_callback>", methods=["POST"])
+@limiter.limit("30 per minute")
+def api_callback_instalacao(token_callback):
+    dados = request.json or {}
+    try:
+        return jsonify(processar_callback_instalacao(token_callback, dados))
+    except ValueError as e:
+        return jsonify({"erro": str(e)}), 404
 
 
 # ── API: Perfis ──────────────────────────────────────────────

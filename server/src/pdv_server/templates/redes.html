@@ -54,6 +54,12 @@
         <span class="nav-label">Usuários</span>
       </a>
       {% endif %}
+      {% if usuario_atual.pode_gerenciar_redes %}
+      <a class="nav-item" href="{{ url_for('painel.instalacao_pagina') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        <span class="nav-label">Instalação</span>
+      </a>
+      {% endif %}
     </div>
 
     <div class="sidebar-foot">
@@ -105,6 +111,10 @@
     <div class="field">
       <label>Nome da rede</label>
       <input id="campoNome" placeholder="Ex: Compre Mais">
+    </div>
+    <div class="field">
+      <label>CNPJ <span class="text-muted">(identifica a empresa de forma única — o nome pode se repetir)</span></label>
+      <input id="campoCnpj" placeholder="00.000.000/0000-00">
     </div>
     <div class="field">
       <label>Unidade</label>
@@ -185,6 +195,7 @@ function abrirModalNovaRede() {
   document.getElementById('modalTitulo').textContent = 'Nova rede';
   document.getElementById('redeId').value = '';
   document.getElementById('campoNome').value = '';
+  document.getElementById('campoCnpj').value = '';
   document.getElementById('campoMongoUri').value = '';
   document.getElementById('campoToken').value = '';
   document.getElementById('campoSiteId').value = '';
@@ -199,6 +210,7 @@ async function editarRede(id) {
   document.getElementById('modalTitulo').textContent = `Editar — ${dados.nome}`;
   document.getElementById('redeId').value = dados.id;
   document.getElementById('campoNome').value = dados.nome;
+  document.getElementById('campoCnpj').value = dados.cnpj || '';
   document.getElementById('campoUnidade').value = dados.unidade_id;
   document.getElementById('campoMongoUri').value = dados.mongo_uri;
   document.getElementById('campoToken').value = dados.token;
@@ -215,6 +227,7 @@ async function salvarRede() {
   const id = document.getElementById('redeId').value;
   const corpo = {
     nome: document.getElementById('campoNome').value,
+    cnpj: document.getElementById('campoCnpj').value,
     unidade_id: parseInt(document.getElementById('campoUnidade').value, 10),
     mongo_uri: document.getElementById('campoMongoUri').value,
     token: document.getElementById('campoToken').value,

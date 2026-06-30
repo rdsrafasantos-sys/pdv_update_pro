@@ -51,7 +51,9 @@ app.register_blueprint(painel_bp)
 @app.before_request
 def exigir_login():
     rota = request.endpoint or ""
-    if rota.startswith("auth.") or rota == "static":
+    # Callback do script de instalacao roda sem sessao de usuario --
+    # autenticado pelo token de uso unico na propria URL (ver gestao.py).
+    if rota.startswith("auth.") or rota == "static" or rota == "painel.api_callback_instalacao":
         return None
     if not current_user.is_authenticated:
         return login_manager.unauthorized()

@@ -65,3 +65,22 @@ MASTER_KEY = os.environ.get("PDV_MASTER_KEY", "")
 # Chave de sessao do Flask (assinatura do cookie). Tambem obrigatoria em
 # producao, gere com: python -c "import secrets; print(secrets.token_hex(32))"
 SECRET_KEY = os.environ.get("PDV_SECRET_KEY", "")
+
+# ──────────────────────────────────────────────
+# TAILSCALE API — automacao da tela de Instalacao (gerar auth key por
+# instalacao, atualizar ACL com as faixas descobertas, aprovar rotas)
+# ──────────────────────────────────────────────
+# OAuth client gerado em Settings > OAuth clients no admin console do
+# Tailscale, com escopos ACL (read+write), Auth Keys (write) e Devices
+# (read+write) -- ver tailscale_api.py. Credencial poderosa: fica so no
+# .env de cada instalacao, nunca commitada, nunca no banco.
+TAILSCALE_OAUTH_CLIENT_ID = os.environ.get("PDV_TAILSCALE_OAUTH_CLIENT_ID", "")
+TAILSCALE_OAUTH_CLIENT_SECRET = os.environ.get("PDV_TAILSCALE_OAUTH_CLIENT_SECRET", "")
+
+# Identificador do tailnet na API ("-" funciona como "o tailnet deste token")
+TAILSCALE_TAILNET = os.environ.get("PDV_TAILSCALE_TAILNET", "-")
+
+# URL pela qual o script do service manager (ja conectado via Tailscale)
+# consegue chamar de volta este painel -- IP ou hostname MagicDNS deste
+# servidor na tailnet, com porta. Ex: http://100.112.37.21:8888
+PAINEL_CALLBACK_URL = os.environ.get("PDV_PAINEL_CALLBACK_URL", "")

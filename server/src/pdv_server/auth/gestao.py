@@ -2,9 +2,42 @@
 cada rede (Mongo URI, token, Tailscale Site ID) sao sempre cifrados antes
 de ir para o banco -- ver auth/crypto.py. Quem usa: rotas em
 painel/routes.py e app.py (resolucao de permissao)."""
+import re
+import secrets
+
+from pdv_server import tailscale_api
 from pdv_server.auth.crypto import cifrar, decifrar
-from pdv_server.auth.models import Perfil, Rede, SessionLocal, Unidade, Usuario
+from pdv_server.auth.models import (
+    InstalacaoSiteId, Perfil, Rede, SessionLocal, Unidade, Usuario,
+)
 from pdv_server.auth.security import gerar_hash_senha
+from pdv_server.config import PAINEL_CALLBACK_URL
+
+_PESOS_CNPJ_1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+_PESOS_CNPJ_2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+
+
+def _digito_verificador_cnpj(numeros, pesos):
+    soma = sum(n * p for n, p in zip(numeros, pesos))
+    resto = soma % 11
+    return 0 if resto < 2 else 11 - resto
+
+
+def validar_cnpj(cnpj):
+    """Normaliza (so digitos) e valida um CNPJ pelo algoritmo oficial dos
+    digitos verificadores. Levanta ValueError com mensagem amigavel se
+    invalido; retorna a string de 14 digitos (sem pontuacao) se valido."""
+    digitos = re.sub(r"\D", "", cnpj or "")
+    if len(digitos) != 14:
+        raise ValueError("CNPJ precisa ter 14 digitos.")
+    if digitos == digitos[0] * 14:
+        raise ValueError("CNPJ invalido.")
+    numeros = [int(d) for d in digitos]
+    d1 = _digito_verificador_cnpj(numeros[:12], _PESOS_CNPJ_1)
+    d2 = _digito_verificador_cnpj(numeros[:12] + [d1], _PESOS_CNPJ_2)
+    if numeros[12] != d1 or numeros[13] != d2:
+        raise ValueError("CNPJ invalido (digito verificador nao confere).")
+    return digitos
 
 
 # ── Unidades ─────────────────────────────────────────────────
@@ -76,6 +109,7 @@ def _rede_para_dict(rede, com_segredos=False):
     dados = {
         "id": rede.id,
         "nome": rede.nome,
+        "cnpj": rede.cnpj,
         "unidade_id": rede.unidade_id,
         "unidade_nome": rede.unidade.nome if rede.unidade else None,
         "ativa": rede.ativa,
@@ -112,12 +146,24 @@ def obter_rede(rede_id, com_segredos=False):
         db.close()
 
 
-def criar_rede(nome, unidade_id, mongo_uri, token, tailscale_site_id=""):
+def _checar_cnpj_disponivel(db, cnpj, ignorar_rede_id=None):
+    """CNPJ identifica a empresa de forma unica -- nome pode se repetir
+    entre clientes diferentes, CNPJ nao pode."""
+    query = db.query(Rede).filter_by(cnpj=cnpj)
+    if ignorar_rede_id:
+        query = query.filter(Rede.id != ignorar_rede_id)
+    existente = query.first()
+    if existente:
+        raise ValueError(f"Ja existe uma rede com este CNPJ: '{existente.nome}'.")
+
+
+def criar_rede(nome, unidade_id, mongo_uri, token, tailscale_site_id="", cnpj=""):
     nome = (nome or "").strip()
     mongo_uri = (mongo_uri or "").strip()
     token = (token or "").strip()
     if not nome or not unidade_id or not mongo_uri or not token:
         raise ValueError("Nome, unidade, Mongo URI e token sao obrigatorios.")
+    cnpj_normalizado = validar_cnpj(cnpj) if cnpj else None
 
     db = SessionLocal()
     try:
@@ -125,9 +171,11 @@ def criar_rede(nome, unidade_id, mongo_uri, token, tailscale_site_id=""):
             raise ValueError("Unidade nao encontrada.")
         if db.query(Rede).filter_by(nome=nome).first():
             raise ValueError(f"Ja existe uma rede chamada '{nome}'.")
+        if cnpj_normalizado:
+            _checar_cnpj_disponivel(db, cnpj_normalizado)
 
         rede = Rede(
-            nome=nome, unidade_id=unidade_id,
+            nome=nome, unidade_id=unidade_id, cnpj=cnpj_normalizado,
             mongo_uri_cifrado=cifrar(mongo_uri),
             token_cifrado=cifrar(token),
             tailscale_site_id_cifrado=cifrar(tailscale_site_id) if tailscale_site_id else None,
@@ -140,7 +188,7 @@ def criar_rede(nome, unidade_id, mongo_uri, token, tailscale_site_id=""):
         db.close()
 
 
-def editar_rede(rede_id, nome, unidade_id, mongo_uri, token, tailscale_site_id=""):
+def editar_rede(rede_id, nome, unidade_id, mongo_uri, token, tailscale_site_id="", cnpj=None):
     db = SessionLocal()
     try:
         rede = db.get(Rede, rede_id)
@@ -159,6 +207,11 @@ def editar_rede(rede_id, nome, unidade_id, mongo_uri, token, tailscale_site_id="
             rede.token_cifrado = cifrar(token.strip())
         if tailscale_site_id is not None:
             rede.tailscale_site_id_cifrado = cifrar(tailscale_site_id) if tailscale_site_id else None
+        if cnpj is not None:
+            cnpj_normalizado = validar_cnpj(cnpj) if cnpj else None
+            if cnpj_normalizado:
+                _checar_cnpj_disponivel(db, cnpj_normalizado, ignorar_rede_id=rede_id)
+            rede.cnpj = cnpj_normalizado
 
         db.commit()
         return _rede_para_dict(rede)
@@ -177,6 +230,208 @@ def alternar_ativa_rede(rede_id, ativa):
         return _rede_para_dict(rede)
     finally:
         db.close()
+
+
+# ── Instalacao (alocacao de Tailscale Site ID) ──────────────────
+# Site ID precisa ser unico pra sempre na tailnet -- mesmo que a rede
+# correspondente nunca seja criada, ou seja excluida depois, o numero
+# alocado aqui nunca pode ser reaproveitado. Por isso o "maior valor" e
+# calculado tanto a partir das Redes existentes (campo pode ter sido
+# preenchido a mao, como o Site ID 7 da TEST) quanto do historico desta
+# tabela, e o registro e gravado ANTES de a rede existir.
+
+def _maior_site_id_existente(db):
+    maior_redes = 0
+    for rede in db.query(Rede).all():
+        if rede.tailscale_site_id_cifrado:
+            valor = decifrar(rede.tailscale_site_id_cifrado)
+            if valor and valor.strip().isdigit():
+                maior_redes = max(maior_redes, int(valor))
+    maior_alocados = max(
+        (r.site_id for r in db.query(InstalacaoSiteId).all()), default=0
+    )
+    return max(maior_redes, maior_alocados)
+
+
+def listar_site_ids_instalacao():
+    db = SessionLocal()
+    try:
+        registros = db.query(InstalacaoSiteId).order_by(InstalacaoSiteId.site_id.desc()).all()
+        return [_instalacao_para_dict(r) for r in registros]
+    finally:
+        db.close()
+
+
+def gerar_proximo_site_id(cliente_cnpj, cliente_nome="", usuario_email=""):
+    cnpj_normalizado = validar_cnpj(cliente_cnpj)
+    db = SessionLocal()
+    try:
+        _checar_cnpj_disponivel(db, cnpj_normalizado)
+        if db.query(InstalacaoSiteId).filter_by(cliente_cnpj=cnpj_normalizado).first():
+            raise ValueError("Ja existe um Site ID gerado para este CNPJ -- veja o historico abaixo.")
+
+        proximo = _maior_site_id_existente(db) + 1
+        registro = InstalacaoSiteId(
+            site_id=proximo,
+            cliente_nome=(cliente_nome or "").strip() or None,
+            cliente_cnpj=cnpj_normalizado,
+            usuario_email=(usuario_email or "").strip() or None,
+        )
+        db.add(registro)
+        db.commit()
+        return {
+            "id": registro.id,
+            "site_id": registro.site_id,
+            "cliente_nome": registro.cliente_nome,
+            "cliente_cnpj": registro.cliente_cnpj,
+            "usuario_email": registro.usuario_email,
+            "criado_em": registro.criado_em.strftime("%Y-%m-%d %H:%M"),
+        }
+    finally:
+        db.close()
+
+
+def _instalacao_para_dict(registro):
+    return {
+        "id": registro.id,
+        "site_id": registro.site_id,
+        "cliente_nome": registro.cliente_nome,
+        "cliente_cnpj": registro.cliente_cnpj,
+        "usuario_email": registro.usuario_email,
+        "status": registro.status,
+        "erp_ip": registro.erp_ip,
+        "tailscale_hostname": registro.tailscale_hostname,
+        "tailscale_ip": registro.tailscale_ip,
+        "faixas_detectadas": registro.faixas_detectadas,
+        "prefixos_ipv6": registro.prefixos_ipv6,
+        "erro_mensagem": registro.erro_mensagem,
+        "criado_em": registro.criado_em.strftime("%Y-%m-%d %H:%M") if registro.criado_em else None,
+        "atualizado_em": registro.atualizado_em.strftime("%Y-%m-%d %H:%M") if registro.atualizado_em else None,
+    }
+
+
+def obter_instalacao(instalacao_id):
+    db = SessionLocal()
+    try:
+        registro = db.get(InstalacaoSiteId, instalacao_id)
+        if not registro:
+            raise ValueError("Instalacao nao encontrada.")
+        return _instalacao_para_dict(registro)
+    finally:
+        db.close()
+
+
+def gerar_script_instalacao(instalacao_id, erp_ip=""):
+    """Gera (ou regenera) o script do service manager para esta instalacao.
+    Exige a credencial da API do Tailscale configurada -- sem ela nao tem
+    como mintar uma auth key de uso unico para o script."""
+    from pdv_server.instalacao_script import gerar_script
+
+    if not tailscale_api.automacao_disponivel():
+        raise ValueError(
+            "PDV_TAILSCALE_OAUTH_CLIENT_ID/SECRET nao configurados neste "
+            "servidor -- nao e possivel gerar a auth key do script."
+        )
+    if not PAINEL_CALLBACK_URL:
+        raise ValueError(
+            "PDV_PAINEL_CALLBACK_URL nao configurada -- o script nao "
+            "saberia para onde reportar o progresso."
+        )
+
+    db = SessionLocal()
+    try:
+        registro = db.get(InstalacaoSiteId, instalacao_id)
+        if not registro:
+            raise ValueError("Instalacao nao encontrada.")
+
+        registro.erp_ip = (erp_ip or "").strip() or None
+        if not registro.token_callback:
+            registro.token_callback = secrets.token_urlsafe(32)
+
+        auth_key = tailscale_api.criar_auth_key(
+            tags=["tag:pdv-service-manager"],
+            descricao=f"instalacao-site-id-{registro.site_id}",
+        )
+
+        callback_url = f"{PAINEL_CALLBACK_URL.rstrip('/')}/api/instalacao/callback/{registro.token_callback}"
+        script = gerar_script(registro.site_id, auth_key, registro.erp_ip, callback_url)
+
+        registro.status = "script_gerado"
+        registro.erro_mensagem = None
+        db.commit()
+        return script
+    finally:
+        db.close()
+
+
+def processar_callback_instalacao(token_callback, payload):
+    """Recebe o status reportado pelo script rodando no service manager.
+    Quando o status e 'concluido', tenta automatizar o resto (aprovar
+    rotas + acrescentar os prefixos no ACL) -- se a automacao falhar (ou
+    nao estiver configurada), a instalacao fica marcada com o erro pra
+    resolver manualmente, mas o que o script ja fez (Tailscale conectado,
+    rotas anunciadas) nao se perde."""
+    db = SessionLocal()
+    try:
+        registro = db.query(InstalacaoSiteId).filter_by(token_callback=token_callback).first()
+        if not registro:
+            raise ValueError("Token de callback invalido.")
+
+        status = payload.get("status", "")
+        if status == "erro":
+            registro.status = "erro"
+            registro.erro_mensagem = payload.get("mensagem", "Erro desconhecido no script.")
+        elif status == "conectado":
+            registro.status = "conectado"
+            registro.tailscale_ip = payload.get("tailscale_ip")
+            registro.tailscale_hostname = payload.get("tailscale_hostname")
+        elif status == "concluido":
+            registro.tailscale_ip = payload.get("tailscale_ip") or registro.tailscale_ip
+            registro.tailscale_hostname = payload.get("tailscale_hostname") or registro.tailscale_hostname
+            registro.faixas_detectadas = payload.get("faixas")
+            registro.prefixos_ipv6 = payload.get("prefixos")
+            db.commit()
+            _finalizar_automacao_instalacao(registro)
+            db.commit()
+            return _instalacao_para_dict(registro)
+        else:
+            registro.status = "iniciando"
+
+        db.commit()
+        return _instalacao_para_dict(registro)
+    finally:
+        db.close()
+
+
+def _finalizar_automacao_instalacao(registro):
+    """Best-effort: aprova as rotas anunciadas e acrescenta os prefixos no
+    ACL via API do Tailscale. So roda se a credencial estiver configurada
+    -- senao, deixa status 'concluido_manual' com os prefixos visiveis pra
+    quem administra colar manualmente no admin console."""
+    prefixos = [p for p in (registro.prefixos_ipv6 or "").split(",") if p]
+    if not prefixos:
+        registro.status = "erro"
+        registro.erro_mensagem = "Script concluiu mas nao reportou nenhum prefixo IPv6."
+        return
+
+    if not tailscale_api.automacao_disponivel():
+        registro.status = "concluido_manual"
+        return
+
+    try:
+        dispositivo = tailscale_api.obter_dispositivo_por_hostname(registro.tailscale_hostname)
+        if not dispositivo:
+            raise ValueError(f"Dispositivo '{registro.tailscale_hostname}' nao encontrado na tailnet ainda.")
+        tailscale_api.aprovar_rotas(dispositivo["id"], prefixos)
+        tailscale_api.adicionar_prefixos_ao_grant("tag:pdv-service-manager", prefixos)
+        registro.status = "concluido"
+        registro.erro_mensagem = None
+    except Exception as e:
+        registro.status = "concluido_pendente_acl"
+        registro.erro_mensagem = (
+            f"Service manager conectado e rotas anunciadas, mas a automacao do "
+            f"ACL falhou: {e}. Aprove a rota e acrescente os prefixos manualmente."
+        )
 
 
 # ── Perfis ───────────────────────────────────────────────────

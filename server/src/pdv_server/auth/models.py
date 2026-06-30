@@ -43,6 +43,11 @@ class Rede(Base):
 
     id = Column(Integer, primary_key=True)
     nome = Column(String(120), nullable=False)
+    # CNPJ identifica a empresa de forma unica (nome pode se repetir entre
+    # clientes diferentes). Unicidade validada em gestao.py, nao aqui --
+    # nullable porque redes criadas antes desta coluna nao tem o valor
+    # preenchido ainda.
+    cnpj = Column(String(14), nullable=True)
     unidade_id = Column(Integer, ForeignKey("unidades.id"), nullable=False)
 
     # Segredos sempre cifrados em repouso (ver auth/crypto.py) -- nunca
@@ -100,6 +105,33 @@ class Usuario(Base):
     redes = relationship("Rede", secondary=usuario_redes)
 
 
+class InstalacaoSiteId(Base):
+    """Registro de cada Tailscale Site ID alocado pela tela de Instalacao
+    (painel/routes.py) -- garante que nenhum numero seja gerado duas vezes,
+    mesmo que a Rede correspondente nunca chegue a ser criada ou seja
+    excluida depois."""
+    __tablename__ = "instalacao_site_ids"
+
+    id = Column(Integer, primary_key=True)
+    site_id = Column(Integer, nullable=False, unique=True)
+    cliente_nome = Column(String(120), nullable=True)
+    cliente_cnpj = Column(String(14), nullable=True)
+    usuario_email = Column(String(160), nullable=True)
+    criado_em = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Progresso da automacao do service manager (ponto 2/3 do onboarding).
+    # status: site_id_gerado -> script_gerado -> conectado -> concluido | erro
+    status = Column(String(30), default="site_id_gerado")
+    erp_ip = Column(String(45), nullable=True)
+    token_callback = Column(String(64), nullable=True, unique=True)
+    tailscale_hostname = Column(String(120), nullable=True)
+    tailscale_ip = Column(String(45), nullable=True)
+    faixas_detectadas = Column(Text, nullable=True)  # CSV de CIDRs (ex: 192.168.1.0/24,...)
+    prefixos_ipv6 = Column(Text, nullable=True)      # CSV de prefixos 4via6 anunciados
+    erro_mensagem = Column(Text, nullable=True)
+    atualizado_em = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
 class Auditoria(Base):
     __tablename__ = "auditoria"
 
@@ -133,6 +165,9 @@ def _migrar_colunas_novas():
             "pode_gerenciar_redes": "BOOLEAN DEFAULT 0",
             "pode_gerenciar_usuarios": "BOOLEAN DEFAULT 0",
             "somente_leitura": "BOOLEAN DEFAULT 0",
+        },
+        "redes": {
+            "cnpj": "VARCHAR(14)",
         },
     }
     with engine.connect() as conn:

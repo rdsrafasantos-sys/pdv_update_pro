@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV Updater — Instalação</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
+<style>
+  .siteid-card { text-align: center; padding: 32px 24px; }
+  .siteid-valor { font-size: 48px; font-weight: 800; color: var(--orange); margin: 10px 0; font-family: monospace; }
+  .siteid-hint { color: var(--text-faint); font-size: 12.5px; max-width: 480px; margin: 0 auto 18px; }
+  .field { margin-bottom: 12px; max-width: 360px; margin-left: auto; margin-right: auto; text-align: left; }
+  .field label { font-size: 11.5px; color: var(--text-faint); font-weight: 650; display:block; margin-bottom:5px; }
+  .field input {
+    width: 100%; background: var(--bg-elevated); border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 13px;
+  }
+  table.tabela-historico { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.tabela-historico th { text-align: left; color: var(--text-faint); font-weight: 650; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.tabela-historico td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .text-muted { color: var(--text-faint); }
+  .copy-btn { cursor: pointer; }
+  #scriptTexto { width: 100%; height: 260px; background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text); font-family: monospace; font-size: 11.5px; padding: 10px; }
+  .status-badge { display:inline-flex; align-items:center; gap:6px; padding: 5px 12px; border-radius: 99px; font-size: 12px; font-weight: 650; }
+  .status-aguardando { background: rgba(255,170,0,.15); color: #ffaa00; }
+  .status-ok { background: rgba(0,200,120,.15); color: #00c878; }
+  .status-erro { background: rgba(255,60,60,.15); color: #ff3c3c; }
+  .botoes-script { display:flex; gap:8px; margin-top:10px; }
+</style>
+</head>
+<body class="app-bg" data-theme="dark">
+<div class="shell" id="shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">VR</div>
+      <div class="brand-name">PDV <span>Updater</span></div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-title">Visão Geral</div>
+      <a class="nav-item" href="{{ url_for('painel.redes') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span class="nav-label">Redes</span>
+      </a>
+      {% if usuario_atual.is_super_admin %}
+      <a class="nav-item" href="{{ url_for('painel.unidades_pagina') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21V12h6v9"/></svg>
+        <span class="nav-label">Unidades</span>
+      </a>
+      {% endif %}
+      {% if usuario_atual.pode_gerenciar_usuarios %}
+      <a class="nav-item" href="{{ url_for('painel.usuarios_pagina') }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        <span class="nav-label">Usuários</span>
+      </a>
+      {% endif %}
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        <span class="nav-label">Instalação</span>
+      </div>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="avatar">{{ usuario_atual.nome[:2].upper() }}</div>
+      <div class="sidebar-foot-text">
+        <div class="name">{{ usuario_atual.nome }}</div>
+        <div class="role">{{ "Super-admin" if usuario_atual.is_super_admin else "Usuário" }}</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="crumbs"><span>Redes</span> <span>›</span> <b>Instalação</b></div>
+      <div class="topbar-right">
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <button type="submit" class="btn btn-ghost btn-sm">Sair</button>
+        </form>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Instalação de cliente novo</div>
+          <div class="page-sub">Centraliza os passos manuais que ainda existem ao colocar uma Rede nova no ar.</div>
+        </div>
+      </div>
+
+      <div class="card siteid-card">
+        <div class="section-title">1. Tailscale Site ID</div>
+        <div class="siteid-hint">
+          Cada cliente precisa de um número único, que nunca se repete e nunca é reaproveitado —
+          mesmo que a Rede correspondente nunca chegue a ser criada. Gere aqui antes de rodar
+          <code>tailscale debug via &lt;site-id&gt; ...</code> no service manager do cliente.
+        </div>
+        <div class="field">
+          <label>CNPJ do cliente</label>
+          <input id="campoClienteCnpj" placeholder="00.000.000/0000-00">
+        </div>
+        <div class="field">
+          <label>Nome do cliente <span class="text-muted">(opcional, só pra identificar no histórico abaixo)</span></label>
+          <input id="campoClienteNome" placeholder="Ex: Compre Mais">
+        </div>
+        <button class="btn btn-primary" onclick="gerarSiteId()">Gerar próximo Site ID</button>
+        <div class="erro-msg" id="siteIdErro" style="display:none; color:var(--red); font-size:12px; margin-top:10px;"></div>
+        <div id="siteIdResultado" style="display:none; margin-top:18px;">
+          <div class="siteid-valor" id="siteIdValor">—</div>
+          <div class="text-muted" style="font-size:12px;">Copiado ao gerar — cole no comando <code>tailscale debug via</code> e no campo "Tailscale Site ID" da Rede.</div>
+        </div>
+      </div>
+
+      <div class="card" id="cardPasso2" style="display:none;">
+        <div class="section-title">2. Instalar no service manager do cliente</div>
+        <div class="siteid-hint" style="margin:0 0 14px;">
+          O script abaixo instala o Tailscale, conecta com uma auth key de uso único,
+          descobre as faixas de rede lendo o replica set do Mongo local e ativa o
+          subnet router — sozinho. Rode como root na máquina do service manager.
+        </div>
+        <div class="field">
+          <label>IP do banco ERP <span class="text-muted">(opcional — some à faixa detectada automaticamente)</span></label>
+          <input id="campoErpIp" placeholder="192.168.1.100">
+        </div>
+        <button class="btn btn-primary" onclick="gerarScript()">Gerar script de instalação</button>
+        <div class="erro-msg" id="scriptErro" style="display:none; color:var(--red); font-size:12px; margin-top:10px;"></div>
+
+        <div id="scriptResultado" style="display:none; margin-top:16px; text-align:left;">
+          <textarea id="scriptTexto" readonly></textarea>
+          <div class="botoes-script">
+            <button class="btn btn-ghost btn-sm" onclick="copiarScript()">Copiar</button>
+            <button class="btn btn-ghost btn-sm" onclick="baixarScript()">Baixar .sh</button>
+          </div>
+        </div>
+
+        <div id="statusInstalacao" style="display:none; margin-top:18px; text-align:left;">
+          <div class="section-title" style="font-size:12px;">Status</div>
+          <span class="status-badge" id="statusBadge">—</span>
+          <div id="statusDetalhe" class="text-muted" style="font-size:12px; margin-top:8px;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Histórico de Site IDs já alocados</div>
+        <div id="historicoContainer"><div class="text-muted">Carregando...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let instalacaoAtual = null;
+let pollingId = null;
+
+const STATUS_LABEL = {
+  site_id_gerado: ['Aguardando script', 'status-aguardando'],
+  script_gerado: ['Aguardando o service manager conectar...', 'status-aguardando'],
+  conectado: ['Conectado — detectando faixas de rede...', 'status-aguardando'],
+  concluido: ['Concluído — ACL e rotas atualizadas automaticamente', 'status-ok'],
+  concluido_manual: ['Concluído (automação do Tailscale não configurada — aplique manualmente)', 'status-erro'],
+  concluido_pendente_acl: ['Concluído, mas a automação do ACL falhou — ver detalhe', 'status-erro'],
+  erro: ['Erro', 'status-erro'],
+};
+
+async function carregarHistorico() {
+  const registros = await fetch('/api/instalacao/site-ids').then(r => r.json());
+  const cont = document.getElementById('historicoContainer');
+  if (registros.length === 0) {
+    cont.innerHTML = '<div class="text-muted">Nenhum Site ID gerado ainda.</div>';
+    return;
+  }
+  cont.innerHTML = `
+    <table class="tabela-historico">
+      <tr><th>Site ID</th><th>Cliente</th><th>CNPJ</th><th>Status</th><th>Gerado por</th><th>Data</th><th></th></tr>
+      ${registros.map(r => `
+        <tr>
+          <td><b>${r.site_id}</b></td>
+          <td>${r.cliente_nome || '<span class="text-muted">—</span>'}</td>
+          <td>${r.cliente_cnpj || '<span class="text-muted">—</span>'}</td>
+          <td>${(STATUS_LABEL[r.status] || [r.status])[0]}</td>
+          <td>${r.usuario_email || '—'}</td>
+          <td>${r.criado_em || '—'}</td>
+          <td><button class="btn btn-ghost btn-sm" onclick="continuarInstalacao(${r.id})">Continuar</button></td>
+        </tr>
+      `).join('')}
+    </table>
+  `;
+}
+
+async function gerarSiteId() {
+  const erroEl = document.getElementById('siteIdErro');
+  erroEl.style.display = 'none';
+  const clienteCnpj = document.getElementById('campoClienteCnpj').value;
+  const clienteNome = document.getElementById('campoClienteNome').value;
+  const r = await fetch('/api/instalacao/site-ids', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cliente_cnpj: clienteCnpj, cliente_nome: clienteNome }),
+  });
+  const dados = await r.json();
+  if (dados.erro) {
+    erroEl.textContent = dados.erro;
+    erroEl.style.display = 'block';
+    return;
+  }
+  document.getElementById('siteIdValor').textContent = dados.site_id;
+  document.getElementById('siteIdResultado').style.display = 'block';
+  try {
+    await navigator.clipboard.writeText(String(dados.site_id));
+  } catch (e) { /* clipboard pode falhar sem HTTPS — sem problema, o numero ja esta na tela */ }
+  carregarHistorico();
+  abrirPasso2(dados.id);
+}
+
+function abrirPasso2(instalacaoId) {
+  instalacaoAtual = instalacaoId;
+  document.getElementById('cardPasso2').style.display = 'block';
+  document.getElementById('cardPasso2').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function continuarInstalacao(instalacaoId) {
+  abrirPasso2(instalacaoId);
+  const dados = await fetch(`/api/instalacao/${instalacaoId}`).then(r => r.json());
+  if (dados.erro) { alert(dados.erro); return; }
+  document.getElementById('campoErpIp').value = dados.erp_ip || '';
+  if (dados.status && dados.status !== 'site_id_gerado') {
+    iniciarPolling();
+  }
+}
+
+async function gerarScript() {
+  const erroEl = document.getElementById('scriptErro');
+  erroEl.style.display = 'none';
+  const erpIp = document.getElementById('campoErpIp').value;
+  const r = await fetch(`/api/instalacao/${instalacaoAtual}/script`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ erp_ip: erpIp }),
+  });
+  const dados = await r.json();
+  if (dados.erro) {
+    erroEl.textContent = dados.erro;
+    erroEl.style.display = 'block';
+    return;
+  }
+  document.getElementById('scriptTexto').value = dados.script;
+  document.getElementById('scriptResultado').style.display = 'block';
+  iniciarPolling();
+  carregarHistorico();
+}
+
+function copiarScript() {
+  navigator.clipboard.writeText(document.getElementById('scriptTexto').value).catch(() => {});
+}
+
+function baixarScript() {
+  const blob = new Blob([document.getElementById('scriptTexto').value], { type: 'text/x-shellscript' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `instalar-service-manager-site${instalacaoAtual}.sh`;
+  a.click();
+}
+
+function iniciarPolling() {
+  document.getElementById('statusInstalacao').style.display = 'block';
+  if (pollingId) clearInterval(pollingId);
+  atualizarStatus();
+  pollingId = setInterval(atualizarStatus, 4000);
+}
+
+async function atualizarStatus() {
+  const dados = await fetch(`/api/instalacao/${instalacaoAtual}`).then(r => r.json());
+  if (dados.erro) return;
+  const [label, classe] = STATUS_LABEL[dados.status] || [dados.status, 'status-aguardando'];
+  const badge = document.getElementById('statusBadge');
+  badge.textContent = label;
+  badge.className = `status-badge ${classe}`;
+
+  const detalhe = document.getElementById('statusDetalhe');
+  const partes = [];
+  if (dados.tailscale_ip) partes.push(`IP Tailscale: ${dados.tailscale_ip}`);
+  if (dados.faixas_detectadas) partes.push(`Faixas: ${dados.faixas_detectadas}`);
+  if (dados.prefixos_ipv6) partes.push(`Prefixos 4via6: ${dados.prefixos_ipv6}`);
+  if (dados.erro_mensagem) partes.push(`⚠️ ${dados.erro_mensagem}`);
+  detalhe.innerHTML = partes.join('<br>');
+
+  const TERMINAIS = ['concluido', 'concluido_manual', 'concluido_pendente_acl', 'erro'];
+  if (TERMINAIS.includes(dados.status) && pollingId) {
+    clearInterval(pollingId);
+    pollingId = null;
+    carregarHistorico();
+  }
+}
+
+carregarHistorico();
+</script>
+</body>
+</html>
