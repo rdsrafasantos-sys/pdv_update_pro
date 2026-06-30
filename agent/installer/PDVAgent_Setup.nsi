@@ -79,7 +79,7 @@ Function TailscalePageCreate
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateLabel} 0 0u 100% 30u "Tailscale (opcional): cole abaixo a auth key da rede deste cliente para conectar este PDV automaticamente a VPN. Deixe em branco para pular esta etapa (pode ser configurado depois)."
+  ${NSD_CreateLabel} 0 0u 100% 30u "Tailscale (opcional): cole abaixo a auth key marcada com tag:pdv-terminal (a mesma para todo PDV, de qualquer cliente) para conectar este PDV automaticamente a VPN. Deixe em branco para pular esta etapa (pode ser configurado depois)."
   Pop $0
 
   ${NSD_CreateLabel} 0 36u 100% 10u "Auth Key:"

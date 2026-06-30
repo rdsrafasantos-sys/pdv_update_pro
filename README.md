@@ -199,27 +199,78 @@ python main.py
 
 ## Tailscale (VPN entre servidor e PDVs)
 
-Cada rede de cliente (ex: `TEST`, `BONNA`) é isolada das outras na mesma tailnet
-via um par de tags: `tag:pdv-<rede>` e `tag:server-<rede>`. O ACL (Access
-Controls, no admin console do Tailscale) só libera tráfego entre o par de tags
-de uma mesma rede — PDVs de redes diferentes nunca se enxergam. Ver o ACL atual
-comentado no admin console; para adicionar uma rede nova, copie o par de tags
-em `tagOwners` e o bloco de 2 `grants` correspondente. Lojas/PDVs novos
-*dentro* de uma rede já existente não exigem mudança no ACL.
+O servidor (`painel-central`, hoje em `192.168.1.124`, futuramente na nuvem)
+precisa alcançar máquinas dentro da rede de cada cliente: o **service
+manager** (integrador + MongoDB na porta `27016`, dentro de uma das lojas) e
+os **PDVs** de cada loja (porta `5000` do agente, `27018` do Mongo local).
 
-O instalador do agente (`PDVAgent_Setup.nsi`) tem uma tela opcional que pede a
-auth key da rede do cliente e instala/conecta o Tailscale automaticamente
+Em vez de uma tag por cliente (esquema antigo `tag:pdv-<rede>` /
+`tag:server-<rede>`, que exigia editar o ACL a cada cliente novo), usamos
+**3 tags fixas, criadas uma única vez e nunca alteradas**:
+
+- `tag:painel-central` — só no servidor do painel.
+- `tag:pdv-service-manager` — em toda máquina de integrador/Mongo, de
+  **qualquer** cliente.
+- `tag:pdv-terminal` — em todo PDV, de **qualquer** cliente.
+
+Isolamento entre clientes continua garantido: o ACL só concede acesso de
+`tag:painel-central` para as outras duas tags — nunca entre
+`tag:pdv-service-manager`/`tag:pdv-terminal` de clientes diferentes, nem entre
+si. Quem garante que o cliente A não enxerga o cliente B é a ausência de
+qualquer regra permitindo isso (Tailscale nega por padrão), não uma tag
+exclusiva por cliente. A separação *de dados* (Mongo URI/token por Rede) já é
+feita na camada de aplicação (`painel.db`), independente da rede.
+
+Política de ACL (cole no admin console → Access Controls, substituindo o que
+existir hoje — ajuste os `autogroup:admin` se preferir restringir a um grupo
+específico):
+
+```json
+{
+  "tagOwners": {
+    "tag:painel-central":      ["autogroup:admin"],
+    "tag:pdv-service-manager":  ["autogroup:admin"],
+    "tag:pdv-terminal":         ["autogroup:admin"],
+  },
+  "grants": [
+    {
+      "src": ["tag:painel-central"],
+      "dst": ["tag:pdv-service-manager"],
+      "ip":  ["tcp:27016"],
+    },
+    {
+      "src": ["tag:painel-central"],
+      "dst": ["tag:pdv-terminal"],
+      "ip":  ["tcp:5000", "tcp:27018"],
+    },
+  ],
+}
+```
+
+Com isso, **onboarding de cliente novo não toca mais no ACL nem no servidor
+central**: você só marca a máquina do cliente com a tag certa ao conectar
+(abaixo). A única exceção é o caso de IP fixo/subnet router (próxima seção),
+que ainda exige um passo manual — inerente a como rotas funcionam no
+Tailscale, não às tags.
+
+O instalador do agente (`PDVAgent_Setup.nsi`) tem uma tela opcional que pede
+uma auth key e instala/conecta o Tailscale automaticamente
 (`tailscale up --auth-key=... --unattended`). Requer o MSI oficial do
 Tailscale em `agent/installer/tailscale-setup-amd64.msi` (baixe em
 https://pkgs.tailscale.com/stable/#windows — não é versionado no git).
 
-**Antes de distribuir uma auth key**: confira no admin console (Settings →
-Keys) que ela foi gerada como **reutilizável**, **não-efêmera** e com a
-**tag certa** (`tag:pdv-<rede>`) marcada — é fácil esquecer o checkbox da tag
-ao gerar uma key, e nesse caso o PDV conecta mas fica sem tag, sem acesso a
-nada (nem ao próprio servidor).
+**Gerando as auth keys** (Settings → Keys no admin console): crie **duas
+chaves reutilizáveis e não-efêmeras**, uma só vez, para sempre — não uma por
+cliente:
+- uma marcada com `tag:pdv-terminal`, usada no instalador de **todo** PDV de
+  **todo** cliente;
+- uma marcada com `tag:pdv-service-manager`, usada na máquina do integrador
+  de cada cliente.
 
-**Depois de qualquer mudança de tag/ACL em produção**: a propagação da nova
+É fácil esquecer o checkbox da tag ao gerar a key — nesse caso a máquina
+conecta mas fica sem tag, sem acesso a nada (nem ao próprio servidor).
+
+**Depois de qualquer mudança no ACL em produção**: a propagação da nova
 política pode não valer imediatamente para conexões já estabelecidas — rode
 `sudo systemctl restart tailscaled` no servidor para forçar a releitura.
 Isso reescreve regras de `iptables`, o que por sua vez pode quebrar o
@@ -234,9 +285,9 @@ clientes existentes, o replica set do Mongo já referencia o IP interno da
 loja (`192.168.x.x`) e **isso nunca pode ser alterado** (`discovery.py`,
 `descobrir_pdvs_via_replicaset()`, le esse IP direto de
 `replSetGetStatus()`). Nesse caso, em vez de instalar Tailscale em cada
-máquina, uma única máquina dentro da rede do cliente (pode ser a do
-integrador) atua como **subnet router**, expondo a faixa toda sem mudar
-nenhum IP existente:
+máquina, a própria máquina do **service manager** atua como **subnet
+router**, expondo a faixa toda sem mudar nenhum IP existente — e continua
+levando a tag fixa `tag:pdv-service-manager`, igual a qualquer outro cliente:
 
 ```bash
 # Gera o prefixo IPv6 para cada faixa interna do cliente, com um Site ID
@@ -245,17 +296,23 @@ nenhum IP existente:
 tailscale debug via 7 192.168.1.0/24
 tailscale debug via 7 192.168.2.0/24
 
-# Anuncia as rotas (substitua pelos prefixos gerados acima):
-tailscale set --advertise-routes=<prefixo1>,<prefixo2> --advertise-tags=tag:server-bonna
+# Anuncia as rotas (a tag continua sendo a mesma de sempre):
+tailscale set --advertise-routes=<prefixo1>,<prefixo2> --advertise-tags=tag:pdv-service-manager
 ```
 
 Depois, no admin console: **aprovar a rota** (Machines → device → routes) e
 **adicionar o(s) prefixo(s) IPv6 gerado(s)** (não o CIDR IPv4 original!) ao
-`dst` do grant que libera esse cliente — esse foi o erro mais fácil de
-cometer durante os testes. No lado de quem vai *consumir* a rota (o
-`pdv-server`), é preciso `sudo tailscale set --accept-routes` — sem isso o
-Tailscale recebe a rota mas não a usa, e parece que nada está configurado
-quando na verdade só falta esse passo.
+`dst` do grant `tag:painel-central → tag:pdv-service-manager` (acrescente os
+prefixos na lista de `dst` daquele grant, sem criar um grant novo) — esse foi
+o erro mais fácil de cometer durante os testes. No lado de quem vai
+*consumir* a rota (o `pdv-server`), é preciso `sudo tailscale set
+--accept-routes` — sem isso o Tailscale recebe a rota mas não a usa, e parece
+que nada está configurado quando na verdade só falta esse passo.
+
+Esse é o único passo de onboarding que ainda toca no ACL — porque rotas são
+amarradas a prefixos de IP, não a tags, então cada faixa nova precisa entrar
+na lista. Mesmo assim é uma linha (`dst`), não mais um tag pair + 2 grants
+novos.
 
 Cadastre o mesmo Site ID usado no `tailscale debug via` no campo "Tailscale
 Site ID" da Rede (tela `/redes`, fica cifrado no banco) — a partir disso,

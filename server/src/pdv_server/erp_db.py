@@ -30,10 +30,12 @@ def salvar_config(contexto, alteracoes):
     return atual
 
 
-def _conectar(cfg):
+def _conectar(cfg, tailscale_site_id=""):
     import psycopg2
+    from pdv_server.discovery import endereco_alcancavel
+    host = endereco_alcancavel(cfg["host"], tailscale_site_id)
     return psycopg2.connect(
-        host=cfg["host"],
+        host=host,
         port=int(cfg.get("porta") or 5432),
         user=cfg.get("usuario") or None,
         password=cfg.get("senha") or None,
@@ -49,7 +51,7 @@ def testar_conexao(contexto):
     if not cfg.get("host") or not cfg.get("banco"):
         return {"online": False, "erro": "Conexao com o banco do ERP ainda nao configurada."}
     try:
-        conn = _conectar(cfg)
+        conn = _conectar(cfg, contexto.tailscale_site_id)
         conn.close()
         return {"online": True, "erro": None}
     except Exception as e:
@@ -65,7 +67,7 @@ def listar_pdvs_ativos(contexto):
     if not cfg.get("host") or not cfg.get("banco"):
         return {"erro": "Conexao com o banco do ERP ainda nao configurada.", "lojas": []}
     try:
-        conn = _conectar(cfg)
+        conn = _conectar(cfg, contexto.tailscale_site_id)
         try:
             with conn.cursor() as cur:
                 cur.execute("""
