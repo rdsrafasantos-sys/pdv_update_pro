@@ -98,7 +98,7 @@ PREFIXOS="${{PREFIXOS#,}}"
 echo "Prefixos 4via6: $PREFIXOS"
 
 # 5. Ativa o subnet router com os prefixos gerados
-tailscale set --advertise-routes="$PREFIXOS" --advertise-tags=tag:pdv-service-manager \
+tailscale set --advertise-routes="$PREFIXOS" \
   || erro_fatal "Falha ao ativar advertise-routes."
 
 echo "Concluido. Aguardando aprovacao das rotas e atualizacao do ACL pelo painel."
