@@ -119,7 +119,7 @@
           subnet router — sozinho. Rode como root na máquina do service manager.
         </div>
         <div class="field">
-          <label>IP do banco ERP <span class="text-muted">(opcional — some à faixa detectada automaticamente)</span></label>
+          <label>IP do banco ERP <span style="color:var(--red);">*</span> <span class="text-muted">(obrigatório — sem ele a faixa do ERP não será roteada via Tailscale)</span></label>
           <input id="campoErpIp" placeholder="192.168.1.100">
         </div>
         <button class="btn btn-primary" id="btnGerarScript" onclick="gerarScript()">Gerar script de instalação</button>
@@ -186,8 +186,8 @@
           <div class="field"><label>Nome do banco</label><input id="p4ErpBanco" placeholder="vr"></div>
         </div>
         <div style="display:flex; gap:8px; margin-top:8px;">
-          <button class="btn btn-ghost btn-sm" onclick="testarErp()">🔌 Testar conexão</button>
-          <button class="btn btn-primary btn-sm" onclick="salvarErp()">💾 Salvar ERP</button>
+          <button class="btn btn-ghost btn-sm" onclick="testarErp()">🔌 Testar</button>
+          <button class="btn btn-primary btn-sm" onclick="salvarErp()">💾 Salvar e testar</button>
         </div>
         <div id="p4ErpResultado" class="text-muted" style="font-size:12px; margin-top:6px;"></div>
 
@@ -201,10 +201,18 @@
           <div class="field"><label>Porta do MongoDB</label><input id="p4IntMongoPorta" type="number" placeholder="27016" value="27016"></div>
         </div>
         <div style="display:flex; gap:8px; margin-top:8px;">
-          <button class="btn btn-ghost btn-sm" onclick="testarIntegrador()">🔌 Testar status</button>
-          <button class="btn btn-primary btn-sm" onclick="salvarIntegrador()">💾 Salvar Integrador</button>
+          <button class="btn btn-ghost btn-sm" onclick="testarIntegrador()">🔌 Testar</button>
+          <button class="btn btn-primary btn-sm" onclick="salvarIntegrador()">💾 Salvar e testar</button>
         </div>
         <div id="p4IntResultado" class="text-muted" style="font-size:12px; margin-top:6px;"></div>
+
+        <div id="p4Conclusao" style="display:none; margin-top:20px; padding:16px; background:rgba(0,200,120,.1); border:1px solid var(--green); border-radius:10px;">
+          <div style="font-size:14px; font-weight:700; color:var(--green); margin-bottom:8px;">✅ Instalação concluída!</div>
+          <div id="p4CheckList" style="font-size:12px; line-height:1.9;"></div>
+          <div style="margin-top:12px;">
+            <a id="p4LinkRede" class="btn btn-primary btn-sm" href="#">Abrir painel da Rede →</a>
+          </div>
+        </div>
       </div>
 
       <div class="card">
@@ -298,10 +306,16 @@ async function continuarInstalacao(instalacaoId) {
 async function gerarScript() {
   const erroEl = document.getElementById('scriptErro');
   erroEl.style.display = 'none';
+  const erpIp = document.getElementById('campoErpIp').value.trim();
+  if (!erpIp) {
+    erroEl.textContent = 'IP do banco ERP é obrigatório — sem ele a faixa do ERP não será roteada pelo subnet router.';
+    erroEl.style.display = 'block';
+    document.getElementById('campoErpIp').focus();
+    return;
+  }
   const btn = document.getElementById('btnGerarScript');
   btn.disabled = true;
   btn.textContent = 'Gerando... (criando auth key no Tailscale)';
-  const erpIp = document.getElementById('campoErpIp').value;
   try {
   const r = await fetch(`/api/instalacao/${instalacaoAtual}/script`, {
     method: 'POST',
@@ -394,7 +408,9 @@ async function mostrarPasso3(dados) {
     : '<option value="">Nenhuma unidade cadastrada</option>';
 }
 
-let redeAtual = null;  // rede_id da Rede criada no passo 3
+let redeAtual = null;   // rede_id da Rede criada no passo 3
+let _erpOk = false;
+let _intOk = false;
 
 function mostrarPasso4(redeId, tailscaleIp, erpIp) {
   redeAtual = redeId;
@@ -411,7 +427,25 @@ function mostrarPasso4(redeId, tailscaleIp, erpIp) {
   }
 }
 
+function _verificarConclusao() {
+  if (!_erpOk || !_intOk) return;
+  const el = document.getElementById('p4Conclusao');
+  el.style.display = 'block';
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('p4CheckList').innerHTML = [
+    '✅ Tailscale instalado e conectado',
+    '✅ Faixas de rede detectadas e roteadas',
+    '✅ ACL e rotas aprovadas automaticamente',
+    '✅ Rede cadastrada no painel',
+    '✅ Conexão com banco ERP verificada',
+    '✅ Integrador VR verificado',
+  ].join('<br>');
+  document.getElementById('p4LinkRede').href = `/r/${redeAtual}/`;
+}
+
 async function salvarErp() {
+  const el = document.getElementById('p4ErpResultado');
+  el.textContent = 'Salvando...';
   const res = await fetch(`/api/${redeAtual}/erp_db/config`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
@@ -423,18 +457,24 @@ async function salvarErp() {
     }),
   });
   const d = await res.json();
-  document.getElementById('p4ErpResultado').textContent = d.erro ? `❌ ${d.erro}` : '✅ ERP salvo';
+  if (d.erro) { el.textContent = `❌ ${d.erro}`; return; }
+  el.textContent = 'Testando conexão...';
+  await testarErp();
 }
 
 async function testarErp() {
-  document.getElementById('p4ErpResultado').textContent = 'Testando...';
+  const el = document.getElementById('p4ErpResultado');
+  el.textContent = 'Testando...';
   const res = await fetch(`/api/${redeAtual}/erp_db/status`);
   const d = await res.json();
-  document.getElementById('p4ErpResultado').textContent =
-    d.online ? '✅ Conexão OK' : `❌ ${d.erro}`;
+  _erpOk = d.online;
+  el.textContent = d.online ? '✅ Conexão com ERP verificada' : `❌ ${d.erro}`;
+  _verificarConclusao();
 }
 
 async function salvarIntegrador() {
+  const el = document.getElementById('p4IntResultado');
+  el.textContent = 'Salvando...';
   const res = await fetch(`/api/${redeAtual}/integrador/config`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
@@ -445,15 +485,19 @@ async function salvarIntegrador() {
     }),
   });
   const d = await res.json();
-  document.getElementById('p4IntResultado').textContent = d.erro ? `❌ ${d.erro}` : '✅ Integrador salvo';
+  if (d.erro) { el.textContent = `❌ ${d.erro}`; return; }
+  el.textContent = 'Testando integrador...';
+  await testarIntegrador();
 }
 
 async function testarIntegrador() {
-  document.getElementById('p4IntResultado').textContent = 'Testando...';
+  const el = document.getElementById('p4IntResultado');
+  el.textContent = 'Testando...';
   const res = await fetch(`/api/${redeAtual}/integrador/status`);
   const d = await res.json();
-  document.getElementById('p4IntResultado').textContent =
-    d.online ? '✅ Integrador online' : `❌ ${d.erro}`;
+  _intOk = d.online;
+  el.textContent = d.online ? '✅ Integrador VR verificado' : `❌ ${d.erro}`;
+  _verificarConclusao();
 }
 
 async function criarRede() {
