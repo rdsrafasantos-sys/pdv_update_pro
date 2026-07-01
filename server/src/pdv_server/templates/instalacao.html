@@ -171,6 +171,42 @@
         </div>
       </div>
 
+      <div class="card" id="cardPasso4" style="display:none;">
+        <div class="section-title">4. Configurar conexões</div>
+        <div class="siteid-hint" style="margin:0 0 16px;">
+          Rede criada. Configure as conexões com o banco ERP e o integrador — os IPs já vêm preenchidos.
+        </div>
+
+        <div class="section-title" style="font-size:12px; margin-bottom:10px;">🛢️ Banco ERP (PostgreSQL)</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:600px;">
+          <div class="field"><label>IP do servidor</label><input id="p4ErpHost" placeholder="192.168.1.100"></div>
+          <div class="field"><label>Porta</label><input id="p4ErpPorta" type="number" placeholder="5432" value="5432"></div>
+          <div class="field"><label>Usuário</label><input id="p4ErpUsuario" placeholder="postgres"></div>
+          <div class="field"><label>Senha</label><input id="p4ErpSenha" type="password"></div>
+          <div class="field"><label>Nome do banco</label><input id="p4ErpBanco" placeholder="vr"></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="testarErp()">🔌 Testar conexão</button>
+          <button class="btn btn-primary btn-sm" onclick="salvarErp()">💾 Salvar ERP</button>
+        </div>
+        <div id="p4ErpResultado" class="text-muted" style="font-size:12px; margin-top:6px;"></div>
+
+        <hr style="border-color:var(--border); margin:18px 0;">
+
+        <div class="section-title" style="font-size:12px; margin-bottom:10px;">🔗 Integrador VR</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:600px;">
+          <div class="field"><label>IP do integrador</label><input id="p4IntIp" placeholder="100.x.x.x"></div>
+          <div class="field"><label>Porta do integrador</label><input id="p4IntPorta" type="number" placeholder="8080" value="8080"></div>
+          <div class="field"><label>IP do MongoDB</label><input id="p4IntMongoIp" placeholder="100.x.x.x"></div>
+          <div class="field"><label>Porta do MongoDB</label><input id="p4IntMongoPorta" type="number" placeholder="27016" value="27016"></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="testarIntegrador()">🔌 Testar status</button>
+          <button class="btn btn-primary btn-sm" onclick="salvarIntegrador()">💾 Salvar Integrador</button>
+        </div>
+        <div id="p4IntResultado" class="text-muted" style="font-size:12px; margin-top:6px;"></div>
+      </div>
+
       <div class="card">
         <div class="section-title">Histórico de Site IDs já alocados</div>
         <div id="historicoContainer"><div class="text-muted">Carregando...</div></div>
@@ -342,6 +378,7 @@ async function atualizarStatus() {
     document.getElementById('passo3Sucesso').style.display = 'block';
     document.getElementById('btnCriarRede').style.display = 'none';
     document.getElementById('linkRede').href = `/r/${dados.rede_id}/`;
+    mostrarPasso4(dados.rede_id, dados.tailscale_ip, dados.erp_ip);
   }
 }
 
@@ -355,6 +392,68 @@ async function mostrarPasso3(dados) {
   sel.innerHTML = unidades.length
     ? unidades.map(u => `<option value="${u.id}">${u.nome}</option>`).join('')
     : '<option value="">Nenhuma unidade cadastrada</option>';
+}
+
+let redeAtual = null;  // rede_id da Rede criada no passo 3
+
+function mostrarPasso4(redeId, tailscaleIp, erpIp) {
+  redeAtual = redeId;
+  const card = document.getElementById('cardPasso4');
+  card.style.display = 'block';
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Pre-preenche campos com dados ja conhecidos
+  if (tailscaleIp) {
+    document.getElementById('p4IntIp').value = tailscaleIp;
+    document.getElementById('p4IntMongoIp').value = tailscaleIp;
+  }
+  if (erpIp) {
+    document.getElementById('p4ErpHost').value = erpIp;
+  }
+}
+
+async function salvarErp() {
+  const res = await fetch(`/api/${redeAtual}/erp_db/config`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      host: document.getElementById('p4ErpHost').value,
+      porta: parseInt(document.getElementById('p4ErpPorta').value) || 5432,
+      usuario: document.getElementById('p4ErpUsuario').value,
+      senha: document.getElementById('p4ErpSenha').value,
+      banco: document.getElementById('p4ErpBanco').value,
+    }),
+  });
+  const d = await res.json();
+  document.getElementById('p4ErpResultado').textContent = d.erro ? `❌ ${d.erro}` : '✅ ERP salvo';
+}
+
+async function testarErp() {
+  document.getElementById('p4ErpResultado').textContent = 'Testando...';
+  const res = await fetch(`/api/${redeAtual}/erp_db/status`);
+  const d = await res.json();
+  document.getElementById('p4ErpResultado').textContent =
+    d.online ? '✅ Conexão OK' : `❌ ${d.erro}`;
+}
+
+async function salvarIntegrador() {
+  const res = await fetch(`/api/${redeAtual}/integrador/config`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      ip: document.getElementById('p4IntIp').value,
+      porta: parseInt(document.getElementById('p4IntPorta').value) || 8080,
+      mongo_ip: document.getElementById('p4IntMongoIp').value,
+      mongo_porta: parseInt(document.getElementById('p4IntMongoPorta').value) || 27016,
+    }),
+  });
+  const d = await res.json();
+  document.getElementById('p4IntResultado').textContent = d.erro ? `❌ ${d.erro}` : '✅ Integrador salvo';
+}
+
+async function testarIntegrador() {
+  document.getElementById('p4IntResultado').textContent = 'Testando...';
+  const res = await fetch(`/api/${redeAtual}/integrador/status`);
+  const d = await res.json();
+  document.getElementById('p4IntResultado').textContent =
+    d.online ? '✅ Integrador online' : `❌ ${d.erro}`;
 }
 
 async function criarRede() {
@@ -383,6 +482,9 @@ async function criarRede() {
     document.getElementById('btnCriarRede').style.display = 'none';
     document.getElementById('linkRede').href = `/r/${dados.rede.id}/`;
     carregarHistorico();
+    // Abre passo 4 automaticamente com dados ja conhecidos
+    const inst = dados.instalacao;
+    mostrarPasso4(dados.rede.id, inst.tailscale_ip, inst.erp_ip);
   } catch(e) {
     erroEl.textContent = 'Erro inesperado: ' + e.message;
     erroEl.style.display = 'block';
