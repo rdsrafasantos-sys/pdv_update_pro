@@ -122,7 +122,7 @@
           <label>IP do banco ERP <span class="text-muted">(opcional — some à faixa detectada automaticamente)</span></label>
           <input id="campoErpIp" placeholder="192.168.1.100">
         </div>
-        <button class="btn btn-primary" onclick="gerarScript()">Gerar script de instalação</button>
+        <button class="btn btn-primary" id="btnGerarScript" onclick="gerarScript()">Gerar script de instalação</button>
         <div class="erro-msg" id="scriptErro" style="display:none; color:var(--red); font-size:12px; margin-top:10px;"></div>
 
         <div id="scriptResultado" style="display:none; margin-top:16px; text-align:left;">
@@ -231,7 +231,11 @@ async function continuarInstalacao(instalacaoId) {
 async function gerarScript() {
   const erroEl = document.getElementById('scriptErro');
   erroEl.style.display = 'none';
+  const btn = document.getElementById('btnGerarScript');
+  btn.disabled = true;
+  btn.textContent = 'Gerando... (criando auth key no Tailscale)';
   const erpIp = document.getElementById('campoErpIp').value;
+  try {
   const r = await fetch(`/api/instalacao/${instalacaoAtual}/script`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -249,6 +253,13 @@ async function gerarScript() {
   resultadoEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   iniciarPolling();
   carregarHistorico();
+  } catch (e) {
+    erroEl.textContent = 'Erro inesperado: ' + e.message;
+    erroEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Gerar script de instalação';
+  }
 }
 
 function copiarScript() {
