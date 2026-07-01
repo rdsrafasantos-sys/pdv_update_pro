@@ -74,6 +74,13 @@ SECRET_KEY = os.environ.get("PDV_SECRET_KEY", "")
 # Tailscale, com escopos ACL (read+write), Auth Keys (write) e Devices
 # (read+write) -- ver tailscale_api.py. Credencial poderosa: fica so no
 # .env de cada instalacao, nunca commitada, nunca no banco.
+# Auth key reutilizavel pre-gerada para service managers (tag:pdv-service-manager).
+# Quando configurada, o script de instalacao e gerado INSTANTANEAMENTE sem
+# nenhuma chamada a API do Tailscale. Gere em Settings > Keys, reusable=true,
+# ephemeral=false, tag:pdv-service-manager. Validade maxima: 90 dias -- renove
+# antes de expirar. Esta e a forma recomendada para uso em producao.
+TAILSCALE_AUTH_KEY_SERVICE_MANAGER = os.environ.get("PDV_TAILSCALE_AUTH_KEY_SERVICE_MANAGER", "")
+
 TAILSCALE_OAUTH_CLIENT_ID = os.environ.get("PDV_TAILSCALE_OAUTH_CLIENT_ID", "")
 TAILSCALE_OAUTH_CLIENT_SECRET = os.environ.get("PDV_TAILSCALE_OAUTH_CLIENT_SECRET", "")
 

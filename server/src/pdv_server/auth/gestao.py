@@ -12,7 +12,7 @@ from pdv_server.auth.models import (
     InstalacaoSiteId, Perfil, Rede, SessionLocal, Unidade, Usuario,
 )
 from pdv_server.auth.security import gerar_hash_senha
-from pdv_server.config import PAINEL_CALLBACK_URL
+from pdv_server.config import PAINEL_CALLBACK_URL, TAILSCALE_AUTH_KEY_SERVICE_MANAGER
 
 _PESOS_CNPJ_1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
 _PESOS_CNPJ_2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
@@ -349,10 +349,19 @@ def gerar_script_instalacao(instalacao_id, erp_ip=""):
         if not registro.token_callback:
             registro.token_callback = secrets.token_urlsafe(32)
 
-        auth_key = tailscale_api.criar_auth_key(
-            tags=["tag:pdv-service-manager"],
-            descricao=f"instalacao-site-id-{registro.site_id}",
-        )
+        if TAILSCALE_AUTH_KEY_SERVICE_MANAGER:
+            auth_key = TAILSCALE_AUTH_KEY_SERVICE_MANAGER
+        elif tailscale_api.automacao_disponivel():
+            auth_key = tailscale_api.criar_auth_key(
+                tags=["tag:pdv-service-manager"],
+                descricao=f"instalacao-site-id-{registro.site_id}",
+            )
+        else:
+            raise ValueError(
+                "Configure PDV_TAILSCALE_AUTH_KEY_SERVICE_MANAGER no .env com a "
+                "auth key reutilizavel (tag:pdv-service-manager) gerada em "
+                "Settings > Keys no admin console do Tailscale."
+            )
 
         callback_url = f"{PAINEL_CALLBACK_URL.rstrip('/')}/api/instalacao/callback/{registro.token_callback}"
         script = gerar_script(registro.site_id, auth_key, registro.erp_ip, callback_url)
