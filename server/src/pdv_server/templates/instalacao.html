@@ -140,6 +140,37 @@
         </div>
       </div>
 
+      <div class="card" id="cardPasso3" style="display:none;">
+        <div class="section-title">3. Criar a Rede no painel</div>
+        <div class="siteid-hint" style="margin:0 0 14px;">
+          Tudo pronto do lado do Tailscale. Agora cadastre a Rede no painel com os dados do cliente.
+          O Mongo URI já vem preenchido automaticamente com o IP Tailscale do service manager.
+        </div>
+        <div class="field">
+          <label>Unidade</label>
+          <select id="campoPasso3Unidade"></select>
+        </div>
+        <div class="field">
+          <label>Token compartilhado com os agentes PDV</label>
+          <input id="campoPasso3Token" placeholder="token-secreto-dos-agentes" type="password">
+        </div>
+        <div class="field">
+          <label>Mongo URI <span class="text-muted">(gerado automaticamente — edite só se necessário)</span></label>
+          <input id="campoPasso3MongoUri" placeholder="mongodb://100.x.x.x:27016">
+        </div>
+        <button class="btn btn-primary" id="btnCriarRede" onclick="criarRede()">Criar Rede automaticamente</button>
+        <div class="erro-msg" id="passo3Erro" style="display:none; color:var(--red); font-size:12px; margin-top:10px;"></div>
+        <div id="passo3Sucesso" style="display:none; margin-top:14px;">
+          <span class="status-badge status-ok">✅ Rede criada com sucesso</span>
+          <div style="margin-top:10px;">
+            <a id="linkRede" class="btn btn-primary" href="#">Abrir painel da Rede →</a>
+          </div>
+          <div class="text-muted" style="font-size:12px; margin-top:8px;">
+            Próximo passo: configure o banco ERP e o integrador em <b>Configurações</b> dentro do painel da Rede.
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="section-title">Histórico de Site IDs já alocados</div>
         <div id="historicoContainer"><div class="text-muted">Carregando...</div></div>
@@ -302,6 +333,62 @@ async function atualizarStatus() {
     clearInterval(pollingId);
     pollingId = null;
     carregarHistorico();
+  }
+  const STATUS_OK = ['concluido', 'concluido_manual', 'concluido_pendente_acl'];
+  if (STATUS_OK.includes(dados.status) && !dados.rede_id) {
+    mostrarPasso3(dados);
+  } else if (dados.rede_id) {
+    document.getElementById('cardPasso3').style.display = 'block';
+    document.getElementById('passo3Sucesso').style.display = 'block';
+    document.getElementById('btnCriarRede').style.display = 'none';
+    document.getElementById('linkRede').href = `/r/${dados.rede_id}/`;
+  }
+}
+
+async function mostrarPasso3(dados) {
+  document.getElementById('cardPasso3').style.display = 'block';
+  document.getElementById('campoPasso3MongoUri').value = dados.mongo_uri_sugerida || '';
+  document.getElementById('cardPasso3').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const unidades = await fetch('/api/unidades').then(r => r.ok ? r.json() : []).catch(() => []);
+  const sel = document.getElementById('campoPasso3Unidade');
+  sel.innerHTML = unidades.length
+    ? unidades.map(u => `<option value="${u.id}">${u.nome}</option>`).join('')
+    : '<option value="">Nenhuma unidade cadastrada</option>';
+}
+
+async function criarRede() {
+  const erroEl = document.getElementById('passo3Erro');
+  erroEl.style.display = 'none';
+  const btn = document.getElementById('btnCriarRede');
+  btn.disabled = true;
+  btn.textContent = 'Criando...';
+  try {
+    const r = await fetch(`/api/instalacao/${instalacaoAtual}/criar-rede`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        unidade_id: parseInt(document.getElementById('campoPasso3Unidade').value, 10),
+        token: document.getElementById('campoPasso3Token').value,
+        mongo_uri: document.getElementById('campoPasso3MongoUri').value,
+      }),
+    });
+    const dados = await r.json();
+    if (dados.erro) {
+      erroEl.textContent = dados.erro;
+      erroEl.style.display = 'block';
+      return;
+    }
+    document.getElementById('passo3Sucesso').style.display = 'block';
+    document.getElementById('btnCriarRede').style.display = 'none';
+    document.getElementById('linkRede').href = `/r/${dados.rede.id}/`;
+    carregarHistorico();
+  } catch(e) {
+    erroEl.textContent = 'Erro inesperado: ' + e.message;
+    erroEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Criar Rede automaticamente';
   }
 }
 

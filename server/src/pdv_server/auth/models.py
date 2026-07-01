@@ -130,6 +130,8 @@ class InstalacaoSiteId(Base):
     prefixos_ipv6 = Column(Text, nullable=True)      # CSV de prefixos 4via6 anunciados
     erro_mensagem = Column(Text, nullable=True)
     atualizado_em = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    # ID da Rede criada automaticamente no passo 3 do wizard de instalacao.
+    rede_id = Column(Integer, ForeignKey("redes.id"), nullable=True)
 
 
 class ChavePool(Base):
@@ -188,6 +190,9 @@ def _migrar_colunas_novas():
         },
         "redes": {
             "cnpj": "VARCHAR(14)",
+        },
+        "instalacao_site_ids": {
+            "rede_id": "INTEGER",
         },
     }
     with engine.connect() as conn:

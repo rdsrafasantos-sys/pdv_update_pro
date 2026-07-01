@@ -396,6 +396,11 @@ def gerar_proximo_site_id(cliente_cnpj, cliente_nome="", usuario_email=""):
 
 
 def _instalacao_para_dict(registro):
+    # Mongo URI sugerida: derivada do IP Tailscale conhecido apos conexao
+    mongo_uri_sugerida = (
+        f"mongodb://{registro.tailscale_ip}:27016"
+        if registro.tailscale_ip else ""
+    )
     return {
         "id": registro.id,
         "site_id": registro.site_id,
@@ -409,6 +414,8 @@ def _instalacao_para_dict(registro):
         "faixas_detectadas": registro.faixas_detectadas,
         "prefixos_ipv6": registro.prefixos_ipv6,
         "erro_mensagem": registro.erro_mensagem,
+        "rede_id": registro.rede_id,
+        "mongo_uri_sugerida": mongo_uri_sugerida,
         "criado_em": registro.criado_em.strftime("%Y-%m-%d %H:%M") if registro.criado_em else None,
         "atualizado_em": registro.atualizado_em.strftime("%Y-%m-%d %H:%M") if registro.atualizado_em else None,
     }
@@ -520,6 +527,57 @@ def processar_callback_instalacao(token_callback, payload):
         return _instalacao_para_dict(registro)
     finally:
         db.close()
+
+
+def criar_rede_da_instalacao(instalacao_id, token, unidade_id, mongo_uri=None):
+    """Cria a Rede usando dados ja coletados pela tela de Instalacao (nome,
+    CNPJ, site_id, tailscale_ip) e vincula o registro de instalacao a ela.
+    Usa nova_sessao() em tres fases para evitar DetachedInstanceError causado
+    pelo conflito entre a sessao desta funcao e a da criar_rede() chamada internamente."""
+    token = (token or "").strip()
+    if not token:
+        raise ValueError("Token do agente e obrigatorio.")
+
+    # Fase 1: leitura -- extrai tudo necessario de registro antes de chamar criar_rede()
+    db = nova_sessao()
+    try:
+        registro = db.get(InstalacaoSiteId, instalacao_id)
+        if not registro:
+            raise ValueError("Instalacao nao encontrada.")
+        if registro.rede_id:
+            raise ValueError("Uma Rede ja foi criada para esta instalacao.")
+        if not registro.tailscale_ip:
+            raise ValueError("O service manager ainda nao se conectou -- aguarde o status 'Concluido'.")
+        tailscale_ip = registro.tailscale_ip
+        cliente_nome = registro.cliente_nome
+        cliente_cnpj = registro.cliente_cnpj
+        site_id = registro.site_id
+    finally:
+        db.close()
+
+    mongo_uri_final = (mongo_uri or "").strip() or f"mongodb://{tailscale_ip}:27016"
+
+    # Fase 2: criacao da Rede (usa SessionLocal propria internamente, sem conflito)
+    rede = criar_rede(
+        nome=cliente_nome or f"Rede {site_id}",
+        unidade_id=unidade_id,
+        mongo_uri=mongo_uri_final,
+        token=token,
+        tailscale_site_id=str(site_id),
+        cnpj=cliente_cnpj or "",
+    )
+
+    # Fase 3: vincula a Rede ao registro de instalacao e retorna o dict atualizado
+    db2 = nova_sessao()
+    try:
+        registro2 = db2.get(InstalacaoSiteId, instalacao_id)
+        registro2.rede_id = rede["id"]
+        db2.commit()
+        resultado_dict = _instalacao_para_dict(registro2)  # lido enquanto sessao ainda aberta
+    finally:
+        db2.close()
+
+    return {"rede": rede, "instalacao": resultado_dict}
 
 
 def _finalizar_automacao_em_background(instalacao_id):

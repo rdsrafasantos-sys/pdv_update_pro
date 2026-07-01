@@ -2,8 +2,8 @@ from flask import Blueprint, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from pdv_server.auth.gestao import (
-    alternar_ativa_rede, criar_perfil, criar_rede, criar_unidade,
-    criar_usuario, editar_perfil, editar_rede, editar_unidade,
+    alternar_ativa_rede, criar_perfil, criar_rede, criar_rede_da_instalacao,
+    criar_unidade, criar_usuario, editar_perfil, editar_rede, editar_unidade,
     editar_usuario, excluir_perfil, excluir_unidade, excluir_usuario,
     gerar_proximo_site_id, gerar_script_instalacao, listar_perfis,
     listar_redes, listar_site_ids_instalacao, listar_unidades,
@@ -196,6 +196,24 @@ def api_gerar_script_instalacao(instalacao_id):
 # autenticado pelo token de uso unico gerado junto com o script (ver
 # gerar_script_instalacao). Rate limit por seguranca extra, ja que e o
 # unico endpoint deste blueprint sem sessao por tras.
+@painel_bp.route("/api/instalacao/<int:instalacao_id>/criar-rede", methods=["POST"])
+@exigir_permissao("pode_gerenciar_redes")
+def api_criar_rede_da_instalacao(instalacao_id):
+    dados = request.json or {}
+    unidade_id = dados.get("unidade_id")
+    if not current_user.acesso_total and unidade_id not in current_user.unidade_ids:
+        return jsonify({"erro": "Sem acesso a essa unidade"}), 403
+    try:
+        return jsonify(criar_rede_da_instalacao(
+            instalacao_id,
+            token=dados.get("token", ""),
+            unidade_id=unidade_id,
+            mongo_uri=dados.get("mongo_uri", ""),
+        ))
+    except ValueError as e:
+        return jsonify({"erro": str(e)}), 400
+
+
 @painel_bp.route("/api/instalacao/pool/status", methods=["GET"])
 @exigir_permissao("pode_gerenciar_redes")
 def api_status_pool():
