@@ -2,6 +2,7 @@
 cada rede (Mongo URI, token, Tailscale Site ID) sao sempre cifrados antes
 de ir para o banco -- ver auth/crypto.py. Quem usa: rotas em
 painel/routes.py e app.py (resolucao de permissao)."""
+import datetime
 import re
 import secrets
 import threading
@@ -9,10 +10,112 @@ import threading
 from pdv_server import tailscale_api
 from pdv_server.auth.crypto import cifrar, decifrar
 from pdv_server.auth.models import (
-    InstalacaoSiteId, Perfil, Rede, SessionLocal, Unidade, Usuario,
+    ChavePool, InstalacaoSiteId, Perfil, Rede, SessionLocal, Unidade, Usuario,
+    nova_sessao,
 )
 from pdv_server.auth.security import gerar_hash_senha
 from pdv_server.config import PAINEL_CALLBACK_URL, TAILSCALE_AUTH_KEY_SERVICE_MANAGER
+
+# ── Pool de auth keys pre-geradas ────────────────────────────────────────────
+# Chaves geradas via OAuth em background, cifradas no banco. Geração de script
+# pega do pool (instantâneo, zero chamada de rede). Pool reposto automaticamente
+# após cada uso e na inicialização do servidor.
+
+_POOL_ALVO = 3      # numero de chaves que o pool deve manter disponiveis
+_POOL_EXPIRY_DIAS = 25  # cada chave expira em 25 dias (bem antes dos 90 do Tailscale)
+
+
+def _chaves_disponiveis_count(db):
+    agora = datetime.datetime.utcnow()
+    return db.query(ChavePool).filter(
+        ChavePool.usada == False,
+        (ChavePool.expira_em == None) | (ChavePool.expira_em > agora),
+    ).count()
+
+
+def obter_chave_do_pool():
+    """Retira a chave mais antiga disponivel do pool e marca como usada.
+    Usa sessao independente (nova_sessao) para nao interferir com sessoes
+    scoped_session da funcao chamadora. Dispara reposicao em background."""
+    db = nova_sessao()
+    try:
+        agora = datetime.datetime.utcnow()
+        chave = (
+            db.query(ChavePool)
+            .filter(
+                ChavePool.usada == False,
+                (ChavePool.expira_em == None) | (ChavePool.expira_em > agora),
+            )
+            .order_by(ChavePool.criado_em.asc())
+            .first()
+        )
+        if not chave:
+            return None
+        chave.usada = True
+        db.commit()
+        valor = decifrar(chave.chave_cifrada)
+        threading.Thread(target=repor_pool_background, daemon=True).start()
+        return valor
+    finally:
+        db.close()
+
+
+def _gerar_e_salvar_chave_no_pool():
+    """Chama a API do Tailscale e persiste a nova chave cifrada no pool."""
+    chave_valor = tailscale_api.criar_auth_key(
+        tags=["tag:pdv-service-manager"],
+        descricao="pool-instalacao-auto",
+        expiry_seconds=_POOL_EXPIRY_DIAS * 24 * 3600,
+    )
+    expira_em = datetime.datetime.utcnow() + datetime.timedelta(days=_POOL_EXPIRY_DIAS)
+    db = nova_sessao()
+    try:
+        db.add(ChavePool(chave_cifrada=cifrar(chave_valor), expira_em=expira_em))
+        db.commit()
+    finally:
+        db.close()
+
+
+def repor_pool_background():
+    """Daemon thread: verifica quantas chaves disponiveis ha e gera novas ate
+    atingir _POOL_ALVO. Silencioso se OAuth nao estiver configurado."""
+    if not tailscale_api.automacao_disponivel():
+        return
+    try:
+        db = nova_sessao()
+        try:
+            faltam = _POOL_ALVO - _chaves_disponiveis_count(db)
+        finally:
+            db.close()
+        for _ in range(max(0, faltam)):
+            _gerar_e_salvar_chave_no_pool()
+    except Exception:
+        pass
+
+
+def status_pool():
+    """Para uso administrativo -- retorna contagem atual do pool."""
+    db = nova_sessao()
+    try:
+        agora = datetime.datetime.utcnow()
+        total = db.query(ChavePool).count()
+        disponiveis = _chaves_disponiveis_count(db)
+        usadas = db.query(ChavePool).filter(ChavePool.usada == True).count()
+        expiradas = db.query(ChavePool).filter(
+            ChavePool.usada == False,
+            ChavePool.expira_em != None,
+            ChavePool.expira_em <= agora,
+        ).count()
+        return {
+            "disponiveis": disponiveis,
+            "usadas": usadas,
+            "expiradas": expiradas,
+            "total": total,
+            "alvo": _POOL_ALVO,
+            "automacao_disponivel": tailscale_api.automacao_disponivel(),
+        }
+    finally:
+        db.close()
 
 _PESOS_CNPJ_1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
 _PESOS_CNPJ_2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
@@ -328,11 +431,6 @@ def gerar_script_instalacao(instalacao_id, erp_ip=""):
     como mintar uma auth key de uso unico para o script."""
     from pdv_server.instalacao_script import gerar_script
 
-    if not tailscale_api.automacao_disponivel():
-        raise ValueError(
-            "PDV_TAILSCALE_OAUTH_CLIENT_ID/SECRET nao configurados neste "
-            "servidor -- nao e possivel gerar a auth key do script."
-        )
     if not PAINEL_CALLBACK_URL:
         raise ValueError(
             "PDV_PAINEL_CALLBACK_URL nao configurada -- o script nao "
@@ -349,19 +447,22 @@ def gerar_script_instalacao(instalacao_id, erp_ip=""):
         if not registro.token_callback:
             registro.token_callback = secrets.token_urlsafe(32)
 
-        if TAILSCALE_AUTH_KEY_SERVICE_MANAGER:
-            auth_key = TAILSCALE_AUTH_KEY_SERVICE_MANAGER
-        elif tailscale_api.automacao_disponivel():
-            auth_key = tailscale_api.criar_auth_key(
-                tags=["tag:pdv-service-manager"],
-                descricao=f"instalacao-site-id-{registro.site_id}",
-            )
-        else:
-            raise ValueError(
-                "Configure PDV_TAILSCALE_AUTH_KEY_SERVICE_MANAGER no .env com a "
-                "auth key reutilizavel (tag:pdv-service-manager) gerada em "
-                "Settings > Keys no admin console do Tailscale."
-            )
+        # Prioridade: pool (instantaneo, pre-gerado) > env var (estatico) > API (lento)
+        auth_key = obter_chave_do_pool()
+        if not auth_key:
+            if TAILSCALE_AUTH_KEY_SERVICE_MANAGER:
+                auth_key = TAILSCALE_AUTH_KEY_SERVICE_MANAGER
+            elif tailscale_api.automacao_disponivel():
+                auth_key = tailscale_api.criar_auth_key(
+                    tags=["tag:pdv-service-manager"],
+                    descricao=f"instalacao-site-id-{registro.site_id}",
+                )
+            else:
+                raise ValueError(
+                    "Nenhuma auth key disponivel. Configure "
+                    "PDV_TAILSCALE_AUTH_KEY_SERVICE_MANAGER no .env ou "
+                    "PDV_TAILSCALE_OAUTH_CLIENT_ID/SECRET para geracao automatica."
+                )
 
         callback_url = f"{PAINEL_CALLBACK_URL.rstrip('/')}/api/instalacao/callback/{registro.token_callback}"
         script = gerar_script(registro.site_id, auth_key, registro.erp_ip, callback_url)

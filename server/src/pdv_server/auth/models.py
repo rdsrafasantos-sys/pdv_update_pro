@@ -132,6 +132,20 @@ class InstalacaoSiteId(Base):
     atualizado_em = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
 
+class ChavePool(Base):
+    """Pool de auth keys pre-geradas via OAuth para uso na tela de Instalacao.
+    Chaves sao geradas em background, guardadas cifradas e consumidas uma a uma
+    (reusable=False) -- sem nunca bloquear a geracao do script no click do admin."""
+    __tablename__ = "chave_pool"
+
+    id = Column(Integer, primary_key=True)
+    chave_cifrada = Column(Text, nullable=False)
+    descricao = Column(String(120), nullable=True)
+    criado_em = Column(DateTime, default=datetime.datetime.utcnow)
+    expira_em = Column(DateTime, nullable=True)
+    usada = Column(Boolean, default=False)
+
+
 class Auditoria(Base):
     __tablename__ = "auditoria"
 
@@ -147,6 +161,12 @@ os.makedirs(AUTH_DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(AUTH_DATA_DIR, "painel.db")
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = scoped_session(sessionmaker(bind=engine))
+
+# Fabrica de sessoes independentes (nao thread-local) para uso em background
+# threads e em funcoes chamadas de dentro de outras que ja tem SessionLocal aberta
+# -- evita conflito de sessao compartilhada via scoped_session.
+def nova_sessao():
+    return sessionmaker(bind=engine)()
 
 
 def init_db():

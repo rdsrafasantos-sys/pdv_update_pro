@@ -8,7 +8,7 @@ from pdv_server.auth.gestao import (
     gerar_proximo_site_id, gerar_script_instalacao, listar_perfis,
     listar_redes, listar_site_ids_instalacao, listar_unidades,
     listar_usuarios, obter_instalacao, obter_rede, obter_usuario,
-    processar_callback_instalacao, redes_visiveis_para,
+    processar_callback_instalacao, redes_visiveis_para, status_pool,
     usuario_pode_acessar_rede,
 )
 from pdv_server.auth.routes import exigir_permissao, exigir_super_admin, limiter
@@ -196,6 +196,12 @@ def api_gerar_script_instalacao(instalacao_id):
 # autenticado pelo token de uso unico gerado junto com o script (ver
 # gerar_script_instalacao). Rate limit por seguranca extra, ja que e o
 # unico endpoint deste blueprint sem sessao por tras.
+@painel_bp.route("/api/instalacao/pool/status", methods=["GET"])
+@exigir_permissao("pode_gerenciar_redes")
+def api_status_pool():
+    return jsonify(status_pool())
+
+
 @painel_bp.route("/api/instalacao/callback/<token_callback>", methods=["POST"])
 @limiter.limit("30 per minute")
 def api_callback_instalacao(token_callback):
