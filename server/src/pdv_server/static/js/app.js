@@ -573,8 +573,15 @@ window.testarConexaoErpDb = testarConexaoErpDb;
 
 function atualizarKpiErpDb(dados) {
   const el = document.getElementById("kpiErpDb");
+  const sub = document.getElementById("kpiErpDbSub");
+  const card = document.getElementById("kpiCardErpDb");
   if (!el) return;
   el.textContent = dados.online ? "🟢 Online" : "🔴 Offline";
+  if (sub) sub.textContent = dados.online ? "" : (dados.erro || "Sem conexão com o servidor ERP");
+  if (card) {
+    card.classList.remove("kpi-card--ok", "kpi-card--error", "kpi-card--warning");
+    card.classList.add(dados.online ? "kpi-card--ok" : "kpi-card--error");
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -644,6 +651,7 @@ window.testarStatusIntegrador = testarStatusIntegrador;
 function atualizarKpiIntegrador(dados) {
   const el = document.getElementById("kpiIntegrador");
   const sub = document.getElementById("kpiIntegradorSub");
+  const card = document.getElementById("kpiCardIntegrador");
   if (!el) return;
   const rotulos = {
     ok: "🟢 OK", atencao: "🟡 Atenção", erro: "🔴 Erro",
@@ -651,6 +659,12 @@ function atualizarKpiIntegrador(dados) {
   };
   el.textContent = rotulos[dados.status] || "—";
   if (sub) sub.textContent = dados.status === "ok" || dados.status === "nao_configurado" ? "" : (dados.erro || "");
+  if (card) {
+    card.classList.remove("kpi-card--ok", "kpi-card--error", "kpi-card--warning");
+    if (dados.status === "ok") card.classList.add("kpi-card--ok");
+    else if (dados.status === "atencao") card.classList.add("kpi-card--warning");
+    else if (dados.status !== "nao_configurado") card.classList.add("kpi-card--error");
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -876,6 +890,23 @@ async function carregarDashboard() {
   lojas = lojasResp;
   atualizarKpiErpDb(erpDbStatus);
   atualizarKpiIntegrador(integradorStatus);
+
+  const dashAlertas = document.getElementById("dashAlertas");
+  if (dashAlertas) {
+    const alertas = [];
+    if (!erpDbStatus.online) {
+      const detalhe = erpDbStatus.erro ? ` — ${erpDbStatus.erro}` : "";
+      alertas.push(`<div class="dash-alerta dash-alerta--erro">🔴 <span><b>Banco de dados ERP offline.</b> O painel não consegue conectar ao servidor ERP${detalhe}. Verifique se o serviço está rodando e a configuração de acesso em Configurações.</span></div>`);
+    }
+    if (integradorStatus.status !== "ok" && integradorStatus.status !== "nao_configurado") {
+      const cls = integradorStatus.status === "atencao" ? "dash-alerta--atencao" : "dash-alerta--erro";
+      const icone = integradorStatus.status === "atencao" ? "⚠️" : "🔴";
+      const titulo = integradorStatus.status === "offline" ? "Integrador offline." : integradorStatus.status === "atencao" ? "Integrador com atenção." : "Integrador com erro.";
+      const detalhe = integradorStatus.erro ? ` — ${integradorStatus.erro}` : "";
+      alertas.push(`<div class="dash-alerta ${cls}">${icone} <span><b>${titulo}</b>${detalhe}</span></div>`);
+    }
+    dashAlertas.innerHTML = alertas.join("");
+  }
 
   const usarErp = !pdvsAtivosErp.erro;
   const lojasErp = pdvsAtivosErp.lojas || [];

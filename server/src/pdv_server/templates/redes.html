@@ -25,6 +25,13 @@
   .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
   .erro-msg { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
   .text-muted { color: var(--text-faint); }
+  .rede-saude { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .saude-badge { font-size: 11px; padding: 3px 9px; border-radius: 99px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+  .saude-verificando { background: var(--surface-2); color: var(--text-faint); }
+  .saude-ok { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+  .saude-erro { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); }
+  .saude-atencao { background: var(--amber-dim); color: var(--amber); border: 1px solid var(--amber); }
+  .saude-neutro { background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border-strong); }
 </style>
 </head>
 <body class="app-bg" data-theme="dark">
@@ -187,8 +194,11 @@ async function carregarTudo() {
           <button class="btn btn-ghost btn-sm" onclick="alternarRede(${r.id}, ${!r.ativa})">${r.ativa ? 'Desativar' : 'Ativar'}</button>
         ` : ''}
       </div>
+      ${r.ativa ? `<div class="rede-saude" id="saude-${r.id}"><span class="saude-badge saude-verificando">Verificando saúde...</span></div>` : ''}
     </div>
   `).join('');
+
+  redes.filter(r => r.ativa).forEach(r => verificarSaudeRede(r.id));
 }
 
 function abrirModalNovaRede() {
@@ -256,6 +266,37 @@ async function alternarRede(id, ativa) {
     body: JSON.stringify({ ativa }),
   });
   carregarTudo();
+}
+
+async function verificarSaudeRede(redeId) {
+  const el = document.getElementById(`saude-${redeId}`);
+  if (!el) return;
+
+  function comTimeout(promise, ms) {
+    return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]);
+  }
+
+  const [erp, integ] = await Promise.all([
+    comTimeout(fetch(`/api/${redeId}/erp_db/status`).then(r => r.json()), 12000)
+      .catch(() => ({ online: false, erro: "Sem resposta (timeout)" })),
+    comTimeout(fetch(`/api/${redeId}/integrador/status`).then(r => r.json()), 12000)
+      .catch(() => ({ status: "erro", erro: "Sem resposta (timeout)" })),
+  ]);
+
+  const erpBadge = erp.online
+    ? `<span class="saude-badge saude-ok" title="Banco de dados ERP acessível">🛢️ ERP OK</span>`
+    : `<span class="saude-badge saude-erro" title="${erp.erro || 'Falha de conexão'}">🛢️ ERP offline</span>`;
+
+  const iStatus = integ.status;
+  const intBadge = iStatus === "ok"
+    ? `<span class="saude-badge saude-ok" title="Integrador online e replicando">🔗 Integrador OK</span>`
+    : iStatus === "nao_configurado"
+    ? `<span class="saude-badge saude-neutro" title="Integrador não configurado">🔗 Não configurado</span>`
+    : iStatus === "atencao"
+    ? `<span class="saude-badge saude-atencao" title="${integ.erro || ''}">🔗 Integrador atenção</span>`
+    : `<span class="saude-badge saude-erro" title="${integ.erro || 'Integrador inacessível'}">🔗 Integrador offline</span>`;
+
+  el.innerHTML = erpBadge + intBadge;
 }
 
 carregarTudo();

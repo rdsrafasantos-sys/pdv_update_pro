@@ -201,10 +201,20 @@ input:checked + .slider:before { transform: translateX(17px); background: #1a0f0
 
 /* DASHBOARD */
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
-.kpi-card { border-radius: 10px; padding: 18px; background: var(--surface); border: 1px solid var(--border); }
+.kpi-card { border-radius: 10px; padding: 18px; background: var(--surface); border: 1px solid var(--border); transition: border-color .25s, background .25s; }
+.kpi-card--ok { border-color: var(--green); background: linear-gradient(145deg, var(--surface), var(--green-dim)); }
+.kpi-card--error { border-color: var(--red); background: linear-gradient(145deg, var(--surface), var(--red-dim)); }
+.kpi-card--warning { border-color: var(--amber); background: linear-gradient(145deg, var(--surface), var(--amber-dim)); }
 .kpi-label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint); font-weight: 600; margin-bottom: 8px; }
 .kpi-value { font-size: 27px; font-weight: 700; letter-spacing: -.4px; }
 .kpi-sub { font-size: 11px; margin-top: 5px; color: var(--text-faint); }
+
+/* Banner de alertas no topo do dashboard */
+.dash-alertas { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.dash-alerta { border-radius: 8px; padding: 10px 14px; font-size: 13px; font-weight: 500; display: flex; align-items: flex-start; gap: 8px; line-height: 1.4; }
+.dash-alerta--erro { background: var(--red-dim); border: 1px solid var(--red); color: var(--red); }
+.dash-alerta--atencao { background: var(--amber-dim); border: 1px solid var(--amber); color: var(--amber); }
+.dash-alerta b { font-weight: 700; }
 
 .quick-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .btn-quick {

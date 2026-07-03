@@ -96,6 +96,7 @@
 
         <!-- ═══════════════ DASHBOARD ═══════════════ -->
         <div class="view" id="view-dashboard">
+          <div class="dash-alertas" id="dashAlertas"></div>
           <div class="kpi-grid">
             <div class="kpi-card">
               <div class="kpi-label">🏪 Lojas</div>
@@ -110,11 +111,12 @@
               <div class="kpi-label">⚠️ Última verificação</div>
               <div class="kpi-value" id="kpiUltima" style="font-size:16px;">—</div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card" id="kpiCardErpDb">
               <div class="kpi-label">🛢️ Banco de dados ERP</div>
               <div class="kpi-value" id="kpiErpDb" style="font-size:16px;">—</div>
+              <div class="kpi-sub" id="kpiErpDbSub"></div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card" id="kpiCardIntegrador">
               <div class="kpi-label">🔗 Integrador</div>
               <div class="kpi-value" id="kpiIntegrador" style="font-size:16px;">—</div>
               <div class="kpi-sub" id="kpiIntegradorSub"></div>
