@@ -228,6 +228,7 @@ window.verificarOnline = verificarOnline;
 async function carregarLojas() {
   const r = await fetch(API("/lojas"));
   lojas = await r.json();
+  _cacheLojasSalvar(lojas);
   for (const key of KEYS) renderLojaTabs(key);
 }
 
@@ -1070,15 +1071,26 @@ async function init() {
   const toggleInput = document.getElementById("themeToggle");
   if (toggleInput) toggleInput.checked = temaSalvo === "light";
   restaurarEstadoMenu();
-
-  await carregarLojas();
-  await verificarAgenteDisponivel();
-  await carregarArquivos();
-  await carregarConfigReplicacaoAuto();
-  await carregarHistoricoReplicacao();
-  await carregarConfigErpDb();
-  await carregarConfigIntegrador();
   configurarDropZone();
+
+  // Mostra o overlay imediatamente, antes de qualquer await,
+  // para o usuario ver feedback instantâneo ao abrir o painel.
+  _dashMostrarLoading();
+
+  // Todas as chamadas de init em paralelo — reduz o tempo total
+  // de sum(cada_call) para max(call_mais_lento).
+  // carregarLojas() salva no cache para carregarDashboard() usar
+  // sem novo fetch.
+  await Promise.all([
+    carregarLojas(),
+    verificarAgenteDisponivel(),
+    carregarArquivos(),
+    carregarConfigReplicacaoAuto(),
+    carregarHistoricoReplicacao(),
+    carregarConfigErpDb(),
+    carregarConfigIntegrador(),
+  ]);
+
   mostrarView("dashboard");
 }
 
