@@ -233,19 +233,41 @@ específico):
     "tag:pdv-terminal":         ["autogroup:admin"],
   },
   "grants": [
+    { "src": ["autogroup:admin"], "dst": ["*"], "ip": ["*"] },
     {
       "src": ["tag:painel-central"],
       "dst": ["tag:pdv-service-manager"],
-      "ip":  ["tcp:27016"],
+      "ip":  ["*"],
     },
     {
       "src": ["tag:painel-central"],
       "dst": ["tag:pdv-terminal"],
-      "ip":  ["tcp:5000", "tcp:27018"],
+      "ip":  ["*"],
+    },
+    {
+      "src": ["tag:pdv-service-manager"],
+      "dst": ["tag:painel-central"],
+      "ip":  ["tcp:8888"],
+    },
+    {
+      "src": ["tag:pdv-service-manager"],
+      "dst": ["tag:pdv-terminal"],
+      "ip":  ["*"],
+    },
+    {
+      "src": ["tag:pdv-terminal"],
+      "dst": ["tag:pdv-service-manager"],
+      "ip":  ["*"],
     },
   ],
 }
 ```
+
+Os dois últimos grants (`pdv-service-manager ↔ pdv-terminal`) são
+**obrigatórios para a replicação MongoDB funcionar**: o PRIMARY do replica set
+(no service manager) precisa alcançar os membros passivos (PDVs) para enviar
+dados, e os PDVs precisam enviar heartbeats de volta. Sem eles o replica set
+fica degradado e os PDVs param de receber atualizações de cadastro.
 
 Com isso, **onboarding de cliente novo não toca mais no ACL nem no servidor
 central**: você só marca a máquina do cliente com a tag certa ao conectar
