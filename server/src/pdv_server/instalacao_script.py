@@ -101,6 +101,17 @@ echo "Prefixos 4via6: $PREFIXOS"
 tailscale set --advertise-routes="$PREFIXOS" \
   || erro_fatal "Falha ao ativar advertise-routes."
 
+# 6. Libera trafego Tailscale para containers Docker (sem isso a porta 27016
+# do integrador fica inacessivel pelo Tailscale mesmo com ACL correto,
+# porque o Docker usa bridge networking com iptables proprios).
+echo "Configurando iptables para Tailscale + Docker..."
+iptables -I DOCKER-USER -i tailscale0 -j ACCEPT 2>/dev/null || true
+if command -v netfilter-persistent >/dev/null 2>&1; then
+  netfilter-persistent save 2>/dev/null || true
+elif [ -d /etc/iptables ]; then
+  iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
+fi
+
 echo "Concluido. Aguardando aprovacao das rotas e atualizacao do ACL pelo painel."
 reportar "{{\"status\":\"concluido\",\"faixas\":\"$FAIXAS\",\"prefixos\":\"$PREFIXOS\",\"tailscale_ip\":\"$TS_IP\",\"tailscale_hostname\":\"$HOSTNAME_TS\"}}"
 """
