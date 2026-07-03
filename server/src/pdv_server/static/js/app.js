@@ -21,6 +21,8 @@ for (const k of KEYS) {
 }
 
 let pollReplicacaoTimer = null;
+let _sysinfoTimer = null;
+const _SYSINFO_INTERVALO_MS = 20000;
 
 // ──────────────────────────────────────────────
 // CACHE DE LOJAS (localStorage, TTL 60s)
@@ -84,7 +86,8 @@ function mostrarView(nome) {
   document.querySelectorAll(".menu-item").forEach(el => {
     el.classList.toggle("active", el.dataset.view === nome);
   });
-  if (nome === "dashboard") carregarDashboard();
+  if (nome === "dashboard") { carregarDashboard(); _iniciarPolingSysinfo(); }
+  else _pararPolingSysinfo();
 }
 window.mostrarView = mostrarView;
 
@@ -635,7 +638,24 @@ function _formatarUptime(seg) {
   return `${m}min`;
 }
 
-function renderSysinfo(dados) {
+async function _tickSysinfo() {
+  const dados = await fetch(API("/sysinfo")).then(r => r.json()).catch(() => null);
+  const el = document.getElementById("kpiSysinfo");
+  if (!el || !dados || dados.erro) return;
+  const agora = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  el.innerHTML = renderSysinfo(dados, agora);
+}
+
+function _iniciarPolingSysinfo() {
+  _pararPolingSysinfo();
+  _sysinfoTimer = setInterval(_tickSysinfo, _SYSINFO_INTERVALO_MS);
+}
+
+function _pararPolingSysinfo() {
+  if (_sysinfoTimer) { clearInterval(_sysinfoTimer); _sysinfoTimer = null; }
+}
+
+function renderSysinfo(dados, timestamp) {
   if (!dados || dados.erro) return "";
   const bar = (pct) => {
     const cor = pct < 70 ? "var(--green)" : pct < 85 ? "var(--amber)" : "var(--red)";
@@ -655,6 +675,7 @@ function renderSysinfo(dados) {
     ${row("RAM", dados.mem_pct, memExtra)}
     ${row("Disk", dados.disco_pct, diskExtra)}
     ${dados.uptime_seg ? `<div class="kpi-metrica-uptime">⏱ Uptime: ${_formatarUptime(dados.uptime_seg)}</div>` : ""}
+    ${timestamp ? `<div class="kpi-metrica-uptime" style="margin-top:4px;opacity:.6;">🔄 ${timestamp}</div>` : ""}
   </div>`;
 }
 
@@ -1053,7 +1074,10 @@ async function _dashFase2(lojasList, historico) {
   atualizarKpiIntegrador(integradorStatus);
 
   const elSysinfo = document.getElementById("kpiSysinfo");
-  if (elSysinfo) elSysinfo.innerHTML = renderSysinfo(sysinfoData);
+  if (elSysinfo) {
+    const agora = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    elSysinfo.innerHTML = renderSysinfo(sysinfoData, agora);
+  }
 
   const elErpStats = document.getElementById("kpiErpDbStats");
   if (elErpStats) elErpStats.innerHTML = renderErpStats(erpStatsData);
