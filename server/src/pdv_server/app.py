@@ -497,3 +497,46 @@ def api_integrador_config_set(contexto):
 @com_rede
 def api_integrador_status(contexto):
     return jsonify(integrador.testar_status(contexto))
+
+
+@app.route("/api/<int:rede_id>/sysinfo", methods=["GET"])
+@com_rede
+def api_sysinfo(contexto):
+    """Consulta o agente de monitoramento do service manager (porta 5001).
+    O agente é instalado pelo script de instalação da rede."""
+    from urllib.parse import urlparse
+    parsed = urlparse(contexto.mongo_uri)
+    host_raw = parsed.hostname or ""
+    if not host_raw:
+        return jsonify({"erro": "Mongo URI não configurado."})
+    host = endereco_alcancavel(host_raw, contexto.tailscale_site_id)
+    try:
+        r = requests.get(f"http://{host}:5001/sysinfo", timeout=3)
+        return jsonify(r.json())
+    except Exception as e:
+        return jsonify({"erro": str(e)})
+
+
+@app.route("/api/<int:rede_id>/erp_db/stats", methods=["GET"])
+@com_rede
+def api_erp_db_stats(contexto):
+    """Retorna estatísticas do banco PostgreSQL do ERP."""
+    cfg = erp_db.carregar_config(contexto)
+    if not cfg.get("host") or not cfg.get("banco"):
+        return jsonify({"erro": "ERP não configurado."})
+    try:
+        conn = erp_db._conectar(cfg, contexto.tailscale_site_id)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT version()")
+                row = cur.fetchone()
+                versao = row[0].split()[1] if row else "?"
+                cur.execute("SELECT pg_size_pretty(pg_database_size(current_database()))")
+                tamanho = cur.fetchone()[0]
+                cur.execute("SELECT count(*) FROM pg_stat_activity WHERE state = 'active'")
+                conexoes = cur.fetchone()[0]
+        finally:
+            conn.close()
+        return jsonify({"versao": versao, "tamanho_bd": tamanho, "conexoes_ativas": int(conexoes)})
+    except Exception as e:
+        return jsonify({"erro": str(e)})

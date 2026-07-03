@@ -209,6 +209,18 @@ input:checked + .slider:before { transform: translateX(17px); background: #1a0f0
 .kpi-value { font-size: 27px; font-weight: 700; letter-spacing: -.4px; }
 .kpi-sub { font-size: 11px; margin-top: 5px; color: var(--text-faint); }
 
+/* Métricas de saúde da máquina dentro do KPI card */
+.kpi-metricas { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.kpi-metrica-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; font-size: 11px; }
+.kpi-metrica-row:last-child { margin-bottom: 0; }
+.kpi-metrica-label { color: var(--text-faint); width: 28px; flex-shrink: 0; font-weight: 600; }
+.kpi-metrica-bar-wrap { flex: 1; background: var(--surface-2); border-radius: 99px; height: 5px; overflow: hidden; }
+.kpi-metrica-bar { height: 100%; border-radius: 99px; transition: width .5s ease; }
+.kpi-metrica-pct { color: var(--text-dim); width: 32px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.kpi-metrica-uptime { font-size: 10.5px; color: var(--text-faint); margin-top: 6px; }
+.kpi-stat-row { display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; color: var(--text-dim); }
+.kpi-stat-row + .kpi-stat-row { border-top: 1px solid var(--border); }
+
 /* Loading overlay do dashboard */
 .dash-loading-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.5);

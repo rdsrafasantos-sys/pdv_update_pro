@@ -623,6 +623,50 @@ async function testarConexaoErpDb() {
 }
 window.testarConexaoErpDb = testarConexaoErpDb;
 
+// ──────────────────────────────────────────────
+// METRICAS DE SAUDE DA MAQUINA (sysinfo + erp stats)
+// ──────────────────────────────────────────────
+function _formatarUptime(seg) {
+  const d = Math.floor(seg / 86400);
+  const h = Math.floor((seg % 86400) / 3600);
+  const m = Math.floor((seg % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}min`;
+  return `${m}min`;
+}
+
+function renderSysinfo(dados) {
+  if (!dados || dados.erro) return "";
+  const bar = (pct) => {
+    const cor = pct < 70 ? "var(--green)" : pct < 85 ? "var(--amber)" : "var(--red)";
+    return `<div class="kpi-metrica-bar" style="width:${Math.min(pct,100)}%;background:${cor};"></div>`;
+  };
+  const row = (label, pct, extra) => `
+    <div class="kpi-metrica-row">
+      <span class="kpi-metrica-label">${label}</span>
+      <div class="kpi-metrica-bar-wrap">${bar(pct)}</div>
+      <span class="kpi-metrica-pct">${pct}%</span>
+      ${extra ? `<span style="font-size:10px;color:var(--text-faint);white-space:nowrap;">${extra}</span>` : ""}
+    </div>`;
+  const memExtra = `${dados.mem_usado_mb >= 1024 ? (dados.mem_usado_mb/1024).toFixed(1)+"GB" : dados.mem_usado_mb+"MB"}/${dados.mem_total_mb >= 1024 ? (dados.mem_total_mb/1024).toFixed(0)+"GB" : dados.mem_total_mb+"MB"}`;
+  const diskExtra = `${dados.disco_usado_gb}/${dados.disco_total_gb}GB`;
+  return `<div class="kpi-metricas">
+    ${row("CPU", dados.cpu_pct)}
+    ${row("RAM", dados.mem_pct, memExtra)}
+    ${row("Disk", dados.disco_pct, diskExtra)}
+    ${dados.uptime_seg ? `<div class="kpi-metrica-uptime">⏱ Uptime: ${_formatarUptime(dados.uptime_seg)}</div>` : ""}
+  </div>`;
+}
+
+function renderErpStats(dados) {
+  if (!dados || dados.erro) return "";
+  return `<div class="kpi-metricas">
+    <div class="kpi-stat-row"><span>Tamanho do BD</span><span>${dados.tamanho_bd}</span></div>
+    <div class="kpi-stat-row"><span>Conexões ativas</span><span>${dados.conexoes_ativas}</span></div>
+    <div class="kpi-stat-row"><span>Versão PostgreSQL</span><span>${dados.versao}</span></div>
+  </div>`;
+}
+
 function atualizarKpiErpDb(dados) {
   const el = document.getElementById("kpiErpDb");
   const sub = document.getElementById("kpiErpDbSub");
@@ -996,15 +1040,23 @@ async function carregarDashboard() {
 }
 
 async function _dashFase2(lojasList, historico) {
-  const [erpDbStatus, integradorStatus, pdvsAtivosErp, statusPorLoja] = await Promise.all([
+  const [erpDbStatus, integradorStatus, pdvsAtivosErp, statusPorLoja, sysinfoData, erpStatsData] = await Promise.all([
     fetch(API("/erp_db/status")).then(r => r.json()).catch(() => ({ online: false })),
     fetch(API("/integrador/status")).then(r => r.json()).catch(() => ({ status: "erro", erro: "Falha ao consultar." })),
     fetch(API("/erp_db/pdvs_ativos")).then(r => r.json()).catch(() => ({ erro: "Falha ao consultar.", lojas: [] })),
     statusOnlinePorLoja(lojasList),
+    fetch(API("/sysinfo")).then(r => r.json()).catch(() => null),
+    fetch(API("/erp_db/stats")).then(r => r.json()).catch(() => null),
   ]);
 
   atualizarKpiErpDb(erpDbStatus);
   atualizarKpiIntegrador(integradorStatus);
+
+  const elSysinfo = document.getElementById("kpiSysinfo");
+  if (elSysinfo) elSysinfo.innerHTML = renderSysinfo(sysinfoData);
+
+  const elErpStats = document.getElementById("kpiErpDbStats");
+  if (elErpStats) elErpStats.innerHTML = renderErpStats(erpStatsData);
 
   const dashAlertas = document.getElementById("dashAlertas");
   if (dashAlertas) {

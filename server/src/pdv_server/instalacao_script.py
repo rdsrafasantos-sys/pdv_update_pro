@@ -112,6 +112,75 @@ elif [ -d /etc/iptables ]; then
   iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
 fi
 
+
+# 7. Instala agente de monitoramento do sistema (CPU, memoria, disco -- porta 5001).
+# O painel consulta este agente para exibir a saude da maquina no dashboard.
+echo "Instalando agente de monitoramento..."
+pip3 install psutil --quiet 2>/dev/null || pip install psutil --quiet 2>/dev/null || \
+  apt-get install -y python3-psutil -qq 2>/dev/null || true
+
+mkdir -p /opt/pdv-sysinfo
+cat > /opt/pdv-sysinfo/sysinfo.py << 'SYSINFO_EOF'
+#!/usr/bin/env python3
+"""PDV Sysinfo Agent -- expoe metricas do host na porta 5001."""
+import json, time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
+def coletar():
+    if not psutil:
+        return {{"erro": "psutil nao instalado"}}
+    mem = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+    return {{
+        "cpu_pct": psutil.cpu_percent(interval=0.3),
+        "mem_total_mb": mem.total // 1048576,
+        "mem_usado_mb": (mem.total - mem.available) // 1048576,
+        "mem_pct": mem.percent,
+        "disco_total_gb": round(disk.total / 1073741824, 1),
+        "disco_usado_gb": round(disk.used / 1073741824, 1),
+        "disco_pct": disk.percent,
+        "uptime_seg": int(time.time() - psutil.boot_time()),
+    }}
+
+class H(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/sysinfo":
+            b = json.dumps(coletar()).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", len(b))
+            self.end_headers()
+            self.wfile.write(b)
+        else:
+            self.send_response(404)
+            self.end_headers()
+    def log_message(self, *a): pass
+
+HTTPServer(("0.0.0.0", 5001), H).serve_forever()
+SYSINFO_EOF
+
+cat > /etc/systemd/system/pdv-sysinfo.service << 'SVC_EOF'
+[Unit]
+Description=PDV Sysinfo Agent
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/pdv-sysinfo/sysinfo.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SVC_EOF
+
+systemctl daemon-reload
+systemctl enable pdv-sysinfo --quiet 2>/dev/null || true
+systemctl restart pdv-sysinfo 2>/dev/null || true
+
 echo "Concluido. Aguardando aprovacao das rotas e atualizacao do ACL pelo painel."
 reportar "{{\"status\":\"concluido\",\"faixas\":\"$FAIXAS\",\"prefixos\":\"$PREFIXOS\",\"tailscale_ip\":\"$TS_IP\",\"tailscale_hostname\":\"$HOSTNAME_TS\"}}"
 """
