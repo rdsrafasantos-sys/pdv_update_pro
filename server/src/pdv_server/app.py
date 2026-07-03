@@ -499,6 +499,35 @@ def api_integrador_status(contexto):
     return jsonify(integrador.testar_status(contexto))
 
 
+@app.route("/api/<int:rede_id>/sysinfo_loja/<loja_id>", methods=["GET"])
+@com_rede
+def api_sysinfo_loja(contexto, loja_id):
+    """Consulta /sysinfo do agente de todos os PDVs de uma loja em paralelo."""
+    loja = next((l for l in get_lojas(contexto) if l["id"] == loja_id), None)
+    if not loja:
+        return jsonify({}), 404
+    resultados = {}
+    threads = []
+
+    def checar(pdv):
+        try:
+            r = requests.get(
+                f"http://{endereco_alcancavel(pdv['ip'], contexto.tailscale_site_id)}:5000/sysinfo",
+                timeout=3
+            )
+            resultados[pdv["id"]] = r.json()
+        except Exception:
+            resultados[pdv["id"]] = {"erro": "sem resposta"}
+
+    for pdv in loja["pdvs"]:
+        t = threading.Thread(target=checar, args=(pdv,))
+        threads.append(t)
+        t.start()
+    for t in threads:
+        t.join(timeout=5)
+    return jsonify(resultados)
+
+
 @app.route("/api/<int:rede_id>/sysinfo", methods=["GET"])
 @com_rede
 def api_sysinfo(contexto):

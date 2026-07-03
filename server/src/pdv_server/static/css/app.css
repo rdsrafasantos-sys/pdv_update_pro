@@ -221,6 +221,14 @@ input:checked + .slider:before { transform: translateX(17px); background: #1a0f0
 .kpi-stat-row { display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; color: var(--text-dim); }
 .kpi-stat-row + .kpi-stat-row { border-top: 1px solid var(--border); }
 
+/* Sysinfo compacto dentro dos cards de PDV */
+.pdv-sysinfo-mini { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 3px; }
+.pdv-sysinfo-row { display: flex; align-items: center; gap: 4px; font-size: 10px; }
+.pdv-sysinfo-label { color: var(--text-faint); width: 26px; flex-shrink: 0; font-weight: 600; }
+.pdv-sysinfo-bar-wrap { flex: 1; background: var(--surface-2); border-radius: 99px; height: 3px; overflow: hidden; }
+.pdv-sysinfo-bar { height: 100%; border-radius: 99px; transition: width .4s ease; }
+.pdv-sysinfo-pct { color: var(--text-dim); width: 28px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+
 /* Loading overlay do dashboard */
 .dash-loading-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.5);

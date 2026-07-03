@@ -2,6 +2,7 @@ import logging
 import os
 import subprocess
 import threading
+import time
 
 from flask import Flask, jsonify, request
 
@@ -23,6 +24,27 @@ def verificar_token(req):
 @app.route("/ping")
 def ping():
     return jsonify({"online": True, "versao": VERSION})
+
+
+@app.route("/sysinfo")
+def sysinfo():
+    try:
+        import psutil
+        mem = psutil.virtual_memory()
+        drive = os.environ.get("SystemDrive", "C:\\") + "\\"
+        disk = psutil.disk_usage(drive)
+        return jsonify({
+            "cpu_pct": psutil.cpu_percent(interval=0.3),
+            "mem_total_mb": mem.total // 1048576,
+            "mem_usado_mb": (mem.total - mem.available) // 1048576,
+            "mem_pct": mem.percent,
+            "disco_total_gb": round(disk.total / 1073741824, 1),
+            "disco_usado_gb": round(disk.used / 1073741824, 1),
+            "disco_pct": disk.percent,
+            "uptime_seg": int(time.time() - psutil.boot_time()),
+        })
+    except Exception as e:
+        return jsonify({"erro": str(e)})
 
 
 @app.route("/info")

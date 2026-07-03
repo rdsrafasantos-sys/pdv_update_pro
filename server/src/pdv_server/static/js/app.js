@@ -23,6 +23,8 @@ for (const k of KEYS) {
 let pollReplicacaoTimer = null;
 let _sysinfoTimer = null;
 const _SYSINFO_INTERVALO_MS = 20000;
+let _sysinfoLoja = {};
+const _SYSINFO_PDV_INTERVALO_MS = 30000;
 
 // ──────────────────────────────────────────────
 // CACHE DE LOJAS (localStorage, TTL 60s)
@@ -87,7 +89,7 @@ function mostrarView(nome) {
     el.classList.toggle("active", el.dataset.view === nome);
   });
   if (nome === "dashboard") { carregarDashboard(); _iniciarPolingSysinfo(); }
-  else _pararPolingSysinfo();
+  else { _pararPolingSysinfo(); _pararPolingSysinfoLojas(); }
 }
 window.mostrarView = mostrarView;
 
@@ -655,6 +657,40 @@ function _pararPolingSysinfo() {
   if (_sysinfoTimer) { clearInterval(_sysinfoTimer); _sysinfoTimer = null; }
 }
 
+function renderSysinfoMini(dados) {
+  if (!dados || dados.erro) return "";
+  const bar = (pct) => {
+    const cor = pct < 70 ? "var(--green)" : pct < 85 ? "var(--amber)" : "var(--red)";
+    return `<div class="pdv-sysinfo-bar-wrap"><div class="pdv-sysinfo-bar" style="width:${Math.min(pct,100)}%;background:${cor};"></div></div>`;
+  };
+  const row = (label, pct) => `<div class="pdv-sysinfo-row"><span class="pdv-sysinfo-label">${label}</span>${bar(pct)}<span class="pdv-sysinfo-pct">${pct}%</span></div>`;
+  return `<div class="pdv-sysinfo-mini">${row("CPU", dados.cpu_pct)}${row("RAM", dados.mem_pct)}${row("Disk", dados.disco_pct)}</div>`;
+}
+
+async function _tickSysinfoLoja(lojaId, pdvIds) {
+  const dados = await fetch(API(`/sysinfo_loja/${lojaId}`)).then(r => r.json()).catch(() => ({}));
+  for (const pdvId of pdvIds) {
+    const el = document.getElementById(`pdvsysinfo-${pdvId}`);
+    if (el && dados[pdvId] && !dados[pdvId].erro) el.innerHTML = renderSysinfoMini(dados[pdvId]);
+  }
+}
+
+function _iniciarPolingSysinfoLojas(lojasCruzadas) {
+  _pararPolingSysinfoLojas();
+  for (const loja of lojasCruzadas) {
+    const lojaId = `loja${String(loja.id_loja).padStart(2, "0")}`;
+    const pdvsOnline = loja.pdvs.filter(p => p.status === "online").map(p => p.pdvId);
+    if (pdvsOnline.length === 0) continue;
+    _tickSysinfoLoja(lojaId, pdvsOnline);
+    _sysinfoLoja[lojaId] = setInterval(() => _tickSysinfoLoja(lojaId, pdvsOnline), _SYSINFO_PDV_INTERVALO_MS);
+  }
+}
+
+function _pararPolingSysinfoLojas() {
+  for (const timer of Object.values(_sysinfoLoja)) clearInterval(timer);
+  _sysinfoLoja = {};
+}
+
 function renderSysinfo(dados, timestamp) {
   if (!dados || dados.erro) return "";
   const bar = (pct) => {
@@ -953,6 +989,7 @@ function renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, erroErp, ocultarOffline) 
       const ip = p.pdv ? `<div class="pdv-ip">${p.pdv.ip}</div>` : '<div class="pdv-ip text-muted">IP desconhecido</div>';
       const versao = p.pdv && p.pdv.versao ? `<div class="pdv-versao">v${p.pdv.versao}</div>` : "";
       const replicacao = p.status === "online" ? cardReplicacaoPdv(ultimaPorPdv[p.pdvId]) : "";
+      const sysinfoSlot = p.status === "online" ? `<div id="pdvsysinfo-${p.pdvId}"></div>` : "";
       return `
         <div class="pdv-card" style="cursor:default;">
           <div class="pdv-name">${nome}</div>
@@ -960,6 +997,7 @@ function renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, erroErp, ocultarOffline) 
           ${versao}
           <div class="badge ${classe}"><span class="dot"></span>${texto}</div>
           ${replicacao}
+          ${sysinfoSlot}
         </div>
       `;
     }).join("");
@@ -1120,6 +1158,7 @@ async function _dashFase2(lojasList, historico) {
     const ocultarOffline = localStorage.getItem("dashOcultarOffline") === "1";
     _dashUltimoEstado = { lojasCruzadas, ultimaPorPdv, erroErp: pdvsAtivosErp.erro };
     elOnline.innerHTML = renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, pdvsAtivosErp.erro, ocultarOffline);
+    _iniciarPolingSysinfoLojas(lojasCruzadas);
   }
 
   _dashOcultarLoading();
