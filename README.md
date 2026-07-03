@@ -259,15 +259,25 @@ específico):
       "dst": ["tag:pdv-service-manager"],
       "ip":  ["*"],
     },
+    {
+      "src": ["tag:pdv-terminal"],
+      "dst": ["tag:painel-central"],
+      "ip":  ["tcp:443", "tcp:8888"],
+    },
   ],
 }
 ```
 
-Os dois últimos grants (`pdv-service-manager ↔ pdv-terminal`) são
+Os grants `pdv-service-manager ↔ pdv-terminal` são
 **obrigatórios para a replicação MongoDB funcionar**: o PRIMARY do replica set
 (no service manager) precisa alcançar os membros passivos (PDVs) para enviar
 dados, e os PDVs precisam enviar heartbeats de volta. Sem eles o replica set
 fica degradado e os PDVs param de receber atualizações de cadastro.
+
+O grant `pdv-terminal → painel-central` (tcp:443 + tcp:8888) é necessário
+para dispositivos PDV com Tailscale instalado acessarem o painel via browser
+— sem ele o MagicDNS do Tailscale intercepta o domínio `.ts.net` e tenta
+uma conexão peer-to-peer que seria bloqueada.
 
 Com isso, **onboarding de cliente novo não toca mais no ACL nem no servidor
 central**: você só marca a máquina do cliente com a tag certa ao conectar
