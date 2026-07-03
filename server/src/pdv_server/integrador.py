@@ -65,6 +65,15 @@ def testar_status(contexto):
 
     processo_online = _porta_aberta(cfg["ip"], cfg["porta"])
 
+    if not processo_online:
+        return {
+            "status": "offline",
+            "processo_online": False,
+            "mongo_online": None,
+            "erro": "Porta do integrador não respondeu.",
+            "colecoes": {},
+        }
+
     from bson import ObjectId
     from pymongo import MongoClient
     from pymongo.errors import PyMongoError
@@ -76,7 +85,7 @@ def testar_status(contexto):
     try:
         cliente = MongoClient(
             f"mongodb://{cfg['mongo_ip']}:{int(cfg.get('mongo_porta') or 27016)}",
-            serverSelectionTimeoutMS=4000,
+            serverSelectionTimeoutMS=3000,
         )
         cliente.admin.command("ping")
         mongo_online = True

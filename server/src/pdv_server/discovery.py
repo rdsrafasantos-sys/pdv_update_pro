@@ -24,7 +24,7 @@ def endereco_alcancavel(ip, tailscale_site_id=""):
 
 def _get_mongo(contexto):
     from pymongo import MongoClient
-    return MongoClient(contexto.mongo_uri)
+    return MongoClient(contexto.mongo_uri, serverSelectionTimeoutMS=3000)
 
 
 def descobrir_pdvs_via_replicaset(contexto):

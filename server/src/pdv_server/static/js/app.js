@@ -880,14 +880,66 @@ async function statusOnlinePorLoja(lojasList) {
 }
 
 async function carregarDashboard() {
-  const [lojasResp, historico, erpDbStatus, integradorStatus, pdvsAtivosErp] = await Promise.all([
+  // ── Fase 1: dados rápidos (lojas via Mongo + histórico local) ────────
+  // Com serverSelectionTimeoutMS=3000 no backend, isto resolve em < 3s
+  // mesmo quando o integrador está offline.
+  const [lojasResp, historico] = await Promise.all([
     fetch(API("/lojas")).then(r => r.json()).catch(() => []),
     fetch(API("/replicacao/historico")).then(r => r.json()).catch(() => []),
+  ]);
+  lojas = lojasResp;
+
+  // Gráfico e última verificação — dados locais, sempre rápidos
+  const grafico = document.getElementById("dashGrafico");
+  if (grafico) grafico.innerHTML = svgGraficoBarras(historico);
+
+  const elUltima = document.getElementById("kpiUltima");
+  if (elUltima) {
+    elUltima.textContent = historico.length === 0 ? "—"
+      : historico[0].tem_divergencia ? "⚠️ Com divergência" : "✔ Sem divergência";
+  }
+
+  // KPIs básicos de lojas/PDVs (sem cruzamento ERP ainda)
+  const elLojas = document.getElementById("kpiLojas");
+  const elPdvs = document.getElementById("kpiPdvs");
+  const elPdvsSub = document.getElementById("kpiPdvsSub");
+  if (elLojas) elLojas.textContent = lojas.length;
+  if (elPdvs) elPdvs.textContent = lojas.reduce((a, l) => a + l.pdvs.length, 0);
+  if (elPdvsSub) elPdvsSub.textContent = "";
+
+  // Placeholder enquanto os checks lentos rodam em background
+  const ocultarOffline = localStorage.getItem("dashOcultarOffline") === "1";
+  const checkbox = document.getElementById("dashOcultarOffline");
+  if (checkbox) checkbox.checked = ocultarOffline;
+  const elOnline = document.getElementById("dashOnlinePorLoja");
+  if (elOnline) {
+    elOnline.innerHTML = lojas.length === 0
+      ? '<div class="empty">Nenhuma loja. O integrador pode estar offline.</div>'
+      : lojas.map(l => `
+          <div class="dash-loja-grupo">
+            <div class="dash-loja-titulo">${l.nome} — verificando online...</div>
+            <div class="dash-pdv-grid">${l.pdvs.map(p =>
+              `<div class="pdv-card" style="cursor:default;">
+                <div class="pdv-name">${p.nome || p.id}</div>
+                <div class="pdv-ip text-muted">${p.ip || ""}</div>
+                <div class="badge"><span class="dot"></span>Verificando...</div>
+              </div>`).join("")}
+            </div>
+          </div>`).join("");
+  }
+
+  // ── Fase 2: checks lentos em background, não bloqueiam a UI ─────────
+  _dashFase2(lojas, historico);
+}
+
+async function _dashFase2(lojasList, historico) {
+  const [erpDbStatus, integradorStatus, pdvsAtivosErp, statusPorLoja] = await Promise.all([
     fetch(API("/erp_db/status")).then(r => r.json()).catch(() => ({ online: false })),
     fetch(API("/integrador/status")).then(r => r.json()).catch(() => ({ status: "erro", erro: "Falha ao consultar." })),
     fetch(API("/erp_db/pdvs_ativos")).then(r => r.json()).catch(() => ({ erro: "Falha ao consultar.", lojas: [] })),
+    statusOnlinePorLoja(lojasList),
   ]);
-  lojas = lojasResp;
+
   atualizarKpiErpDb(erpDbStatus);
   atualizarKpiIntegrador(integradorStatus);
 
@@ -910,46 +962,23 @@ async function carregarDashboard() {
 
   const usarErp = !pdvsAtivosErp.erro;
   const lojasErp = pdvsAtivosErp.lojas || [];
-
-  const elLojas = document.getElementById("kpiLojas");
-  const elPdvs = document.getElementById("kpiPdvs");
-  const elPdvsSub = document.getElementById("kpiPdvsSub");
-  const elUltima = document.getElementById("kpiUltima");
-
-  const statusPorLoja = await statusOnlinePorLoja(lojas);
-  const lojasCruzadas = cruzarLojasErpComOnline(lojasErp, lojas, statusPorLoja);
+  const lojasCruzadas = cruzarLojasErpComOnline(lojasErp, lojasList, statusPorLoja);
 
   if (usarErp) {
     const totalAtivosErp = lojasCruzadas.reduce((acc, l) => acc + l.pdvs.length, 0);
     const totalOnlineErp = lojasCruzadas.reduce((acc, l) => acc + l.pdvs.filter(p => p.status === "online").length, 0);
+    const elLojas = document.getElementById("kpiLojas");
+    const elPdvs = document.getElementById("kpiPdvs");
+    const elPdvsSub = document.getElementById("kpiPdvsSub");
     if (elLojas) elLojas.textContent = lojasCruzadas.length;
     if (elPdvs) elPdvs.textContent = totalOnlineErp;
     if (elPdvsSub) elPdvsSub.textContent = `de ${totalAtivosErp} ativo(s) no ERP`;
-  } else {
-    const totalPdvs = lojas.reduce((acc, l) => acc + l.pdvs.length, 0);
-    if (elLojas) elLojas.textContent = lojas.length;
-    if (elPdvs) elPdvs.textContent = totalPdvs;
-    if (elPdvsSub) elPdvsSub.textContent = "";
   }
-
-  if (elUltima) {
-    if (historico.length === 0) {
-      elUltima.textContent = "—";
-    } else {
-      const h0 = historico[0];
-      elUltima.textContent = h0.tem_divergencia ? "⚠️ Com divergência" : "✔ Sem divergência";
-    }
-  }
-
-  const grafico = document.getElementById("dashGrafico");
-  if (grafico) grafico.innerHTML = svgGraficoBarras(historico);
 
   const elOnline = document.getElementById("dashOnlinePorLoja");
   if (elOnline) {
     const ultimaPorPdv = ultimaReplicacaoPorPdv(historico);
-    const checkbox = document.getElementById("dashOcultarOffline");
     const ocultarOffline = localStorage.getItem("dashOcultarOffline") === "1";
-    if (checkbox) checkbox.checked = ocultarOffline;
     _dashUltimoEstado = { lojasCruzadas, ultimaPorPdv, erroErp: pdvsAtivosErp.erro };
     elOnline.innerHTML = renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, pdvsAtivosErp.erro, ocultarOffline);
   }
