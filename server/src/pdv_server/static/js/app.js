@@ -23,6 +23,57 @@ for (const k of KEYS) {
 let pollReplicacaoTimer = null;
 
 // ──────────────────────────────────────────────
+// CACHE DE LOJAS (localStorage, TTL 60s)
+// Evita fetch ao Mongo em visitas subsequentes — renderiza instantâneo
+// e atualiza em background.
+// ──────────────────────────────────────────────
+const _CACHE_LOJAS_TTL = 60000;
+
+function _cacheLojasSalvar(data) {
+  try {
+    localStorage.setItem(`pdv_lojas_${window.REDE_ID}`, JSON.stringify({ ts: Date.now(), data }));
+  } catch (e) {}
+}
+
+function _cacheLojasBuscar() {
+  try {
+    const raw = localStorage.getItem(`pdv_lojas_${window.REDE_ID}`);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts < _CACHE_LOJAS_TTL) return data;
+  } catch (e) {}
+  return null;
+}
+
+// ──────────────────────────────────────────────
+// LOADING OVERLAY DO DASHBOARD
+// ──────────────────────────────────────────────
+function _dashMostrarLoading() {
+  const el = document.getElementById("dashLoadingOverlay");
+  if (!el) return;
+  el.classList.remove("fechando");
+  el.style.display = "flex";
+  _dashProgressoLoading(5, "Buscando lojas e histórico...");
+}
+
+function _dashProgressoLoading(pct, msg) {
+  const bar = document.getElementById("dashLoadingBar");
+  const msgEl = document.getElementById("dashLoadingMsg");
+  if (bar) bar.style.width = `${pct}%`;
+  if (msgEl && msg) msgEl.textContent = msg;
+}
+
+function _dashOcultarLoading() {
+  _dashProgressoLoading(100, "Pronto!");
+  setTimeout(() => {
+    const el = document.getElementById("dashLoadingOverlay");
+    if (!el) return;
+    el.classList.add("fechando");
+    setTimeout(() => { el.style.display = "none"; el.classList.remove("fechando"); }, 300);
+  }, 400);
+}
+
+// ──────────────────────────────────────────────
 // NAVEGACAO (sidebar + views)
 // ──────────────────────────────────────────────
 function mostrarView(nome) {
@@ -880,14 +931,25 @@ async function statusOnlinePorLoja(lojasList) {
 }
 
 async function carregarDashboard() {
-  // ── Fase 1: dados rápidos (lojas via Mongo + histórico local) ────────
-  // Com serverSelectionTimeoutMS=3000 no backend, isto resolve em < 3s
-  // mesmo quando o integrador está offline.
+  _dashMostrarLoading();
+
+  // ── Fase 1: lojas (cache → instantâneo / fetch → até 3s) + histórico ─
+  const lojasCache = _cacheLojasBuscar();
   const [lojasResp, historico] = await Promise.all([
-    fetch(API("/lojas")).then(r => r.json()).catch(() => []),
+    lojasCache ? Promise.resolve(lojasCache)
+               : fetch(API("/lojas")).then(r => r.json()).catch(() => []),
     fetch(API("/replicacao/historico")).then(r => r.json()).catch(() => []),
   ]);
+
+  // Atualiza cache em background se usamos o cache (stale-while-revalidate)
+  if (lojasCache) {
+    fetch(API("/lojas")).then(r => r.json()).then(d => { lojas = d; _cacheLojasSalvar(d); }).catch(() => {});
+  } else {
+    _cacheLojasSalvar(lojasResp);
+  }
+
   lojas = lojasResp;
+  _dashProgressoLoading(50, "Verificando ERP, integrador e PDVs online...");
 
   // Gráfico e última verificação — dados locais, sempre rápidos
   const grafico = document.getElementById("dashGrafico");
@@ -982,6 +1044,8 @@ async function _dashFase2(lojasList, historico) {
     _dashUltimoEstado = { lojasCruzadas, ultimaPorPdv, erroErp: pdvsAtivosErp.erro };
     elOnline.innerHTML = renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, pdvsAtivosErp.erro, ocultarOffline);
   }
+
+  _dashOcultarLoading();
 }
 
 // ──────────────────────────────────────────────

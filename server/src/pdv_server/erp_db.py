@@ -40,7 +40,7 @@ def _conectar(cfg, tailscale_site_id=""):
         user=cfg.get("usuario") or None,
         password=cfg.get("senha") or None,
         dbname=cfg["banco"],
-        connect_timeout=5,
+        connect_timeout=3,
     )
 
 
