@@ -168,8 +168,10 @@ function renderPDVs(key) {
         : `<div class="badge offline"><span class="dot"></span>offline</div>`;
     }
     const etapa = prog && prog.etapa ? `<div class="pdv-etapa">${prog.etapa}</div>` : "";
+    const erroMsg = prog && prog.status === "error" && prog.erro
+      ? `<div class="pdv-etapa" style="color:var(--red);font-size:10px;word-break:break-all;">${prog.erro}</div>` : "";
     const bar = prog && prog.progresso != null
-      ? `<div class="pdv-progress"><div class="bar-wrap"><div class="bar" style="width:${prog.progresso}%"></div></div>${etapa}</div>`
+      ? `<div class="pdv-progress"><div class="bar-wrap"><div class="bar" style="width:${prog.progresso}%"></div></div>${etapa}${erroMsg}</div>`
       : "";
     const versaoPdv = key === "pdv" && pdv.versao ? `<div class="pdv-versao">v${pdv.versao}</div>` : "";
     const versaoAgente = key === "agente"

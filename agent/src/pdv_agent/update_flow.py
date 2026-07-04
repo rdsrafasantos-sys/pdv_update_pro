@@ -113,11 +113,25 @@ def fazer_backup():
     set_estado("updating", "Realizando backup", 35)
     salvar_banco()
     if os.path.exists(VRPDV_OLD_DIR):
-        shutil.rmtree(VRPDV_OLD_DIR)
+        shutil.rmtree(VRPDV_OLD_DIR, ignore_errors=True)
     if os.path.exists(VRPDV_DIR):
-        shutil.copytree(VRPDV_DIR, VRPDV_OLD_DIR,
-                         ignore=shutil.ignore_patterns("_update.zip"))
-    log.info("Backup OK.")
+        arquivos_ignorados = []
+
+        def _copiar(src, dst):
+            try:
+                shutil.copy2(src, dst)
+            except Exception as e:
+                arquivos_ignorados.append(os.path.basename(src))
+                log.warning(f"Backup ignorou arquivo bloqueado: {src} — {e}")
+
+        shutil.copytree(
+            VRPDV_DIR, VRPDV_OLD_DIR,
+            ignore=shutil.ignore_patterns("_update.zip"),
+            copy_function=_copiar,
+        )
+        if arquivos_ignorados:
+            log.warning(f"Backup incompleto: {len(arquivos_ignorados)} arquivo(s) ignorado(s) — {', '.join(arquivos_ignorados[:5])}")
+    log.info("Backup concluido.")
 
 
 def descompactar():
