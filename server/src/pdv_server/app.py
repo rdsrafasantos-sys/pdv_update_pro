@@ -555,7 +555,7 @@ def api_erp_db_lojas(contexto):
                     cur.execute("""
                         SELECT l.id, l.descricao, f.nomefantasia, f.cnpj
                         FROM loja l
-                        LEFT JOIN fornecedor f ON f.id = l.fornecedor
+                        LEFT JOIN fornecedor f ON f.id = l.id_fornecedor
                         ORDER BY l.id
                     """)
                     linhas = cur.fetchall()
