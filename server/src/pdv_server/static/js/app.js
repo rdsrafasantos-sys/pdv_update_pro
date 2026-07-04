@@ -266,10 +266,15 @@ async function verificarAgenteDisponivel() {
 async function uploadAgente(input) {
   const arquivo = input.files[0];
   if (!arquivo) return;
+  const btn = document.getElementById("btnUploadAgente");
+  const info = document.getElementById("agenteInfoTexto");
+  if (btn) { btn.disabled = true; btn.textContent = `⏳ Enviando ${(arquivo.size / 1048576).toFixed(1)} MB...`; }
+  if (info) info.textContent = "Enviando agente.exe para o servidor...";
   const fd = new FormData();
   fd.append("arquivo", arquivo);
   await fetch(API("/upload_agente"), { method: "POST", body: fd });
   input.value = "";
+  if (btn) { btn.disabled = false; btn.textContent = "⬆️ Enviar novo agente.exe"; }
   await verificarAgenteDisponivel();
 }
 window.uploadAgente = uploadAgente;
@@ -284,12 +289,20 @@ async function iniciarAtualizacaoAgente() {
   const loja_id = seletores.agente.lojaAtiva;
   const pdv_ids = Array.from(seletores.agente.selecionados);
   if (!loja_id || pdv_ids.length === 0) return;
+  const btn = document.getElementById("btnAtualizarAgente");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Enviando agente para PDVs..."; }
   const r = await fetch(API("/atualizar_agente"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ loja_id, pdv_ids }),
   });
   const dados = await r.json();
-  alert(dados.mensagem || dados.erro || "Concluído");
+  if (btn) { btn.disabled = false; btn.textContent = "🚀 Atualizar Agente nos PDVs Selecionados"; }
+  if (dados.erro) { alert(`Erro: ${dados.erro}`); return; }
+  const resultados = dados.resultados || {};
+  const linhas = Object.entries(resultados)
+    .map(([id, res]) => `${id}: ${res.ok ? "✅" : "❌"} ${res.msg || ""}`)
+    .join("\n");
+  alert(linhas || "Nenhum resultado retornado.");
 }
 window.iniciarAtualizacaoAgente = iniciarAtualizacaoAgente;
 

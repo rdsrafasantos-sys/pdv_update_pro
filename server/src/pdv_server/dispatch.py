@@ -1,10 +1,28 @@
 import os
+import socket
 import threading
 import time
 
 import requests
 
 from pdv_server.discovery import endereco_alcancavel
+
+
+def _resolver_endereco(ip_raw, tailscale_site_id, porta=5000, timeout_tcp=2):
+    """Resolve o melhor endereco para alcançar o PDV.
+
+    Tenta o endereco 4via6 (quando tailscale_site_id existe) com um TCP
+    rapido; se nao responder em timeout_tcp segundos, cai no IP original
+    (funciona quando o painel esta na mesma LAN ou o PDV tem Tailscale direto).
+    """
+    principal = endereco_alcancavel(ip_raw, tailscale_site_id)
+    if principal == ip_raw:
+        return ip_raw
+    try:
+        socket.create_connection((principal, porta), timeout=timeout_tcp).close()
+        return principal
+    except Exception:
+        return ip_raw
 
 atualizacoes = {}
 lock = threading.Lock()
@@ -46,10 +64,11 @@ def enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo):
     resultados = {}
 
     def enviar(pdv):
+        endereco = _resolver_endereco(pdv["ip"], contexto.tailscale_site_id)
         try:
             with open(caminho_exe, "rb") as f:
                 r = requests.post(
-                    f"http://{endereco_alcancavel(pdv['ip'], contexto.tailscale_site_id)}:5000/atualizar_agente",
+                    f"http://{endereco}:5000/atualizar_agente",
                     files={"arquivo": ("agente.exe", f, "application/octet-stream")},
                     headers={"X-Agent-Token": contexto.token},
                     timeout=60
@@ -89,26 +108,27 @@ def _enviar_para_pdv(contexto, loja_id, pdv, caminho_zip):
     pdv_id = pdv["id"]
     ip = pdv["ip"]
     rede_id = contexto.rede_id
+    endereco = _resolver_endereco(ip, contexto.tailscale_site_id)
     try:
         set_estado_pdv(rede_id, loja_id, pdv_id, {
             "status": "enviando", "etapa": "Enviando arquivo",
-            "progresso": 5, "mensagem": f"Enviando para {ip}...",
+            "progresso": 5, "mensagem": f"Enviando para {endereco}...",
             "erro": "", "inicio": time.strftime("%Y-%m-%d %H:%M:%S"), "fim": None
         })
         with open(caminho_zip, "rb") as f:
             r = requests.post(
-                f"http://{endereco_alcancavel(ip, contexto.tailscale_site_id)}:5000/atualizar",
+                f"http://{endereco}:5000/atualizar",
                 files={"arquivo": (os.path.basename(caminho_zip), f, "application/zip")},
                 headers={"X-Agent-Token": contexto.token},
                 timeout=120
             )
         if r.status_code != 200:
             raise Exception(f"Agente recusou: {r.text}")
-        _monitorar_pdv(contexto, loja_id, pdv_id, ip)
+        _monitorar_pdv(contexto, loja_id, pdv_id, endereco)
     except requests.exceptions.ConnectionError:
         set_estado_pdv(rede_id, loja_id, pdv_id, {
             "status": "error", "etapa": "Sem conexão", "progresso": 0,
-            "mensagem": "", "erro": f"PDV {ip} não acessível.",
+            "mensagem": "", "erro": f"PDV {ip} não acessível (nem via 4via6 nem IP direto).",
             "inicio": time.strftime("%Y-%m-%d %H:%M:%S"),
             "fim": time.strftime("%Y-%m-%d %H:%M:%S")
         })
@@ -121,12 +141,12 @@ def _enviar_para_pdv(contexto, loja_id, pdv, caminho_zip):
         })
 
 
-def _monitorar_pdv(contexto, loja_id, pdv_id, ip):
+def _monitorar_pdv(contexto, loja_id, pdv_id, endereco):
     falhas = 0
     while True:
         try:
             r = requests.get(
-                f"http://{endereco_alcancavel(ip, contexto.tailscale_site_id)}:5000/status",
+                f"http://{endereco}:5000/status",
                 timeout=5
             )
             dados = r.json()

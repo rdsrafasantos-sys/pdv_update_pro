@@ -23,7 +23,15 @@ def verificar_token(req):
 
 @app.route("/ping")
 def ping():
-    return jsonify({"online": True, "versao": VERSION})
+    ts_ip = None
+    try:
+        result = subprocess.run(
+            ["tailscale", "ip", "-4"], capture_output=True, text=True, timeout=3
+        )
+        ts_ip = result.stdout.strip() or None
+    except Exception:
+        pass
+    return jsonify({"online": True, "versao": VERSION, "tailscale_ip": ts_ip})
 
 
 @app.route("/sysinfo")

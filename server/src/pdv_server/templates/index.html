@@ -164,7 +164,7 @@
               <span class="agente-badge indisponivel" id="agenteBadge">—</span>
             </div>
             <input type="file" id="agenteInput" accept=".exe" style="display:none" onchange="uploadAgente(this)">
-            <button class="btn-atualizar-agente" onclick="document.getElementById('agenteInput').click()">⬆️ Enviar novo agente.exe</button>
+            <button class="btn-atualizar-agente" id="btnUploadAgente" onclick="document.getElementById('agenteInput').click()">⬆️ Enviar novo agente.exe</button>
           </div>
 
           {{ seletor_pdv("agente", "🏪 Lojas & PDVs") }}
