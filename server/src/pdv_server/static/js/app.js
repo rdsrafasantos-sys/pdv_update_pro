@@ -644,6 +644,31 @@ window.testarConexaoErpDb = testarConexaoErpDb;
 // ──────────────────────────────────────────────
 // METRICAS DE SAUDE DA MAQUINA (sysinfo + erp stats)
 // ──────────────────────────────────────────────
+async function _carregarLojasErp() {
+  const el = document.getElementById("kpiLojasLista");
+  if (!el) return;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 10000); // 10s timeout
+  try {
+    const dados = await fetch(API("/erp_db/lojas"), { signal: ctrl.signal })
+      .then(r => r.json());
+    clearTimeout(timer);
+    if (dados.erro || !dados.lojas || dados.lojas.length === 0) {
+      el.innerHTML = "";
+      return;
+    }
+    el.innerHTML = dados.lojas.map(l => `
+      <div class="kpi-loja-item">
+        <div class="kpi-loja-nome">${l.nome || l.apelido || "—"}</div>
+        ${l.apelido ? `<div class="kpi-loja-apelido">📍 ${l.apelido}</div>` : ""}
+        ${l.cnpj ? `<div class="kpi-loja-cnpj">${_formatarCnpj(l.cnpj)}</div>` : ""}
+      </div>`).join("");
+  } catch (e) {
+    clearTimeout(timer);
+    el.innerHTML = "";
+  }
+}
+
 function _formatarCnpj(cnpj) {
   const s = String(cnpj).replace(/\D/g, "").padStart(14, "0");
   return s.length === 14
@@ -1119,15 +1144,17 @@ async function carregarDashboard() {
 }
 
 async function _dashFase2(lojasList, historico) {
-  const [erpDbStatus, integradorStatus, pdvsAtivosErp, statusPorLoja, sysinfoData, erpStatsData, erpLojasData] = await Promise.all([
+  const [erpDbStatus, integradorStatus, pdvsAtivosErp, statusPorLoja, sysinfoData, erpStatsData] = await Promise.all([
     fetch(API("/erp_db/status")).then(r => r.json()).catch(() => ({ online: false })),
     fetch(API("/integrador/status")).then(r => r.json()).catch(() => ({ status: "erro", erro: "Falha ao consultar." })),
     fetch(API("/erp_db/pdvs_ativos")).then(r => r.json()).catch(() => ({ erro: "Falha ao consultar.", lojas: [] })),
     statusOnlinePorLoja(lojasList),
     fetch(API("/sysinfo")).then(r => r.json()).catch(() => null),
     fetch(API("/erp_db/stats")).then(r => r.json()).catch(() => null),
-    fetch(API("/erp_db/lojas")).then(r => r.json()).catch(() => null),
   ]);
+
+  // Lojas do ERP carregadas em background — não bloqueia o dashboard
+  _carregarLojasErp();
 
   atualizarKpiErpDb(erpDbStatus);
   atualizarKpiIntegrador(integradorStatus);
@@ -1141,16 +1168,9 @@ async function _dashFase2(lojasList, historico) {
   const elErpStats = document.getElementById("kpiErpDbStats");
   if (elErpStats) elErpStats.innerHTML = renderErpStats(erpStatsData);
 
-  // Lista de lojas no card de Lojas
+  // Lista de lojas: placeholder enquanto carrega em background
   const elLojasLista = document.getElementById("kpiLojasLista");
-  if (elLojasLista && erpLojasData && !erpLojasData.erro && erpLojasData.lojas.length > 0) {
-    elLojasLista.innerHTML = erpLojasData.lojas.map(l => `
-      <div class="kpi-loja-item">
-        <div class="kpi-loja-nome">${l.nome || l.apelido || "—"}</div>
-        ${l.apelido ? `<div class="kpi-loja-apelido">📍 ${l.apelido}</div>` : ""}
-        ${l.cnpj ? `<div class="kpi-loja-cnpj">${_formatarCnpj(l.cnpj)}</div>` : ""}
-      </div>`).join("");
-  }
+  if (elLojasLista) elLojasLista.innerHTML = '<div class="kpi-loja-apelido">Consultando ERP...</div>';
 
   // Breakdown de PDVs no card de PDVs
   const elPdvsDetalhe = document.getElementById("kpiPdvsDetalhe");

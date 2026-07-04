@@ -551,6 +551,7 @@ def api_erp_db_lojas(contexto):
         conn = erp_db._conectar(cfg, contexto.tailscale_site_id)
         try:
             with conn.cursor() as cur:
+                cur.execute("SET statement_timeout = '8000'")
                 cur.execute("""
                     SELECT l.id, l.apelido, f.nome, f.cnpj
                     FROM loja l
