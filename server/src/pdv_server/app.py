@@ -298,7 +298,11 @@ def api_atualizar_agente(contexto):
     if not pdvs_alvo:
         return jsonify({"erro": "Nenhum PDV selecionado"}), 400
 
-    resultados = enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo)
+    caminho_status = os.path.join(contexto.upload_dir, "status_pdv.exe")
+    resultados = enviar_agente_para_pdvs(
+        contexto, caminho_exe, pdvs_alvo,
+        caminho_status=caminho_status if os.path.exists(caminho_status) else None
+    )
     return jsonify({"resultados": resultados})
 
 

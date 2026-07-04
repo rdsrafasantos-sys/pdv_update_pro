@@ -34,6 +34,32 @@ def ping():
     return jsonify({"online": True, "versao": VERSION, "tailscale_ip": ts_ip})
 
 
+@app.route("/atualizar_status_pdv", methods=["POST"])
+def atualizar_status_pdv():
+    """Recebe novo status_pdv.exe, substitui e relança na sessao do usuario."""
+    if not verificar_token(request):
+        return jsonify({"erro": "Token invalido"}), 403
+    if "arquivo" not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado"}), 400
+    arq = request.files["arquivo"]
+    try:
+        atual = os.path.join(PASTA_AGENTE, "status_pdv.exe")
+        novo = os.path.join(PASTA_AGENTE, "status_pdv_novo.exe")
+        arq.save(novo)
+        # Encerra instancia atual
+        subprocess.run(["taskkill", "/F", "/IM", "status_pdv.exe"],
+                       capture_output=True)
+        time.sleep(1)
+        os.replace(novo, atual)
+        log.info("status_pdv.exe atualizado — relancando na sessao do usuario.")
+        from pdv_agent.update_flow import _iniciar_na_sessao_usuario
+        _iniciar_na_sessao_usuario(atual)
+        return jsonify({"mensagem": "status_pdv.exe atualizado e iniciado."})
+    except Exception as e:
+        log.error(f"Erro ao atualizar status_pdv.exe: {e}")
+        return jsonify({"erro": str(e)}), 500
+
+
 @app.route("/sysinfo")
 def sysinfo():
     try:

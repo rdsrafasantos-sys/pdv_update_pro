@@ -42,7 +42,7 @@ def iniciar_envio_zip(contexto, loja_id, pdv, caminho_zip):
     t.start()
 
 
-def enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo):
+def enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo, caminho_status=None):
     resultados = {}
 
     def enviar(pdv):
@@ -56,14 +56,24 @@ def enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo):
                 with open(caminho_exe, "rb") as f:
                     r = requests.post(
                         f"http://{endereco}:5000/atualizar_agente",
-                    files={"arquivo": ("agente.exe", f, "application/octet-stream")},
-                    headers={"X-Agent-Token": contexto.token},
-                    timeout=60
-                )
-                resultados[pdv["id"]] = {
-                    "ok": r.status_code == 200,
-                    "msg": r.json().get("mensagem", r.text)
-                }
+                        files={"arquivo": ("agente.exe", f, "application/octet-stream")},
+                        headers={"X-Agent-Token": contexto.token},
+                        timeout=60
+                    )
+                ok = r.status_code == 200
+                msg = r.json().get("mensagem", r.text)
+                if ok and caminho_status:
+                    try:
+                        with open(caminho_status, "rb") as f2:
+                            requests.post(
+                                f"http://{endereco}:5000/atualizar_status_pdv",
+                                files={"arquivo": ("status_pdv.exe", f2, "application/octet-stream")},
+                                headers={"X-Agent-Token": contexto.token},
+                                timeout=60
+                            )
+                    except Exception:
+                        pass
+                resultados[pdv["id"]] = {"ok": ok, "msg": msg}
                 return
             except Exception as e:
                 ultimo_erro = str(e)
