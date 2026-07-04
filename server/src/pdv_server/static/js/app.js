@@ -769,19 +769,6 @@ function renderErpStats(dados) {
   </div>`;
 }
 
-function atualizarKpiErpDb(dados) {
-  const el = document.getElementById("kpiErpDb");
-  const sub = document.getElementById("kpiErpDbSub");
-  const card = document.getElementById("kpiCardErpDb");
-  if (!el) return;
-  el.textContent = dados.online ? "🟢 Online" : "🔴 Offline";
-  if (sub) sub.textContent = dados.online ? "" : (dados.erro || "Sem conexão com o servidor ERP");
-  if (card) {
-    card.classList.remove("kpi-card--ok", "kpi-card--error", "kpi-card--warning");
-    card.classList.add(dados.online ? "kpi-card--ok" : "kpi-card--error");
-  }
-}
-
 // ──────────────────────────────────────────────
 // CONFIGURACOES: INTEGRADOR VR
 // ──────────────────────────────────────────────
@@ -846,24 +833,6 @@ async function testarStatusIntegrador() {
 }
 window.testarStatusIntegrador = testarStatusIntegrador;
 
-function atualizarKpiIntegrador(dados) {
-  const el = document.getElementById("kpiIntegrador");
-  const sub = document.getElementById("kpiIntegradorSub");
-  const card = document.getElementById("kpiCardIntegrador");
-  if (!el) return;
-  const rotulos = {
-    ok: "🟢 OK", atencao: "🟡 Atenção", erro: "🔴 Erro",
-    offline: "🔴 Offline", nao_configurado: "— Não configurado",
-  };
-  el.textContent = rotulos[dados.status] || "—";
-  if (sub) sub.textContent = dados.status === "ok" || dados.status === "nao_configurado" ? "" : (dados.erro || "");
-  if (card) {
-    card.classList.remove("kpi-card--ok", "kpi-card--error", "kpi-card--warning");
-    if (dados.status === "ok") card.classList.add("kpi-card--ok");
-    else if (dados.status === "atencao") card.classList.add("kpi-card--warning");
-    else if (dados.status !== "nao_configurado") card.classList.add("kpi-card--error");
-  }
-}
 
 // ──────────────────────────────────────────────
 // DASHBOARD
@@ -1072,7 +1041,12 @@ window.alternarOcultarOffline = alternarOcultarOffline;
 
 async function statusOnlinePorLoja(lojasList) {
   const resultados = await Promise.all(
-    lojasList.map(l => fetch(API(`/ping_loja/${l.id}`)).then(r => r.json()).catch(() => ({})))
+    lojasList.map(l => {
+      const ctrl = new AbortController();
+      setTimeout(() => ctrl.abort(), 10000);
+      return fetch(API(`/ping_loja/${l.id}`), { signal: ctrl.signal })
+        .then(r => r.json()).catch(() => ({}));
+    })
   );
   const mapa = {};
   lojasList.forEach((loja, i) => { mapa[loja.id] = resultados[i]; });
@@ -1139,93 +1113,130 @@ async function carregarDashboard() {
           </div>`).join("");
   }
 
-  // ── Fase 2: checks lentos em background, não bloqueiam a UI ─────────
+  // Overlay fecha ao fim da Fase 1 — Fase 2 roda em background
+  _dashOcultarLoading();
   _dashFase2(lojas, historico);
 }
 
-async function _dashFase2(lojasList, historico) {
-  const [erpDbStatus, integradorStatus, pdvsAtivosErp, statusPorLoja, sysinfoData, erpStatsData] = await Promise.all([
-    fetch(API("/erp_db/status")).then(r => r.json()).catch(() => ({ online: false })),
-    fetch(API("/integrador/status")).then(r => r.json()).catch(() => ({ status: "erro", erro: "Falha ao consultar." })),
-    fetch(API("/erp_db/pdvs_ativos")).then(r => r.json()).catch(() => ({ erro: "Falha ao consultar.", lojas: [] })),
+function _dashFase2(lojasList, historico) {
+  // Helper: fetch com timeout proprio por AbortController
+  function _f(url, ms) {
+    const c = new AbortController();
+    setTimeout(() => c.abort(), ms || 8000);
+    return fetch(url, { signal: c.signal }).then(r => r.json()).catch(() => null);
+  }
+
+  // Grupo A: ERP status + integrador + sysinfo + erp stats
+  // Cada um independente, atualiza o UI quando chega
+  _f(API("/erp_db/status")).then(d => {
+    atualizarKpiErpDb(d || { online: false });
+    _atualizarBannerAlertas();
+  });
+  _f(API("/integrador/status")).then(d => {
+    atualizarKpiIntegrador(d || { status: "erro", erro: "Falha." });
+    _atualizarBannerAlertas();
+  });
+  _f(API("/sysinfo")).then(d => {
+    const el = document.getElementById("kpiSysinfo");
+    if (el && d) {
+      const agora = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      el.innerHTML = renderSysinfo(d, agora);
+    }
+  });
+  _f(API("/erp_db/stats")).then(d => {
+    const el = document.getElementById("kpiErpDbStats");
+    if (el) el.innerHTML = renderErpStats(d);
+  });
+
+  // Grupo B: PDVs ativos ERP + pings — dependem um do outro, mas não bloqueiam o resto
+  Promise.all([
+    _f(API("/erp_db/pdvs_ativos"), 10000),
     statusOnlinePorLoja(lojasList),
-    fetch(API("/sysinfo")).then(r => r.json()).catch(() => null),
-    fetch(API("/erp_db/stats")).then(r => r.json()).catch(() => null),
-  ]);
-
-  // Lojas do ERP carregadas em background — não bloqueia o dashboard
-  _carregarLojasErp();
-
-  atualizarKpiErpDb(erpDbStatus);
-  atualizarKpiIntegrador(integradorStatus);
-
-  const elSysinfo = document.getElementById("kpiSysinfo");
-  if (elSysinfo) {
-    const agora = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    elSysinfo.innerHTML = renderSysinfo(sysinfoData, agora);
-  }
-
-  const elErpStats = document.getElementById("kpiErpDbStats");
-  if (elErpStats) elErpStats.innerHTML = renderErpStats(erpStatsData);
-
-  // Lista de lojas: placeholder enquanto carrega em background
-  const elLojasLista = document.getElementById("kpiLojasLista");
-  if (elLojasLista) elLojasLista.innerHTML = '<div class="kpi-loja-apelido">Consultando ERP...</div>';
-
-  // Breakdown de PDVs no card de PDVs
-  const elPdvsDetalhe = document.getElementById("kpiPdvsDetalhe");
-  if (elPdvsDetalhe) {
-    const totalAtivos = lojasCruzadas.reduce((a, l) => a + l.pdvs.length, 0);
-    const totalOnline = lojasCruzadas.reduce((a, l) => a + l.pdvs.filter(p => p.status === "online").length, 0);
-    const totalOffline = totalAtivos - totalOnline;
-    elPdvsDetalhe.innerHTML = `
-      <div class="kpi-pdv-linha"><span class="kpi-pdv-dot kpi-pdv-dot--online"></span><span class="kpi-pdv-count">${totalOnline}</span><span class="kpi-pdv-label">online</span></div>
-      <div class="kpi-pdv-linha"><span class="kpi-pdv-dot kpi-pdv-dot--offline"></span><span class="kpi-pdv-count">${totalOffline}</span><span class="kpi-pdv-label">offline</span></div>
-      <div class="kpi-pdv-linha" style="margin-top:2px;padding-top:4px;border-top:1px solid var(--border);"><span style="width:7px;flex-shrink:0;"></span><span class="kpi-pdv-count">${totalAtivos}</span><span class="kpi-pdv-label">total cadastrado(s)</span></div>`;
-  }
-
-  const dashAlertas = document.getElementById("dashAlertas");
-  if (dashAlertas) {
-    const alertas = [];
-    if (!erpDbStatus.online) {
-      const detalhe = erpDbStatus.erro ? ` — ${erpDbStatus.erro}` : "";
-      alertas.push(`<div class="dash-alerta dash-alerta--erro">🔴 <span><b>Banco de dados ERP offline.</b> O painel não consegue conectar ao servidor ERP${detalhe}. Verifique se o serviço está rodando e a configuração de acesso em Configurações.</span></div>`);
-    }
-    if (integradorStatus.status !== "ok" && integradorStatus.status !== "nao_configurado") {
-      const cls = integradorStatus.status === "atencao" ? "dash-alerta--atencao" : "dash-alerta--erro";
-      const icone = integradorStatus.status === "atencao" ? "⚠️" : "🔴";
-      const titulo = integradorStatus.status === "offline" ? "Integrador offline." : integradorStatus.status === "atencao" ? "Integrador com atenção." : "Integrador com erro.";
-      const detalhe = integradorStatus.erro ? ` — ${integradorStatus.erro}` : "";
-      alertas.push(`<div class="dash-alerta ${cls}">${icone} <span><b>${titulo}</b>${detalhe}</span></div>`);
-    }
-    dashAlertas.innerHTML = alertas.join("");
-  }
-
-  const usarErp = !pdvsAtivosErp.erro;
-  const lojasErp = pdvsAtivosErp.lojas || [];
-  const lojasCruzadas = cruzarLojasErpComOnline(lojasErp, lojasList, statusPorLoja);
-
-  if (usarErp) {
-    const totalAtivosErp = lojasCruzadas.reduce((acc, l) => acc + l.pdvs.length, 0);
-    const totalOnlineErp = lojasCruzadas.reduce((acc, l) => acc + l.pdvs.filter(p => p.status === "online").length, 0);
-    const elLojas = document.getElementById("kpiLojas");
-    const elPdvs = document.getElementById("kpiPdvs");
-    const elPdvsSub = document.getElementById("kpiPdvsSub");
-    if (elLojas) elLojas.textContent = lojasCruzadas.length;
-    if (elPdvs) elPdvs.textContent = totalOnlineErp;
-    if (elPdvsSub) elPdvsSub.textContent = `de ${totalAtivosErp} ativo(s) no ERP`;
-  }
-
-  const elOnline = document.getElementById("dashOnlinePorLoja");
-  if (elOnline) {
+  ]).then(([pdvsAtivosErp, statusPorLoja]) => {
+    pdvsAtivosErp = pdvsAtivosErp || { erro: "timeout", lojas: [] };
+    const lojasErp = pdvsAtivosErp.lojas || [];
+    const lojasCruzadas = cruzarLojasErpComOnline(lojasErp, lojasList, statusPorLoja);
     const ultimaPorPdv = ultimaReplicacaoPorPdv(historico);
     const ocultarOffline = localStorage.getItem("dashOcultarOffline") === "1";
-    _dashUltimoEstado = { lojasCruzadas, ultimaPorPdv, erroErp: pdvsAtivosErp.erro };
-    elOnline.innerHTML = renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, pdvsAtivosErp.erro, ocultarOffline);
-    _iniciarPolingSysinfoLojas(lojasCruzadas);
-  }
 
-  _dashOcultarLoading();
+    if (!pdvsAtivosErp.erro) {
+      const totalAtivos = lojasCruzadas.reduce((a, l) => a + l.pdvs.length, 0);
+      const totalOnline = lojasCruzadas.reduce((a, l) => a + l.pdvs.filter(p => p.status === "online").length, 0);
+      const elLojas = document.getElementById("kpiLojas");
+      const elPdvs = document.getElementById("kpiPdvs");
+      const elPdvsSub = document.getElementById("kpiPdvsSub");
+      if (elLojas) elLojas.textContent = lojasCruzadas.length;
+      if (elPdvs) elPdvs.textContent = totalOnline;
+      if (elPdvsSub) elPdvsSub.textContent = `de ${totalAtivos} ativo(s) no ERP`;
+      const elPdvsDetalhe = document.getElementById("kpiPdvsDetalhe");
+      if (elPdvsDetalhe) {
+        const off = totalAtivos - totalOnline;
+        elPdvsDetalhe.innerHTML = `
+          <div class="kpi-pdv-linha"><span class="kpi-pdv-dot kpi-pdv-dot--online"></span><span class="kpi-pdv-count">${totalOnline}</span><span class="kpi-pdv-label">online</span></div>
+          <div class="kpi-pdv-linha"><span class="kpi-pdv-dot kpi-pdv-dot--offline"></span><span class="kpi-pdv-count">${off}</span><span class="kpi-pdv-label">offline</span></div>
+          <div class="kpi-pdv-linha" style="margin-top:2px;padding-top:4px;border-top:1px solid var(--border);"><span style="width:7px;flex-shrink:0;"></span><span class="kpi-pdv-count">${totalAtivos}</span><span class="kpi-pdv-label">total cadastrado(s)</span></div>`;
+      }
+    }
+
+    const elOnline = document.getElementById("dashOnlinePorLoja");
+    if (elOnline) {
+      _dashUltimoEstado = { lojasCruzadas, ultimaPorPdv, erroErp: pdvsAtivosErp.erro };
+      elOnline.innerHTML = renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, pdvsAtivosErp.erro, ocultarOffline);
+      _iniciarPolingSysinfoLojas(lojasCruzadas);
+    }
+  });
+
+  // Grupo C: lojas ERP (mais lento, lazy)
+  _carregarLojasErp();
+}
+
+// Estado dos cards de ERP/integrador para o banner (atualizado independentemente)
+let _erpStatus = null, _integradorStatus = null;
+function atualizarKpiErpDb(dados) {
+  _erpStatus = dados;
+  const el = document.getElementById("kpiErpDb");
+  const sub = document.getElementById("kpiErpDbSub");
+  const card = document.getElementById("kpiCardErpDb");
+  if (!el) return;
+  el.textContent = dados.online ? "🟢 Online" : "🔴 Offline";
+  if (sub) sub.textContent = dados.online ? "" : (dados.erro || "Sem conexão com o servidor ERP");
+  if (card) {
+    card.classList.remove("kpi-card--ok", "kpi-card--error", "kpi-card--warning");
+    card.classList.add(dados.online ? "kpi-card--ok" : "kpi-card--error");
+  }
+}
+function atualizarKpiIntegrador(dados) {
+  _integradorStatus = dados;
+  const el = document.getElementById("kpiIntegrador");
+  const sub = document.getElementById("kpiIntegradorSub");
+  const card = document.getElementById("kpiCardIntegrador");
+  if (!el) return;
+  const rotulos = { ok: "🟢 OK", atencao: "🟡 Atenção", erro: "🔴 Erro", offline: "🔴 Offline", nao_configurado: "— Não configurado" };
+  el.textContent = rotulos[dados.status] || "—";
+  if (sub) sub.textContent = dados.status === "ok" || dados.status === "nao_configurado" ? "" : (dados.erro || "");
+  if (card) {
+    card.classList.remove("kpi-card--ok", "kpi-card--error", "kpi-card--warning");
+    if (dados.status === "ok") card.classList.add("kpi-card--ok");
+    else if (dados.status === "atencao") card.classList.add("kpi-card--warning");
+    else if (dados.status !== "nao_configurado") card.classList.add("kpi-card--error");
+  }
+}
+function _atualizarBannerAlertas() {
+  const dashAlertas = document.getElementById("dashAlertas");
+  if (!dashAlertas) return;
+  const alertas = [];
+  if (_erpStatus && !_erpStatus.online) {
+    const d = _erpStatus.erro ? ` — ${_erpStatus.erro}` : "";
+    alertas.push(`<div class="dash-alerta dash-alerta--erro">🔴 <span><b>Banco de dados ERP offline.</b>${d}</span></div>`);
+  }
+  if (_integradorStatus && _integradorStatus.status !== "ok" && _integradorStatus.status !== "nao_configurado") {
+    const cls = _integradorStatus.status === "atencao" ? "dash-alerta--atencao" : "dash-alerta--erro";
+    const icone = _integradorStatus.status === "atencao" ? "⚠️" : "🔴";
+    const titulo = _integradorStatus.status === "offline" ? "Integrador offline." : _integradorStatus.status === "atencao" ? "Integrador com atenção." : "Integrador com erro.";
+    const d = _integradorStatus.erro ? ` — ${_integradorStatus.erro}` : "";
+    alertas.push(`<div class="dash-alerta ${cls}">${icone} <span><b>${titulo}</b>${d}</span></div>`);
+  }
+  dashAlertas.innerHTML = alertas.join("");
 }
 
 // ──────────────────────────────────────────────
