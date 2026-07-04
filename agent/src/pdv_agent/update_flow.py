@@ -289,10 +289,18 @@ def _iniciar_na_sessao_usuario(exe_path):
         si = STARTUPINFOW()
         si.cb = ctypes.sizeof(si)
         si.lpDesktop = "winsta0\\default"
+        si.dwFlags = 0x1   # STARTF_USESHOWWINDOW
+        si.wShowWindow = 1  # SW_SHOWNORMAL
         pi = PROCESS_INFORMATION()
 
+        # lpCommandLine deve ser buffer mutavel (Windows pode modificar o buffer)
+        cmd_buf = ctypes.create_unicode_buffer(exe_path)
+
         ok = advapi32.CreateProcessAsUserW(
-            h_dup, None, exe_path, None, None, False,
+            h_dup,
+            None,      # lpApplicationName
+            cmd_buf,   # lpCommandLine (mutavel)
+            None, None, False,
             0x420,   # CREATE_UNICODE_ENVIRONMENT | CREATE_NEW_CONSOLE
             env_block, None, ctypes.byref(si), ctypes.byref(pi),
         )

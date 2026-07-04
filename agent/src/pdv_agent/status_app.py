@@ -390,6 +390,17 @@ class StatusApp:
 
 
 def main():
+    # DPI awareness para Windows 10/11 (evita crash do tkinter em telas de alta resolucao)
+    try:
+        import ctypes as _ct
+        _ct.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        try:
+            import ctypes as _ct
+            _ct.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
     _lock = garantir_instancia_unica()
     root = tk.Tk()
     app = StatusApp(root)
