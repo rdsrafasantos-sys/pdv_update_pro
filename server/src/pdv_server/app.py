@@ -5,7 +5,7 @@ import time
 from functools import wraps
 
 import requests
-from flask import Flask, Response, jsonify, redirect, render_template, request, url_for
+from flask import Flask, Response, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
@@ -239,6 +239,15 @@ def api_limpar_arquivos(contexto):
             os.remove(os.path.join(contexto.upload_dir, f))
             removidos += 1
     return jsonify({"mensagem": f"{removidos} arquivo(s) removido(s)"})
+
+
+@app.route("/download/agente.exe")
+def download_agente_publico():
+    """Download publico do agente.exe — sem autenticacao, para recuperacao de PDVs."""
+    import glob
+    for caminho in glob.glob("/opt/pdv-server/uploads/*/agente.exe"):
+        return send_file(caminho, as_attachment=True, download_name="agente.exe")
+    return "agente.exe nao disponivel", 404
 
 
 @app.route("/api/<int:rede_id>/upload_agente", methods=["POST"])

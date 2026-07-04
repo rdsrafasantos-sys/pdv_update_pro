@@ -12,10 +12,10 @@ agente = Analysis(
     pathex=['src'],
     binaries=[],
     datas=[],
-    hiddenimports=['waitress', 'flask', 'lmdb', 'pdv_agent', 'psutil'],
+    hiddenimports=['waitress', 'flask', 'lmdb', 'psutil'],
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    excludes=['tkinter', 'pdv_agent.status_app'],
     cipher=block_cipher,
 )
 agente_pyz = PYZ(agente.pure, agente.zipped_data, cipher=block_cipher)
