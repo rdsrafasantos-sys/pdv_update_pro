@@ -152,10 +152,11 @@ if (Test-Path $origem2) {
     # Task Scheduler: roda ao login de qualquer usuario, interactive
     $action  = New-ScheduledTaskAction -Execute $statusExe
     $trigger = New-ScheduledTaskTrigger -AtLogOn
-    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0 -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
-    $principal = New-ScheduledTaskPrincipal -GroupId "BUILTIN\Users" -RunLevel Limited
+    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0 -RestartCount 3 `
+                    -RestartInterval (New-TimeSpan -Minutes 1)
+    # Sem -Principal: usa o usuario atual (funciona em qualquer idioma do Windows)
     Register-ScheduledTask -TaskName "PDVStatus" -Action $action -Trigger $trigger `
-        -Settings $settings -Principal $principal -Force | Out-Null
+        -Settings $settings -Force | Out-Null
 
     # Inicia imediatamente sem precisar de logout/login
     Stop-Process -Name "status_pdv" -Force -ErrorAction SilentlyContinue
