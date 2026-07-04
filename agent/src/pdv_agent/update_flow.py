@@ -205,9 +205,35 @@ def iniciar_vrcheckout():
     time.sleep(1)
 
 
+def _garantir_status_pdv():
+    """Garante que status_pdv.exe esta rodando na sessao do usuario.
+    Usa 'start' via cmd para abrir na sessao interativa (nao em Session 0)."""
+    try:
+        status_exe = r"C:\PDVAgent\status_pdv.exe"
+        if os.path.exists(status_exe):
+            # Verifica se ja esta rodando
+            resultado = subprocess.run(
+                ["tasklist", "/FI", "IMAGENAME eq status_pdv.exe", "/NH"],
+                capture_output=True, text=True
+            )
+            if "status_pdv.exe" not in resultado.stdout:
+                log.info("status_pdv.exe nao esta rodando — iniciando...")
+                subprocess.Popen(
+                    ["cmd", "/c", "start", "", status_exe],
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+                time.sleep(1)
+                log.info("status_pdv.exe iniciado.")
+            else:
+                log.info("status_pdv.exe ja estava rodando.")
+    except Exception as e:
+        log.warning(f"Nao foi possivel verificar/iniciar status_pdv.exe: {e}")
+
+
 def executar_atualizacao():
     set_estado("updating", "Iniciando", 0, "Atualizacao iniciada...")
     try:
+        _garantir_status_pdv()
         servicos = detectar_servicos()
         encerrar_processos()
         parar_servicos(servicos)
