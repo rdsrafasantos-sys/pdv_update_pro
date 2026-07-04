@@ -195,13 +195,37 @@ def garantir_processos_encerrados():
             log.info(f"{proc} nao esta rodando. OK.")
 
 
+VRCHECKOUT_EXE = r"C:\vrpdv\vrcheckout.exe"
+VRPDV_DIR = r"C:\vrpdv"
+
+
 def iniciar_vrcheckout():
     set_estado("updating", "Aguardando para abrir PDV", 90,
                "Aguardando 10 segundos antes de abrir o PDV...")
     log.info("Aguardando 10 segundos antes de abrir o vrcheckout...")
     time.sleep(10)
     set_estado("updating", "Iniciando vrcheckout", 95)
-    log.info("status_pdv.exe abrira o vrcheckout.")
+
+    # O agente abre o vrcheckout diretamente na sessao do usuario.
+    # Nao depende mais do status_pdv.exe para isso.
+    if os.path.exists(VRCHECKOUT_EXE):
+        ok = _iniciar_na_sessao_usuario(VRCHECKOUT_EXE)
+        if ok:
+            log.info("vrcheckout.exe aberto pelo agente na sessao do usuario.")
+        else:
+            log.warning("Falha ao abrir vrcheckout via WTS — tentando schtasks...")
+            subprocess.run(
+                ["schtasks", "/create", "/tn", "PDVAbrirVRCheckout",
+                 "/tr", VRCHECKOUT_EXE, "/sc", "once", "/st", "00:00",
+                 "/f", "/rl", "LIMITED"],
+                capture_output=True
+            )
+            subprocess.run(["schtasks", "/run", "/tn", "PDVAbrirVRCheckout"],
+                           capture_output=True)
+            subprocess.run(["schtasks", "/delete", "/tn", "PDVAbrirVRCheckout", "/f"],
+                           capture_output=True)
+    else:
+        log.warning(f"vrcheckout.exe nao encontrado em {VRCHECKOUT_EXE}")
     time.sleep(1)
 
 
