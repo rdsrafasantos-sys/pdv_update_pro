@@ -205,29 +205,120 @@ def iniciar_vrcheckout():
     time.sleep(1)
 
 
-def _garantir_status_pdv():
-    """Garante que status_pdv.exe esta rodando na sessao do usuario.
-    Usa 'start' via cmd para abrir na sessao interativa (nao em Session 0)."""
+def _iniciar_na_sessao_usuario(exe_path):
+    """Lança processo na sessão interativa do usuário a partir de Session 0.
+
+    Serviços Windows rodam em Session 0 (sem GUI). Para abrir uma janela
+    na tela do usuário é necessário usar WTSQueryUserToken + CreateProcessAsUser
+    -- a única forma correta de fazer isso no Windows Vista+.
+    """
+    import ctypes
+    import ctypes.wintypes as wt
+
     try:
-        status_exe = r"C:\PDVAgent\status_pdv.exe"
-        if os.path.exists(status_exe):
-            # Verifica se ja esta rodando
-            resultado = subprocess.run(
-                ["tasklist", "/FI", "IMAGENAME eq status_pdv.exe", "/NH"],
-                capture_output=True, text=True
-            )
-            if "status_pdv.exe" not in resultado.stdout:
-                log.info("status_pdv.exe nao esta rodando — iniciando...")
-                subprocess.Popen(
-                    ["cmd", "/c", "start", "", status_exe],
-                    creationflags=subprocess.CREATE_NO_WINDOW
-                )
-                time.sleep(1)
-                log.info("status_pdv.exe iniciado.")
-            else:
-                log.info("status_pdv.exe ja estava rodando.")
+        wts      = ctypes.WinDLL("wtsapi32")
+        kernel32 = ctypes.WinDLL("kernel32")
+        advapi32 = ctypes.WinDLL("advapi32")
+        userenv  = ctypes.WinDLL("userenv")
+
+        session_id = kernel32.WTSGetActiveConsoleSessionId()
+        if session_id == 0xFFFFFFFF:
+            log.warning("Nenhuma sessao interativa ativa — status_pdv nao sera iniciado.")
+            return False
+
+        h_token = wt.HANDLE()
+        if not wts.WTSQueryUserToken(session_id, ctypes.byref(h_token)):
+            log.warning(f"WTSQueryUserToken falhou (err={kernel32.GetLastError()}).")
+            return False
+
+        h_dup = wt.HANDLE()
+        if not advapi32.DuplicateTokenEx(
+            h_token, 0xF01FF, None, 2, 1, ctypes.byref(h_dup)
+        ):
+            kernel32.CloseHandle(h_token)
+            log.warning(f"DuplicateTokenEx falhou (err={kernel32.GetLastError()}).")
+            return False
+
+        env_block = ctypes.c_void_p()
+        userenv.CreateEnvironmentBlock(ctypes.byref(env_block), h_dup, False)
+
+        class STARTUPINFOW(ctypes.Structure):
+            _fields_ = [
+                ("cb",              wt.DWORD),  ("lpReserved",      wt.LPWSTR),
+                ("lpDesktop",       wt.LPWSTR), ("lpTitle",         wt.LPWSTR),
+                ("dwX",             wt.DWORD),  ("dwY",             wt.DWORD),
+                ("dwXSize",         wt.DWORD),  ("dwYSize",         wt.DWORD),
+                ("dwXCountChars",   wt.DWORD),  ("dwYCountChars",   wt.DWORD),
+                ("dwFillAttribute", wt.DWORD),  ("dwFlags",         wt.DWORD),
+                ("wShowWindow",     wt.WORD),   ("cbReserved2",     wt.WORD),
+                ("lpReserved2",     ctypes.c_char_p),
+                ("hStdInput",  wt.HANDLE), ("hStdOutput", wt.HANDLE),
+                ("hStdError",  wt.HANDLE),
+            ]
+
+        class PROCESS_INFORMATION(ctypes.Structure):
+            _fields_ = [
+                ("hProcess", wt.HANDLE), ("hThread",     wt.HANDLE),
+                ("dwProcessId", wt.DWORD), ("dwThreadId", wt.DWORD),
+            ]
+
+        si = STARTUPINFOW()
+        si.cb = ctypes.sizeof(si)
+        si.lpDesktop = "winsta0\\default"
+        pi = PROCESS_INFORMATION()
+
+        ok = advapi32.CreateProcessAsUserW(
+            h_dup, None, exe_path, None, None, False,
+            0x420,   # CREATE_UNICODE_ENVIRONMENT | CREATE_NEW_CONSOLE
+            env_block, None, ctypes.byref(si), ctypes.byref(pi),
+        )
+
+        userenv.DestroyEnvironmentBlock(env_block)
+        kernel32.CloseHandle(h_dup)
+        kernel32.CloseHandle(h_token)
+
+        if ok:
+            kernel32.CloseHandle(pi.hProcess)
+            kernel32.CloseHandle(pi.hThread)
+            log.info(f"status_pdv.exe iniciado na sessao {session_id}.")
+            return True
+        else:
+            log.warning(f"CreateProcessAsUserW falhou (err={kernel32.GetLastError()}).")
+            return False
+
     except Exception as e:
-        log.warning(f"Nao foi possivel verificar/iniciar status_pdv.exe: {e}")
+        log.warning(f"Erro ao iniciar status_pdv na sessao do usuario: {e}")
+        return False
+
+
+def _garantir_status_pdv():
+    """Garante que status_pdv.exe esta rodando na sessao interativa do usuario."""
+    status_exe = r"C:\PDVAgent\status_pdv.exe"
+    if not os.path.exists(status_exe):
+        return
+
+    resultado = subprocess.run(
+        ["tasklist", "/FI", "IMAGENAME eq status_pdv.exe", "/NH"],
+        capture_output=True, text=True
+    )
+    if "status_pdv.exe" in resultado.stdout:
+        log.info("status_pdv.exe ja estava rodando.")
+        return
+
+    log.info("status_pdv.exe nao esta rodando — iniciando na sessao do usuario...")
+
+    # Tenta via Task Scheduler (se a tarefa PDVStatus existir)
+    r = subprocess.run(
+        ["schtasks", "/run", "/tn", "PDVStatus"],
+        capture_output=True, text=True
+    )
+    if r.returncode == 0:
+        log.info("status_pdv.exe iniciado via schtasks.")
+        time.sleep(1)
+        return
+
+    # Fallback: WTSQueryUserToken + CreateProcessAsUser (correto para Session 0)
+    _iniciar_na_sessao_usuario(status_exe)
 
 
 def executar_atualizacao():
