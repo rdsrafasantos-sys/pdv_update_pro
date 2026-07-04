@@ -114,7 +114,6 @@ def atualizar_agente():
 
         # Script .bat completamente independente
         # ping -n X = pausa de X-1 segundos (truque clássico do Windows)
-        status_exe = os.path.join(pasta, "status_pdv.exe")
         linhas = [
             "@echo off",
             "ping 127.0.0.1 -n 4 > nul",
@@ -123,11 +122,6 @@ def atualizar_agente():
             f'copy /Y "{novo}" "{atual}"',
             f'del /F /Q "{novo}"',
             f'"{nssm}" start PDVAgent',
-            # Reinicia status_pdv.exe na sessao do usuario para garantir que
-            # a proxima atualizacao seja monitorada corretamente
-            f'taskkill /F /IM status_pdv.exe 2>nul',
-            "ping 127.0.0.1 -n 2 > nul",
-            f'start "" "{status_exe}"',
             'schtasks /delete /tn "PDVAgentUpdate" /f',
             f'del /F /Q "{bat}"',
         ]
