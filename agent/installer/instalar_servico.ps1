@@ -138,19 +138,32 @@ if ($status -eq "Running") {
 }
 
 Write-Host ""
-# 7. Adicionar status_pdv.exe na inicialização do Windows
+# 7. Configurar status_pdv.exe via Task Scheduler (mais confiavel que Run key no W11)
 Write-Host "[7/7] Configurando status_pdv.exe na inicializacao..." -ForegroundColor Yellow
 $statusExe = "C:\PDVAgent\status_pdv.exe"
 $origem2   = Join-Path $PastaScript "status_pdv.exe"
 if (Test-Path $origem2) {
     Copy-Item -Path $origem2 -Destination $statusExe -Force
-    # Adiciona no registro de inicialização do Windows (roda com o usuário logado)
+
+    # Remove Run key legada (se existir)
     $regKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-    Set-ItemProperty -Path $regKey -Name "PDVStatus" -Value $statusExe
-    Write-Host "status_pdv.exe configurado na inicializacao." -ForegroundColor Green
+    Remove-ItemProperty -Path $regKey -Name "PDVStatus" -ErrorAction SilentlyContinue
+
+    # Task Scheduler: roda ao login de qualquer usuario, interactive
+    $action  = New-ScheduledTaskAction -Execute $statusExe
+    $trigger = New-ScheduledTaskTrigger -AtLogOn
+    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0 -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+    $principal = New-ScheduledTaskPrincipal -GroupId "BUILTIN\Users" -RunLevel Limited
+    Register-ScheduledTask -TaskName "PDVStatus" -Action $action -Trigger $trigger `
+        -Settings $settings -Principal $principal -Force | Out-Null
+
+    # Inicia imediatamente sem precisar de logout/login
+    Stop-Process -Name "status_pdv" -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
+    Start-Process -FilePath $statusExe
+    Write-Host "status_pdv.exe configurado no Task Scheduler e iniciado agora." -ForegroundColor Green
 } else {
     Write-Host "AVISO: status_pdv.exe nao encontrado em $origem2" -ForegroundColor Yellow
-    Write-Host "Copie manualmente para C:\PDVAgent\ e execute uma vez." -ForegroundColor Yellow
 }
 
 Write-Host ""
