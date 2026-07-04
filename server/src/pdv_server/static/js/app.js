@@ -644,6 +644,13 @@ window.testarConexaoErpDb = testarConexaoErpDb;
 // ──────────────────────────────────────────────
 // METRICAS DE SAUDE DA MAQUINA (sysinfo + erp stats)
 // ──────────────────────────────────────────────
+function _formatarCnpj(cnpj) {
+  const s = String(cnpj).replace(/\D/g, "").padStart(14, "0");
+  return s.length === 14
+    ? `${s.slice(0,2)}.${s.slice(2,5)}.${s.slice(5,8)}/${s.slice(8,12)}-${s.slice(12)}`
+    : cnpj;
+}
+
 function _formatarUptime(seg) {
   const d = Math.floor(seg / 86400);
   const h = Math.floor((seg % 86400) / 3600);
@@ -1112,13 +1119,14 @@ async function carregarDashboard() {
 }
 
 async function _dashFase2(lojasList, historico) {
-  const [erpDbStatus, integradorStatus, pdvsAtivosErp, statusPorLoja, sysinfoData, erpStatsData] = await Promise.all([
+  const [erpDbStatus, integradorStatus, pdvsAtivosErp, statusPorLoja, sysinfoData, erpStatsData, erpLojasData] = await Promise.all([
     fetch(API("/erp_db/status")).then(r => r.json()).catch(() => ({ online: false })),
     fetch(API("/integrador/status")).then(r => r.json()).catch(() => ({ status: "erro", erro: "Falha ao consultar." })),
     fetch(API("/erp_db/pdvs_ativos")).then(r => r.json()).catch(() => ({ erro: "Falha ao consultar.", lojas: [] })),
     statusOnlinePorLoja(lojasList),
     fetch(API("/sysinfo")).then(r => r.json()).catch(() => null),
     fetch(API("/erp_db/stats")).then(r => r.json()).catch(() => null),
+    fetch(API("/erp_db/lojas")).then(r => r.json()).catch(() => null),
   ]);
 
   atualizarKpiErpDb(erpDbStatus);
@@ -1132,6 +1140,29 @@ async function _dashFase2(lojasList, historico) {
 
   const elErpStats = document.getElementById("kpiErpDbStats");
   if (elErpStats) elErpStats.innerHTML = renderErpStats(erpStatsData);
+
+  // Lista de lojas no card de Lojas
+  const elLojasLista = document.getElementById("kpiLojasLista");
+  if (elLojasLista && erpLojasData && !erpLojasData.erro && erpLojasData.lojas.length > 0) {
+    elLojasLista.innerHTML = erpLojasData.lojas.map(l => `
+      <div class="kpi-loja-item">
+        <div class="kpi-loja-nome">${l.nome || l.apelido || "—"}</div>
+        ${l.apelido ? `<div class="kpi-loja-apelido">📍 ${l.apelido}</div>` : ""}
+        ${l.cnpj ? `<div class="kpi-loja-cnpj">${_formatarCnpj(l.cnpj)}</div>` : ""}
+      </div>`).join("");
+  }
+
+  // Breakdown de PDVs no card de PDVs
+  const elPdvsDetalhe = document.getElementById("kpiPdvsDetalhe");
+  if (elPdvsDetalhe) {
+    const totalAtivos = lojasCruzadas.reduce((a, l) => a + l.pdvs.length, 0);
+    const totalOnline = lojasCruzadas.reduce((a, l) => a + l.pdvs.filter(p => p.status === "online").length, 0);
+    const totalOffline = totalAtivos - totalOnline;
+    elPdvsDetalhe.innerHTML = `
+      <div class="kpi-pdv-linha"><span class="kpi-pdv-dot kpi-pdv-dot--online"></span><span class="kpi-pdv-count">${totalOnline}</span><span class="kpi-pdv-label">online</span></div>
+      <div class="kpi-pdv-linha"><span class="kpi-pdv-dot kpi-pdv-dot--offline"></span><span class="kpi-pdv-count">${totalOffline}</span><span class="kpi-pdv-label">offline</span></div>
+      <div class="kpi-pdv-linha" style="margin-top:2px;padding-top:4px;border-top:1px solid var(--border);"><span style="width:7px;flex-shrink:0;"></span><span class="kpi-pdv-count">${totalAtivos}</span><span class="kpi-pdv-label">total cadastrado(s)</span></div>`;
+  }
 
   const dashAlertas = document.getElementById("dashAlertas");
   if (dashAlertas) {

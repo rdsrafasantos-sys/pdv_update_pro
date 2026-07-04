@@ -540,6 +540,36 @@ def api_sysinfo(contexto):
         return jsonify({"erro": str(e)})
 
 
+@app.route("/api/<int:rede_id>/erp_db/lojas", methods=["GET"])
+@com_rede
+def api_erp_db_lojas(contexto):
+    """Retorna lojas do ERP: apelido (tabela loja) + nome e CNPJ (tabela fornecedor)."""
+    cfg = erp_db.carregar_config(contexto)
+    if not cfg.get("host") or not cfg.get("banco"):
+        return jsonify({"erro": "ERP não configurado.", "lojas": []})
+    try:
+        conn = erp_db._conectar(cfg, contexto.tailscale_site_id)
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT l.id, l.apelido, f.nome, f.cnpj
+                    FROM loja l
+                    LEFT JOIN fornecedor f ON f.id = l.fornecedor
+                    ORDER BY l.id
+                """)
+                linhas = cur.fetchall()
+        finally:
+            conn.close()
+        return jsonify({
+            "lojas": [
+                {"id": r[0], "apelido": r[1] or "", "nome": r[2] or "", "cnpj": r[3] or ""}
+                for r in linhas
+            ]
+        })
+    except Exception as e:
+        return jsonify({"erro": str(e), "lojas": []})
+
+
 @app.route("/api/<int:rede_id>/erp_db/stats", methods=["GET"])
 @com_rede
 def api_erp_db_stats(contexto):
