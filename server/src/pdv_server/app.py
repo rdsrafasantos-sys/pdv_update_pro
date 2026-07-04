@@ -553,7 +553,7 @@ def api_erp_db_lojas(contexto):
                 # Tenta join com fornecedor; se falhar, retorna só a tabela loja
                 try:
                     cur.execute("""
-                        SELECT l.id, l.apelido, f.nome, f.cnpj
+                        SELECT l.id, l.descricao, f.nomefantasia, f.cnpj
                         FROM loja l
                         LEFT JOIN fornecedor f ON f.id = l.fornecedor
                         ORDER BY l.id
@@ -564,9 +564,9 @@ def api_erp_db_lojas(contexto):
                         for r in linhas
                     ]
                 except Exception:
-                    # Fallback: só a tabela loja sem join
+                    # Fallback: so a tabela loja sem join
                     conn.rollback()
-                    cur.execute("SELECT id, apelido FROM loja ORDER BY id")
+                    cur.execute("SELECT id, descricao FROM loja ORDER BY id")
                     linhas = cur.fetchall()
                     lojas_ret = [
                         {"id": r[0], "apelido": r[1] or "", "nome": r[1] or "", "cnpj": ""}
