@@ -550,21 +550,31 @@ def api_erp_db_lojas(contexto):
         try:
             with conn.cursor() as cur:
                 cur.execute("SET statement_timeout = '8000'")
-                cur.execute("""
-                    SELECT l.id, l.apelido, f.nome, f.cnpj
-                    FROM loja l
-                    LEFT JOIN fornecedor f ON f.id = l.fornecedor
-                    ORDER BY l.id
-                """)
-                linhas = cur.fetchall()
+                # Tenta join com fornecedor; se falhar, retorna só a tabela loja
+                try:
+                    cur.execute("""
+                        SELECT l.id, l.apelido, f.nome, f.cnpj
+                        FROM loja l
+                        LEFT JOIN fornecedor f ON f.id = l.fornecedor
+                        ORDER BY l.id
+                    """)
+                    linhas = cur.fetchall()
+                    lojas_ret = [
+                        {"id": r[0], "apelido": r[1] or "", "nome": r[2] or "", "cnpj": r[3] or ""}
+                        for r in linhas
+                    ]
+                except Exception:
+                    # Fallback: só a tabela loja sem join
+                    conn.rollback()
+                    cur.execute("SELECT id, apelido FROM loja ORDER BY id")
+                    linhas = cur.fetchall()
+                    lojas_ret = [
+                        {"id": r[0], "apelido": r[1] or "", "nome": r[1] or "", "cnpj": ""}
+                        for r in linhas
+                    ]
         finally:
             conn.close()
-        return jsonify({
-            "lojas": [
-                {"id": r[0], "apelido": r[1] or "", "nome": r[2] or "", "cnpj": r[3] or ""}
-                for r in linhas
-            ]
-        })
+        return jsonify({"lojas": lojas_ret})
     except Exception as e:
         return jsonify({"erro": str(e), "lojas": []})
 

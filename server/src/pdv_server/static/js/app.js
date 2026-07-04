@@ -1171,10 +1171,24 @@ function _dashFase2(lojasList, historico) {
       const elPdvsDetalhe = document.getElementById("kpiPdvsDetalhe");
       if (elPdvsDetalhe) {
         const off = totalAtivos - totalOnline;
-        elPdvsDetalhe.innerHTML = `
-          <div class="kpi-pdv-linha"><span class="kpi-pdv-dot kpi-pdv-dot--online"></span><span class="kpi-pdv-count">${totalOnline}</span><span class="kpi-pdv-label">online</span></div>
-          <div class="kpi-pdv-linha"><span class="kpi-pdv-dot kpi-pdv-dot--offline"></span><span class="kpi-pdv-count">${off}</span><span class="kpi-pdv-label">offline</span></div>
-          <div class="kpi-pdv-linha" style="margin-top:2px;padding-top:4px;border-top:1px solid var(--border);"><span style="width:7px;flex-shrink:0;"></span><span class="kpi-pdv-count">${totalAtivos}</span><span class="kpi-pdv-label">total cadastrado(s)</span></div>`;
+        const linhasLoja = lojasCruzadas.map(loja => {
+          const on = loja.pdvs.filter(p => p.status === "online").length;
+          const of2 = loja.pdvs.length - on;
+          return `<div class="kpi-pdv-loja">
+            <div class="kpi-pdv-loja-nome">${loja.nome}</div>
+            <div class="kpi-pdv-loja-stats">
+              <span class="kpi-pdv-loja-on">● ${on} online</span>
+              <span class="kpi-pdv-loja-off">● ${of2} offline</span>
+            </div>
+          </div>`;
+        }).join("");
+        elPdvsDetalhe.innerHTML = `${linhasLoja}
+          <div class="kpi-pdv-linha" style="margin-top:4px;padding-top:6px;border-top:1px solid var(--border);">
+            <span class="kpi-pdv-dot kpi-pdv-dot--online"></span><span class="kpi-pdv-count">${totalOnline}</span><span class="kpi-pdv-label">online</span>
+            <span style="margin-left:8px;"></span>
+            <span class="kpi-pdv-dot kpi-pdv-dot--offline"></span><span class="kpi-pdv-count">${off}</span><span class="kpi-pdv-label">offline</span>
+            <span style="margin-left:8px;color:var(--text-faint);font-size:10px;">${totalAtivos} total</span>
+          </div>`;
       }
     }
 
@@ -1186,7 +1200,9 @@ function _dashFase2(lojasList, historico) {
     }
   });
 
-  // Grupo C: lojas ERP (mais lento, lazy)
+  // Grupo C: lojas ERP (mais lento, lazy) — mostra placeholder imediatamente
+  const elLojasLista = document.getElementById("kpiLojasLista");
+  if (elLojasLista) elLojasLista.innerHTML = '<div class="kpi-loja-apelido" style="color:var(--text-faint);font-style:italic;">Buscando informações...</div>';
   _carregarLojasErp();
 }
 
