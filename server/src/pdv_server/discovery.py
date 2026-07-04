@@ -10,22 +10,35 @@ _cache = {}
 _cache_lock = threading.Lock()
 
 
-def resolver_endereco(ip_raw, tailscale_site_id, porta=5000, timeout_tcp=2):
-    """Testa 4via6 com TCP rapido; se falhar usa o IP direto.
+def resolver_endereco(ip_raw, tailscale_site_id):
+    """Retorna o endereco 4via6 quando configurado, senao o IP direto.
 
-    Permite que o painel alcance PDVs tanto via subnet router Tailscale
-    (4via6) quanto diretamente pela LAN ou IP Tailscale proprio do PDV,
-    sem depender do service manager estar online.
+    O fallback para IP direto ocorre na camada de requests (com timeout
+    real incluindo DNS), nao aqui -- socket.create_connection nao aplica
+    timeout ao DNS resolution e poderia travar por 30-60s por PDV.
+    Use _tentar_enderecos() para a logica de fallback com retry.
     """
-    import socket
-    principal = endereco_alcancavel(ip_raw, tailscale_site_id)
-    if principal == ip_raw:
-        return ip_raw
-    try:
-        socket.create_connection((principal, porta), timeout=timeout_tcp).close()
-        return principal
-    except Exception:
-        return ip_raw
+    return endereco_alcancavel(ip_raw, tailscale_site_id)
+
+
+def _tentar_requisicao(ip_raw, tailscale_site_id, path, timeout=3, **kwargs):
+    """Tenta a requisicao no endereco 4via6; se falhar, tenta IP direto.
+
+    Usa requests com timeout real (inclui DNS) para ambas as tentativas.
+    Retorna (response, endereco_usado) ou lanca a ultima excecao.
+    """
+    import requests as _req
+    enderecos = [endereco_alcancavel(ip_raw, tailscale_site_id)]
+    if enderecos[0] != ip_raw:
+        enderecos.append(ip_raw)
+    ultimo_erro = None
+    for end in enderecos:
+        try:
+            r = _req.get(f"http://{end}:{path}", timeout=timeout, **kwargs)
+            return r, end
+        except Exception as e:
+            ultimo_erro = e
+    raise ultimo_erro
 
 
 def endereco_alcancavel(ip, tailscale_site_id=""):

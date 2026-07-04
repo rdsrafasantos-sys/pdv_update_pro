@@ -4,7 +4,7 @@ import time
 
 import requests
 
-from pdv_server.discovery import resolver_endereco
+from pdv_server.discovery import endereco_alcancavel
 
 atualizacoes = {}
 lock = threading.Lock()
@@ -46,21 +46,28 @@ def enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo):
     resultados = {}
 
     def enviar(pdv):
-        endereco = resolver_endereco(pdv["ip"], contexto.tailscale_site_id)
-        try:
-            with open(caminho_exe, "rb") as f:
-                r = requests.post(
-                    f"http://{endereco}:5000/atualizar_agente",
+        ip = pdv["ip"]
+        enderecos = [endereco_alcancavel(ip, contexto.tailscale_site_id)]
+        if enderecos[0] != ip:
+            enderecos.append(ip)
+        ultimo_erro = "Sem resposta"
+        for endereco in enderecos:
+            try:
+                with open(caminho_exe, "rb") as f:
+                    r = requests.post(
+                        f"http://{endereco}:5000/atualizar_agente",
                     files={"arquivo": ("agente.exe", f, "application/octet-stream")},
                     headers={"X-Agent-Token": contexto.token},
                     timeout=60
                 )
-            resultados[pdv["id"]] = {
-                "ok": r.status_code == 200,
-                "msg": r.json().get("mensagem", r.text)
-            }
-        except Exception as e:
-            resultados[pdv["id"]] = {"ok": False, "msg": str(e)}
+                resultados[pdv["id"]] = {
+                    "ok": r.status_code == 200,
+                    "msg": r.json().get("mensagem", r.text)
+                }
+                return
+            except Exception as e:
+                ultimo_erro = str(e)
+        resultados[pdv["id"]] = {"ok": False, "msg": ultimo_erro}
 
     threads = [threading.Thread(target=enviar, args=(p,), daemon=True) for p in pdvs_alvo]
     for t in threads:
@@ -71,7 +78,8 @@ def enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo):
 
 
 def reiniciar_mongo_pdv(contexto, pdv):
-    endereco = resolver_endereco(pdv["ip"], contexto.tailscale_site_id)
+    ip = pdv["ip"]
+    endereco = endereco_alcancavel(ip, contexto.tailscale_site_id)
     try:
         r = requests.post(
             f"http://{endereco}:5000/reiniciar_mongo",
@@ -91,7 +99,7 @@ def _enviar_para_pdv(contexto, loja_id, pdv, caminho_zip):
     pdv_id = pdv["id"]
     ip = pdv["ip"]
     rede_id = contexto.rede_id
-    endereco = resolver_endereco(ip, contexto.tailscale_site_id)
+    endereco = endereco_alcancavel(ip, contexto.tailscale_site_id)
     try:
         set_estado_pdv(rede_id, loja_id, pdv_id, {
             "status": "enviando", "etapa": "Enviando arquivo",
