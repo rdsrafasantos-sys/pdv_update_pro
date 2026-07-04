@@ -20,7 +20,7 @@ from pdv_server.dispatch import (
     reiniciar_mongo_pdv,
 )
 from pdv_server.discovery import (
-    encontrar_pdv, endereco_alcancavel, get_lojas, invalidar_cache,
+    encontrar_pdv, endereco_alcancavel, get_lojas, invalidar_cache, resolver_endereco,
 )
 from pdv_server import erp_db, integrador, replication
 from pdv_server.versioning import eh_downgrade, extrair_versao
@@ -124,11 +124,9 @@ def api_ping(contexto, loja_id, pdv_id):
     pdv = encontrar_pdv(contexto, loja_id, pdv_id)
     if not pdv:
         return jsonify({"erro": "PDV não encontrado"}), 404
+    endereco = resolver_endereco(pdv["ip"], contexto.tailscale_site_id)
     try:
-        r = requests.get(
-            f"http://{endereco_alcancavel(pdv['ip'], contexto.tailscale_site_id)}:5000/ping",
-            timeout=3
-        )
+        r = requests.get(f"http://{endereco}:5000/ping", timeout=3)
         dados = r.json() if r.status_code == 200 else {}
         return jsonify({
             "online": r.status_code == 200,
@@ -150,11 +148,9 @@ def api_ping_loja(contexto, loja_id):
     threads = []
 
     def checar(pdv):
+        endereco = resolver_endereco(pdv["ip"], contexto.tailscale_site_id)
         try:
-            r = requests.get(
-                f"http://{endereco_alcancavel(pdv['ip'], contexto.tailscale_site_id)}:5000/ping",
-                timeout=3
-            )
+            r = requests.get(f"http://{endereco}:5000/ping", timeout=3)
             dados = r.json() if r.status_code == 200 else {}
             resultados[pdv["id"]] = {
                 "online": r.status_code == 200,
@@ -510,11 +506,9 @@ def api_sysinfo_loja(contexto, loja_id):
     threads = []
 
     def checar(pdv):
+        endereco = resolver_endereco(pdv["ip"], contexto.tailscale_site_id)
         try:
-            r = requests.get(
-                f"http://{endereco_alcancavel(pdv['ip'], contexto.tailscale_site_id)}:5000/sysinfo",
-                timeout=3
-            )
+            r = requests.get(f"http://{endereco}:5000/sysinfo", timeout=3)
             resultados[pdv["id"]] = r.json()
         except Exception:
             resultados[pdv["id"]] = {"erro": "sem resposta"}

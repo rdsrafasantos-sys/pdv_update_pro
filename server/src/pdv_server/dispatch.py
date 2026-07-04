@@ -1,28 +1,10 @@
 import os
-import socket
 import threading
 import time
 
 import requests
 
-from pdv_server.discovery import endereco_alcancavel
-
-
-def _resolver_endereco(ip_raw, tailscale_site_id, porta=5000, timeout_tcp=2):
-    """Resolve o melhor endereco para alcançar o PDV.
-
-    Tenta o endereco 4via6 (quando tailscale_site_id existe) com um TCP
-    rapido; se nao responder em timeout_tcp segundos, cai no IP original
-    (funciona quando o painel esta na mesma LAN ou o PDV tem Tailscale direto).
-    """
-    principal = endereco_alcancavel(ip_raw, tailscale_site_id)
-    if principal == ip_raw:
-        return ip_raw
-    try:
-        socket.create_connection((principal, porta), timeout=timeout_tcp).close()
-        return principal
-    except Exception:
-        return ip_raw
+from pdv_server.discovery import resolver_endereco
 
 atualizacoes = {}
 lock = threading.Lock()
@@ -64,7 +46,7 @@ def enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo):
     resultados = {}
 
     def enviar(pdv):
-        endereco = _resolver_endereco(pdv["ip"], contexto.tailscale_site_id)
+        endereco = resolver_endereco(pdv["ip"], contexto.tailscale_site_id)
         try:
             with open(caminho_exe, "rb") as f:
                 r = requests.post(
@@ -89,9 +71,10 @@ def enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo):
 
 
 def reiniciar_mongo_pdv(contexto, pdv):
+    endereco = resolver_endereco(pdv["ip"], contexto.tailscale_site_id)
     try:
         r = requests.post(
-            f"http://{endereco_alcancavel(pdv['ip'], contexto.tailscale_site_id)}:5000/reiniciar_mongo",
+            f"http://{endereco}:5000/reiniciar_mongo",
             headers={"X-Agent-Token": contexto.token},
             timeout=40
         )
@@ -108,7 +91,7 @@ def _enviar_para_pdv(contexto, loja_id, pdv, caminho_zip):
     pdv_id = pdv["id"]
     ip = pdv["ip"]
     rede_id = contexto.rede_id
-    endereco = _resolver_endereco(ip, contexto.tailscale_site_id)
+    endereco = resolver_endereco(ip, contexto.tailscale_site_id)
     try:
         set_estado_pdv(rede_id, loja_id, pdv_id, {
             "status": "enviando", "etapa": "Enviando arquivo",

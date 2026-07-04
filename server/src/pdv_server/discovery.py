@@ -10,6 +10,24 @@ _cache = {}
 _cache_lock = threading.Lock()
 
 
+def resolver_endereco(ip_raw, tailscale_site_id, porta=5000, timeout_tcp=2):
+    """Testa 4via6 com TCP rapido; se falhar usa o IP direto.
+
+    Permite que o painel alcance PDVs tanto via subnet router Tailscale
+    (4via6) quanto diretamente pela LAN ou IP Tailscale proprio do PDV,
+    sem depender do service manager estar online.
+    """
+    import socket
+    principal = endereco_alcancavel(ip_raw, tailscale_site_id)
+    if principal == ip_raw:
+        return ip_raw
+    try:
+        socket.create_connection((principal, porta), timeout=timeout_tcp).close()
+        return principal
+    except Exception:
+        return ip_raw
+
+
 def endereco_alcancavel(ip, tailscale_site_id=""):
     """Traduz o IP bruto do PDV (o mesmo usado no replica set do Mongo, que
     nunca muda) para o formato MagicDNS "via" exigido por um subnet router
