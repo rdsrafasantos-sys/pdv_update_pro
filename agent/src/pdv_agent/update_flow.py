@@ -316,20 +316,20 @@ def _iniciar_na_sessao_usuario(exe_path):
 
 
 def _garantir_status_pdv():
-    """Garante que status_pdv.exe esta rodando na sessao interativa do usuario."""
+    """Mata qualquer instancia existente e lanca status_pdv.exe na sessao do usuario.
+
+    Sempre reinicia para evitar que uma instancia em Session 0 (zombie) segure
+    a porta 50505 e impeca o lock de instancia unica do novo processo.
+    """
     status_exe = r"C:\PDVAgent\status_pdv.exe"
     if not os.path.exists(status_exe):
         return
 
-    resultado = subprocess.run(
-        ["tasklist", "/FI", "IMAGENAME eq status_pdv.exe", "/NH"],
-        capture_output=True, text=True
-    )
-    if "status_pdv.exe" in resultado.stdout:
-        log.info("status_pdv.exe ja estava rodando.")
-        return
+    # Mata qualquer instancia existente (em qualquer sessao)
+    subprocess.run(["taskkill", "/F", "/IM", "status_pdv.exe"], capture_output=True)
+    time.sleep(1.5)  # Garante que a porta 50505 foi liberada
 
-    log.info("status_pdv.exe nao esta rodando — iniciando na sessao do usuario...")
+    log.info("Iniciando status_pdv.exe na sessao do usuario...")
 
     # Tenta via Task Scheduler (se a tarefa PDVStatus existir)
     r = subprocess.run(
