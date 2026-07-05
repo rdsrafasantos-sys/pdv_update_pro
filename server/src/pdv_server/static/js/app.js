@@ -276,10 +276,27 @@ async function uploadAgente(input) {
   fd.append("arquivo", arquivo);
   await fetch(API("/upload_agente"), { method: "POST", body: fd });
   input.value = "";
-  if (btn) { btn.disabled = false; btn.textContent = "⬆️ Enviar novo agente.exe"; }
+  if (btn) { btn.disabled = false; btn.textContent = "Enviar novo agente.exe"; }
   await verificarAgenteDisponivel();
 }
 window.uploadAgente = uploadAgente;
+
+async function uploadStatusPdv(input) {
+  const arquivo = input.files[0];
+  if (!arquivo) return;
+  const btn = document.getElementById("btnUploadStatusPdv");
+  const info = document.getElementById("statusPdvInfoTexto");
+  if (btn) { btn.disabled = true; btn.textContent = `Enviando ${(arquivo.size / 1048576).toFixed(1)} MB...`; }
+  if (info) info.textContent = "Enviando status_pdv.exe...";
+  const fd = new FormData();
+  fd.append("arquivo", arquivo);
+  const r = await fetch(API("/upload_agente"), { method: "POST", body: fd });
+  const dados = await r.json();
+  input.value = "";
+  if (btn) { btn.disabled = false; btn.textContent = "Enviar novo status_pdv.exe"; }
+  if (info) info.textContent = dados.mensagem || dados.erro || "Concluido";
+}
+window.uploadStatusPdv = uploadStatusPdv;
 
 function atualizarBotaoAgente() {
   const btn = document.getElementById("btnAtualizarAgente");

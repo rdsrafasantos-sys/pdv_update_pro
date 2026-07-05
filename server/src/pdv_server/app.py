@@ -254,17 +254,18 @@ def download_agente_publico():
 @com_rede
 @exigir_escrita
 def api_upload_agente(contexto):
-    """Recebe o novo agente.exe e salva no servidor."""
+    """Recebe agente.exe ou status_pdv.exe e salva no servidor."""
     if "arquivo" not in request.files:
         return jsonify({"erro": "Nenhum arquivo enviado"}), 400
     arquivo = request.files["arquivo"]
-    if not arquivo.filename.endswith(".exe"):
-        return jsonify({"erro": "Apenas arquivos .exe sao aceitos"}), 400
-    caminho = os.path.join(contexto.upload_dir, "agente.exe")
+    nome = arquivo.filename.lower()
+    if nome not in ("agente.exe", "status_pdv.exe"):
+        return jsonify({"erro": "Apenas agente.exe ou status_pdv.exe sao aceitos"}), 400
+    caminho = os.path.join(contexto.upload_dir, nome)
     arquivo.save(caminho)
     tamanho = os.path.getsize(caminho)
     return jsonify({
-        "mensagem": "Upload do agente concluido",
+        "mensagem": f"Upload de {nome} concluido",
         "tamanho_mb": round(tamanho / 1024 / 1024, 2)
     })
 
