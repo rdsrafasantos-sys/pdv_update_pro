@@ -324,43 +324,35 @@ def _iniciar_na_sessao_usuario(exe_path):
         return False
 
 
-def _porta_livre(porta, host="127.0.0.1"):
-    """Retorna True se a porta TCP local estiver disponível para bind."""
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind((host, porta))
-        s.close()
-        return True
-    except OSError:
-        return False
+def _status_pdv_rodando():
+    """Retorna True se o processo status_pdv.exe está ativo."""
+    r = subprocess.run(
+        ["tasklist", "/FI", "IMAGENAME eq status_pdv.exe", "/FO", "CSV"],
+        capture_output=True, text=True
+    )
+    return "status_pdv.exe" in r.stdout
 
 
 def _garantir_status_pdv():
     """Garante que status_pdv.exe está rodando na sessão do usuário.
 
-    Se já estiver rodando (porta 50505 ocupada), não faz nada — a instância
-    ativa vai detectar o progresso.json e mostrar a janela automaticamente.
-    Só lança uma nova instância se ninguém estiver rodando.
+    Verifica pelo processo (não por porta) para evitar falsos positivos
+    causados por outras aplicações que possam usar a mesma porta.
     """
     status_exe = r"C:\PDVAgent\status_pdv.exe"
     if not os.path.exists(status_exe):
         log.warning("status_pdv.exe nao encontrado em C:\\PDVAgent\\")
         return
 
-    # Porta ocupada → instância ativa, deixa ela monitorar o progresso.json
-    if not _porta_livre(50505):
-        log.info("status_pdv.exe ja esta rodando (porta 50505). OK.")
+    # Processo ativo → deixa monitorar o progresso.json e mostrar a janela
+    if _status_pdv_rodando():
+        log.info("status_pdv.exe ja esta rodando. OK.")
         return
 
-    # Porta livre → nenhuma instância, mata fantasmas e lança nova
+    # Nenhum processo → mata qualquer fantasma e lança nova instância
     log.info("status_pdv.exe nao rodando. Iniciando...")
     subprocess.run(["taskkill", "/F", "/IM", "status_pdv.exe"], capture_output=True)
-
-    # Aguarda porta liberada (timeout 4s)
-    for _ in range(8):
-        if _porta_livre(50505):
-            break
-        time.sleep(0.5)
+    time.sleep(0.5)
 
     # Tenta via Task Scheduler (PDVStatus configurado pelo instalador)
     r = subprocess.run(

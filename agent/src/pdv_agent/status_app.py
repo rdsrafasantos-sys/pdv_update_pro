@@ -9,10 +9,10 @@ Roda permanentemente na sessão do usuário (Run key).
 - NUNCA fecha sozinho
 """
 
+import ctypes
 import json
 import logging
 import os
-import socket
 import subprocess
 import sys
 import threading
@@ -24,7 +24,9 @@ STATUS_LOG = r"C:\PDVAgent\status_pdv.log"
 POLL_MS = 800
 VRCHECKOUT_EXE = r"C:\vrpdv\vrcheckout.exe"
 VRPDV_DIR = r"C:\vrpdv"
-SINGLE_PORT = 50505  # porta local para garantir instância única
+
+# Named mutex para instância única — imune a conflitos de porta com outros apps
+MUTEX_NAME = "PDVStatusAppMutex_2026"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,14 +37,18 @@ log = logging.getLogger(__name__)
 
 
 def garantir_instancia_unica():
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(("127.0.0.1", SINGLE_PORT))
-        s.listen(1)
-        return s  # mantém o socket aberto enquanto o processo viver
-    except OSError:
-        log.info("Outra instancia ja esta rodando. Saindo.")
-        sys.exit(0)
+    """Usa named mutex do Windows para garantir única instância.
+
+    Ao contrário de socket, mutex não conflita com outras aplicações
+    e é liberado imediatamente pelo OS quando o processo termina.
+    """
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    h = kernel32.CreateMutexW(None, True, MUTEX_NAME)
+    err = ctypes.get_last_error()
+    if h and err != 183:  # 183 = ERROR_ALREADY_EXISTS
+        return h  # somos os donos do mutex
+    log.info("Outra instancia ja esta rodando (mutex). Saindo.")
+    sys.exit(0)
 
 
 ETAPAS_IDX = {
