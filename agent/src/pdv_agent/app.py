@@ -112,16 +112,20 @@ def atualizar_agente():
         arq.save(novo)
         log.info(f"Novo agente recebido: {novo}")
 
-        # Script .bat completamente independente
-        # ping -n X = pausa de X-1 segundos (truque clássico do Windows)
+        # Script .bat completamente independente (roda via Task Scheduler / SYSTEM)
+        # Usa sc.exe (sempre disponivel) em vez de nssm para stop/start.
+        # Loop :aguarda garante que agente.exe esta realmente morto antes de copiar.
         linhas = [
             "@echo off",
             "ping 127.0.0.1 -n 4 > nul",
-            f'"{nssm}" stop PDVAgent',
-            "ping 127.0.0.1 -n 5 > nul",
+            "sc stop PDVAgent",
+            "ping 127.0.0.1 -n 4 > nul",
+            ":aguarda",
+            'tasklist /FI "IMAGENAME eq agente.exe" /FO CSV 2>nul | find /I "agente.exe" >nul',
+            "if not errorlevel 1 (ping 127.0.0.1 -n 3 > nul & goto aguarda)",
             f'copy /Y "{novo}" "{atual}"',
             f'del /F /Q "{novo}"',
-            f'"{nssm}" start PDVAgent',
+            "sc start PDVAgent",
             'schtasks /delete /tn "PDVAgentUpdate" /f',
             f'del /F /Q "{bat}"',
         ]
