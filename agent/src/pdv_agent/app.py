@@ -112,20 +112,30 @@ def atualizar_agente():
         arq.save(novo)
         log.info(f"Novo agente recebido: {novo}")
 
+        # Detecta servicos Mongo agora, enquanto o agente ainda esta rodando,
+        # para incluir o restart deles no BAT — garante que sobem mesmo se o
+        # novo agente demorar a iniciar ou falhar na verificacao de startup.
+        from pdv_agent.service_control import detectar_servicos
+        servicos_mongo = detectar_servicos()
+        linhas_mongo = [f'sc.exe start "{s}" 2>nul' for s in servicos_mongo]
+
         # Script .bat completamente independente (roda via Task Scheduler / SYSTEM)
         # Usa sc.exe (sempre disponivel) em vez de nssm para stop/start.
         # Loop :aguarda garante que agente.exe esta realmente morto antes de copiar.
         linhas = [
             "@echo off",
             "ping 127.0.0.1 -n 4 > nul",
-            "sc stop PDVAgent",
+            "sc.exe stop PDVAgent",
             "ping 127.0.0.1 -n 4 > nul",
             ":aguarda",
             'tasklist /FI "IMAGENAME eq agente.exe" /FO CSV 2>nul | find /I "agente.exe" >nul',
             "if not errorlevel 1 (ping 127.0.0.1 -n 3 > nul & goto aguarda)",
             f'copy /Y "{novo}" "{atual}"',
             f'del /F /Q "{novo}"',
-            "sc start PDVAgent",
+            "sc.exe start PDVAgent",
+            # Aguarda o agente subir antes de iniciar os servicos Mongo
+            "ping 127.0.0.1 -n 5 > nul",
+        ] + linhas_mongo + [
             'schtasks /delete /tn "PDVAgentUpdate" /f',
             f'del /F /Q "{bat}"',
         ]

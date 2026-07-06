@@ -77,7 +77,7 @@ def parar_servicos(servicos):
         st = get_status_servico(svc)
         if st in ("disabled", "nao_existe", "stopped"):
             continue
-        subprocess.run(["sc", "stop", svc], capture_output=True)
+        subprocess.run(["sc.exe", "stop", svc], capture_output=True)
         for _ in range(15):
             time.sleep(1)
             if get_status_servico(svc) == "stopped":
@@ -147,16 +147,24 @@ def descompactar():
 
 def iniciar_servicos(servicos):
     set_estado("updating", "Iniciando servicos", 70)
+    falhos = []
     for svc in servicos:
         st = get_status_servico(svc)
         if st in ("disabled", "nao_existe", "running"):
             continue
         log.info(f"Iniciando {svc}...")
-        subprocess.run(["sc", "start", svc], capture_output=True)
-        time.sleep(3)
-        if get_status_servico(svc) != "running":
-            raise Exception(f"{svc} nao iniciou")
-        log.info(f"{svc} OK.")
+        subprocess.run(["sc.exe", "start", svc], capture_output=True)
+        for _ in range(25):  # MongoDB pode demorar >3s para subir
+            time.sleep(1)
+            if get_status_servico(svc) == "running":
+                log.info(f"{svc} OK.")
+                break
+        else:
+            log.warning(f"{svc} nao iniciou em 25s — continuando.")
+            falhos.append(svc)
+    if falhos:
+        # Lança só no final para que todos os serviços tenham chance de subir
+        raise Exception(f"Servico(s) nao iniciaram: {', '.join(falhos)}")
 
 
 def verificar_arquivos():

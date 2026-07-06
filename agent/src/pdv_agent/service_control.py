@@ -9,10 +9,10 @@ log = logging.getLogger("pdv_agent")
 
 def get_status_servico(nome):
     try:
-        r = subprocess.run(["sc", "query", nome], capture_output=True, text=True)
+        r = subprocess.run(["sc.exe", "query", nome], capture_output=True, text=True)
         if r.returncode == 1060:
             return "nao_existe"
-        r2 = subprocess.run(["sc", "qc", nome], capture_output=True, text=True)
+        r2 = subprocess.run(["sc.exe", "qc", nome], capture_output=True, text=True)
         if "DISABLED" in r2.stdout or "DESATIVADO" in r2.stdout:
             return "disabled"
         if "RUNNING" in r.stdout:
@@ -47,13 +47,13 @@ def reiniciar_servico(nome, espera_parar=15, espera_iniciar=15):
         return status
 
     if status == "running":
-        subprocess.run(["sc", "stop", nome], capture_output=True)
+        subprocess.run(["sc.exe", "stop", nome], capture_output=True)
         for _ in range(espera_parar):
             time.sleep(1)
             if get_status_servico(nome) == "stopped":
                 break
 
-    subprocess.run(["sc", "start", nome], capture_output=True)
+    subprocess.run(["sc.exe", "start", nome], capture_output=True)
     for _ in range(espera_iniciar):
         time.sleep(1)
         if get_status_servico(nome) == "running":

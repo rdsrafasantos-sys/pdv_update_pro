@@ -25,7 +25,6 @@ POLL_MS = 800
 VRCHECKOUT_EXE = r"C:\vrpdv\vrcheckout.exe"
 VRPDV_DIR = r"C:\vrpdv"
 
-# Named mutex para instância única — imune a conflitos de porta com outros apps
 MUTEX_NAME = "PDVStatusAppMutex_2026"
 
 logging.basicConfig(
@@ -37,30 +36,26 @@ log = logging.getLogger(__name__)
 
 
 def garantir_instancia_unica():
-    """Usa named mutex do Windows para garantir única instância.
-
-    Ao contrário de socket, mutex não conflita com outras aplicações
-    e é liberado imediatamente pelo OS quando o processo termina.
-    """
+    """Usa named mutex do Windows para garantir única instância."""
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     h = kernel32.CreateMutexW(None, True, MUTEX_NAME)
     err = ctypes.get_last_error()
     if h and err != 183:  # 183 = ERROR_ALREADY_EXISTS
-        return h  # somos os donos do mutex
+        return h
     log.info("Outra instancia ja esta rodando (mutex). Saindo.")
     sys.exit(0)
 
 
 ETAPAS_IDX = {
-    "Encerrando processos": 0,
-    "Parando servicos": 1,
-    "Realizando backup": 2,
-    "Descompactando": 3,
-    "Verificando arquivos": 4,
-    "Verificando processos": 4,
-    "Iniciando servicos": 5,
+    "Encerrando processos":    0,
+    "Parando servicos":        1,
+    "Realizando backup":       2,
+    "Descompactando":          3,
+    "Verificando arquivos":    4,
+    "Verificando processos":   4,
+    "Iniciando servicos":      5,
     "Aguardando para abrir PDV": 6,
-    "Iniciando vrcheckout": 6,
+    "Iniciando vrcheckout":    6,
 }
 
 ETAPAS_LABELS = [
@@ -69,32 +64,37 @@ ETAPAS_LABELS = [
     "Realizando backup",
     "Descompactando arquivos",
     "Verificando integridade",
-    "Iniciando serviços",
-    "Iniciando PDV",
+    "Reiniciando serviços",
+    "Abrindo o PDVPro",
 ]
 
 ICONES_ETAPA = {
-    "Encerrando processos": ("🔴", "Finalizando processos ativos..."),
-    "Parando servicos": ("⏹", "Parando serviços Mongo..."),
-    "Realizando backup": ("💾", "Fazendo cópia de segurança..."),
-    "Descompactando": ("📦", "Extraindo arquivos do .zip..."),
-    "Verificando arquivos": ("🔍", "Conferindo arquivos copiados..."),
-    "Verificando processos": ("🔍", "Garantindo processos encerrados..."),
-    "Iniciando servicos": ("▶", "Iniciando serviços Mongo..."),
+    "Encerrando processos":      ("🔴", "Finalizando processos ativos..."),
+    "Parando servicos":          ("⏹",  "Parando serviços Mongo..."),
+    "Realizando backup":         ("💾", "Fazendo cópia de segurança..."),
+    "Descompactando":            ("📦", "Extraindo arquivos do .zip..."),
+    "Verificando arquivos":      ("🔍", "Conferindo arquivos copiados..."),
+    "Verificando processos":     ("🔍", "Garantindo processos encerrados..."),
+    "Iniciando servicos":        ("▶",  "Reiniciando serviços Mongo..."),
     "Aguardando para abrir PDV": ("⏰", "Aguardando para abrir o PDV..."),
-    "Iniciando vrcheckout": ("🖥", "Abrindo o sistema PDV..."),
+    "Iniciando vrcheckout":      ("🖥",  "Abrindo o sistema PDV..."),
 }
 
-# Cores
-BG = "#0a0e1a"
-SURFACE = "#1a1d27"
-SURFACE2 = "#22263a"
-BORDER = "#2e3248"
-ACCENT = "#4f8ef7"
-GREEN = "#22c55e"
-RED = "#ef4444"
-TEXT = "#e2e8f0"
-TEXT2 = "#64748b"
+# Cores — Tema Laranja VR
+BG       = "#0d0800"
+SURFACE  = "#1a1200"
+SURFACE2 = "#211800"
+BORDER   = "#3d2800"
+ACCENT    = "#f97316"   # laranja principal
+RED       = "#ef4444"
+TEXT      = "#ffffff"
+TEXT2     = "#a07848"
+ACTIVE_BG = "#2a1000"   # etapa em andamento
+ACTIVE_FG = "#fdba74"
+DONE_BG   = "#1a0900"   # etapa concluída — laranja escuro (era verde)
+DONE_FG   = "#fdba74"   # texto de etapa concluída
+DONE_BDR  = "#3d1800"   # borda de etapa concluída
+WM_COLOR  = "#2a1400"   # VR watermark
 
 
 class StatusApp:
@@ -104,14 +104,14 @@ class StatusApp:
         self.ultimo_status = None
 
         self.root.withdraw()
-        self.root.title("PDV - Atualização em andamento")
+        self.root.title("PDVPro - Atualização em andamento")
         self.root.configure(bg=BG)
         self.root.resizable(False, False)
         self.root.attributes("-topmost", True)
         self.root.overrideredirect(True)
         self._drag_x = self._drag_y = 0
 
-        w, h = 520, 620
+        w, h = 520, 720
         sw = root.winfo_screenwidth()
         sh = root.winfo_screenheight()
         self.root.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
@@ -189,35 +189,39 @@ class StatusApp:
     # UI
     # ──────────────────────────────────────────
     def _build_ui(self):
+        # Topbar — linha de título arrastável
         tbar = tk.Frame(self.root, bg=SURFACE, height=40)
         tbar.pack(fill="x")
-        tbar.bind("<ButtonPress-1>", lambda e: setattr(self, '_drag_x', e.x) or setattr(self, '_drag_y', e.y))
+        tbar.bind("<ButtonPress-1>",
+                  lambda e: setattr(self, '_drag_x', e.x) or setattr(self, '_drag_y', e.y))
         tbar.bind("<B1-Motion>", self._do_drag)
-        tk.Label(tbar, text="⚡  PDV Updater", bg=SURFACE, fg=ACCENT,
+        tk.Label(tbar, text="VR  Atualização PDVPro", bg=SURFACE, fg=ACCENT,
                  font=("Segoe UI", 11, "bold")).pack(side="left", padx=16, pady=8)
-        tk.Frame(self.root, bg=BORDER, height=1).pack(fill="x")
+        tk.Frame(self.root, bg=ACCENT, height=2).pack(fill="x")
 
         body = tk.Frame(self.root, bg=BG)
-        body.pack(fill="both", expand=True, padx=28, pady=24)
+        body.pack(fill="both", expand=True, padx=28, pady=14)
 
-        self.lbl_icone = tk.Label(body, text="⚡", bg=BG, fg=ACCENT,
-                                   font=("Segoe UI", 36))
-        self.lbl_icone.pack(pady=(0, 6))
+        # Ícone VR + título
+        self.lbl_icone = tk.Label(body, text="VR", bg=BG, fg=ACCENT,
+                                   font=("Segoe UI", 38, "bold"))
+        self.lbl_icone.pack(pady=(0, 4))
 
-        self.lbl_titulo = tk.Label(body, text="Atualização do PDV",
+        self.lbl_titulo = tk.Label(body, text="Atualização do PDVPro",
                                     bg=BG, fg=TEXT, font=("Segoe UI", 16, "bold"))
         self.lbl_titulo.pack()
 
         self.lbl_sub = tk.Label(body, text="Aguardando início...",
                                  bg=BG, fg=TEXT2, font=("Segoe UI", 10))
-        self.lbl_sub.pack(pady=(4, 20))
+        self.lbl_sub.pack(pady=(4, 12))
 
+        # Card de etapa atual + barra de progresso
         card = tk.Frame(body, bg=SURFACE, highlightthickness=1,
                          highlightbackground=BORDER)
-        card.pack(fill="x", pady=(0, 14))
+        card.pack(fill="x", pady=(0, 12))
 
         row = tk.Frame(card, bg=SURFACE)
-        row.pack(fill="x", padx=16, pady=14)
+        row.pack(fill="x", padx=16, pady=12)
 
         self.lbl_etapa_icone = tk.Label(row, text="⏳", bg=SURFACE, fg=TEXT,
                                          font=("Segoe UI", 20), width=3)
@@ -241,13 +245,14 @@ class StatusApp:
         self.lbl_pct.pack(side="right")
 
         bar_frame = tk.Frame(card, bg=SURFACE)
-        bar_frame.pack(fill="x", padx=16, pady=(0, 14))
+        bar_frame.pack(fill="x", padx=16, pady=(0, 12))
 
-        self.canvas_bar = tk.Canvas(bar_frame, height=10, bg=SURFACE2,
+        self.canvas_bar = tk.Canvas(bar_frame, height=8, bg=SURFACE2,
                                      highlightthickness=0)
         self.canvas_bar.pack(fill="x")
         self.canvas_bar.bind("<Configure>", lambda e: self._redraw_bar())
 
+        # Lista de etapas (todas as 7)
         steps = tk.Frame(body, bg=BG)
         steps.pack(fill="x")
         self.step_widgets = []
@@ -255,16 +260,22 @@ class StatusApp:
             r = tk.Frame(steps, bg=SURFACE2, highlightthickness=1,
                          highlightbackground=BORDER)
             r.pack(fill="x", pady=2)
-            n = tk.Label(r, text=str(i+1), bg=SURFACE2, fg=TEXT2,
-                         font=("Segoe UI", 9, "bold"), width=3, height=2)
+            n = tk.Label(r, text=str(i + 1), bg=SURFACE2, fg=TEXT2,
+                         font=("Segoe UI", 9, "bold"), width=3, height=1)
             n.pack(side="left")
-            l = tk.Label(r, text=label, bg=SURFACE2, fg=TEXT2,
-                         font=("Segoe UI", 10), anchor="w")
-            l.pack(side="left", fill="x", expand=True)
-            c = tk.Label(r, text="", bg=SURFACE2, fg=GREEN,
-                         font=("Segoe UI", 11, "bold"), width=3)
-            c.pack(side="right")
-            self.step_widgets.append({"row": r, "num": n, "lbl": l, "check": c})
+            lbl = tk.Label(r, text=label, bg=SURFACE2, fg=TEXT2,
+                           font=("Segoe UI", 10), anchor="w")
+            lbl.pack(side="left", fill="x", expand=True)
+            chk = tk.Label(r, text="", bg=SURFACE2, fg=ACCENT,
+                           font=("Segoe UI", 11, "bold"), width=3)
+            chk.pack(side="right")
+            self.step_widgets.append({"row": r, "num": n, "lbl": lbl, "check": chk})
+
+        # Marca d'água VR — fica atrás de todo o conteúdo
+        wm = tk.Label(body, text="VR", bg=BG, fg=WM_COLOR,
+                      font=("Segoe UI", 130, "bold"))
+        wm.place(relx=0.5, rely=0.38, anchor="center")
+        wm.lower()
 
     def _do_drag(self, e):
         x = self.root.winfo_x() + (e.x - self._drag_x)
@@ -274,10 +285,10 @@ class StatusApp:
     def _redraw_bar(self):
         self.canvas_bar.delete("all")
         w = self.canvas_bar.winfo_width()
-        self.canvas_bar.create_rectangle(0, 0, w, 10, fill=SURFACE2, outline="")
+        self.canvas_bar.create_rectangle(0, 0, w, 8, fill=SURFACE2, outline="")
         fw = int(w * self.progresso_atual / 100)
         if fw > 0:
-            self.canvas_bar.create_rectangle(0, 0, fw, 10,
+            self.canvas_bar.create_rectangle(0, 0, fw, 8,
                                               fill=self.bar_cor, outline="")
 
     def _animar_progresso(self):
@@ -290,11 +301,11 @@ class StatusApp:
     # ATUALIZAR UI
     # ──────────────────────────────────────────
     def atualizar_ui(self, dados):
-        status = dados.get("status", "idle")
-        etapa = dados.get("etapa", "")
+        status   = dados.get("status", "idle")
+        etapa    = dados.get("etapa", "")
         progresso = dados.get("progresso", 0)
-        erro = dados.get("erro", "")
-        inicio = dados.get("inicio")
+        erro     = dados.get("erro", "")
+        inicio   = dados.get("inicio")
 
         self.progresso_alvo = progresso
 
@@ -314,35 +325,35 @@ class StatusApp:
         idx = ETAPAS_IDX.get(etapa, -1)
         for i, sw in enumerate(self.step_widgets):
             if i < idx:
-                sw["row"].config(bg="#0f2a1a", highlightbackground="#1a3a2a")
-                sw["num"].config(bg="#0f2a1a", fg=GREEN)
-                sw["lbl"].config(bg="#0f2a1a", fg="#86efac")
-                sw["check"].config(bg="#0f2a1a", text="✓", fg=GREEN)
+                sw["row"].config(bg=DONE_BG,    highlightbackground=DONE_BDR)
+                sw["num"].config(bg=DONE_BG,    fg=ACCENT)
+                sw["lbl"].config(bg=DONE_BG,    fg=DONE_FG)
+                sw["check"].config(bg=DONE_BG,  text="✓", fg=ACCENT)
             elif i == idx:
-                sw["row"].config(bg="#0f1e3a", highlightbackground=ACCENT)
-                sw["num"].config(bg="#0f1e3a", fg=ACCENT)
-                sw["lbl"].config(bg="#0f1e3a", fg="#93c5fd")
-                sw["check"].config(bg="#0f1e3a", text="→", fg=ACCENT)
+                sw["row"].config(bg=ACTIVE_BG,  highlightbackground=ACCENT)
+                sw["num"].config(bg=ACTIVE_BG,  fg=ACCENT)
+                sw["lbl"].config(bg=ACTIVE_BG,  fg=ACTIVE_FG)
+                sw["check"].config(bg=ACTIVE_BG, text="→", fg=ACCENT)
             else:
-                sw["row"].config(bg=SURFACE2, highlightbackground=BORDER)
-                sw["num"].config(bg=SURFACE2, fg=TEXT2)
-                sw["lbl"].config(bg=SURFACE2, fg=TEXT2)
+                sw["row"].config(bg=SURFACE2,   highlightbackground=BORDER)
+                sw["num"].config(bg=SURFACE2,   fg=TEXT2)
+                sw["lbl"].config(bg=SURFACE2,   fg=TEXT2)
                 sw["check"].config(bg=SURFACE2, text="")
 
     def _mostrar_sucesso(self, inicio):
-        self.bar_cor = GREEN
+        self.bar_cor = ACCENT
         self.progresso_alvo = 100
-        self.lbl_icone.config(text="✅", fg=GREEN)
-        self.lbl_titulo.config(text="Atualização Concluída!", fg=GREEN)
+        self.lbl_icone.config(text="VR", fg=ACCENT)
+        self.lbl_titulo.config(text="Atualização Concluída!", fg=ACCENT)
         self.lbl_etapa_icone.config(text="✅")
         self.lbl_etapa_nome.config(text="Atualizado com sucesso!")
-        self.lbl_etapa_desc.config(text="Abrindo o PDV...")
-        self.lbl_pct.config(text="100%", fg=GREEN)
+        self.lbl_etapa_desc.config(text="Abrindo o PDVPro...")
+        self.lbl_pct.config(text="100%", fg=ACCENT)
         for sw in self.step_widgets:
-            sw["row"].config(bg="#0f2a1a", highlightbackground="#1a3a2a")
-            sw["num"].config(bg="#0f2a1a", fg=GREEN)
-            sw["lbl"].config(bg="#0f2a1a", fg="#86efac")
-            sw["check"].config(bg="#0f2a1a", text="✓", fg=GREEN)
+            sw["row"].config(bg=DONE_BG,   highlightbackground=DONE_BDR)
+            sw["num"].config(bg=DONE_BG,   fg=ACCENT)
+            sw["lbl"].config(bg=DONE_BG,   fg=DONE_FG)
+            sw["check"].config(bg=DONE_BG, text="✓", fg=ACCENT)
         if inicio:
             try:
                 from datetime import datetime
@@ -369,17 +380,17 @@ class StatusApp:
         self.progresso_atual = 0
         self.progresso_alvo = 0
         self.bar_cor = ACCENT
-        self.lbl_icone.config(text="⚡", fg=ACCENT)
-        self.lbl_titulo.config(text="Atualização do PDV", fg=TEXT)
+        self.lbl_icone.config(text="VR", fg=ACCENT)
+        self.lbl_titulo.config(text="Atualização do PDVPro", fg=TEXT)
         self.lbl_sub.config(text="Aguardando início...", fg=TEXT2)
         self.lbl_etapa_icone.config(text="⏳")
         self.lbl_etapa_nome.config(text="Aguardando...")
         self.lbl_etapa_desc.config(text="Processo será iniciado em breve")
         self.lbl_pct.config(text="0%", fg=ACCENT)
         for sw in self.step_widgets:
-            sw["row"].config(bg=SURFACE2, highlightbackground=BORDER)
-            sw["num"].config(bg=SURFACE2, fg=TEXT2)
-            sw["lbl"].config(bg=SURFACE2, fg=TEXT2)
+            sw["row"].config(bg=SURFACE2,   highlightbackground=BORDER)
+            sw["num"].config(bg=SURFACE2,   fg=TEXT2)
+            sw["lbl"].config(bg=SURFACE2,   fg=TEXT2)
             sw["check"].config(bg=SURFACE2, text="")
         self._redraw_bar()
 
@@ -396,7 +407,7 @@ class StatusApp:
 
 
 def main():
-    # DPI awareness para Windows 10/11 (evita crash do tkinter em telas de alta resolucao)
+    # DPI awareness para Windows 10/11
     try:
         import ctypes as _ct
         _ct.windll.shcore.SetProcessDpiAwareness(1)
