@@ -140,6 +140,7 @@ input:checked + .slider:before { transform: translateX(17px); background: #1a0f0
 .pdv-name { font-size: 13px; font-weight: 650; margin-bottom: 2px; }
 .pdv-ip { font-size: 11px; color: var(--text-faint); }
 .pdv-versao { font-size: 10px; margin-top: 2px; color: var(--vr-orange); font-family: ui-monospace, monospace; }
+.modelo-tag { display: inline-block; padding: 2px 7px; border-radius: 99px; font-size: 10px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--tag-cor); background: var(--tag-bg); border: 1px solid color-mix(in srgb, var(--tag-cor) 60%, transparent); margin-top: 3px; }
 
 .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 99px; font-size: 10.5px; font-weight: 650; margin-top: 6px; }
 .badge.online    { background: var(--green-dim);  color: var(--green); }

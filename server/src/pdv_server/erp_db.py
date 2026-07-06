@@ -71,9 +71,11 @@ def listar_pdvs_ativos(contexto):
         try:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT e.id_loja, l.descricao AS loja, e.ecf
+                    SELECT e.id_loja, l.descricao AS loja, e.ecf,
+                           e.id_modelopdv, m.descricao AS modelo
                     FROM pdv.ecf e
                     INNER JOIN loja l ON l.id = e.id_loja
+                    LEFT JOIN pdv.modelo m ON m.id = e.id_modelopdv
                     WHERE e.id_situacaocadastro = 1
                     ORDER BY l.descricao, e.ecf
                 """)
@@ -82,9 +84,9 @@ def listar_pdvs_ativos(contexto):
             conn.close()
 
         lojas = {}
-        for id_loja, loja_nome, ecf in linhas:
+        for id_loja, loja_nome, ecf, modelo_id, modelo in linhas:
             grupo = lojas.setdefault(id_loja, {"id_loja": id_loja, "loja": loja_nome, "pdvs": []})
-            grupo["pdvs"].append(ecf)
+            grupo["pdvs"].append({"ecf": ecf, "modelo_id": modelo_id, "modelo": modelo})
         return {"erro": None, "lojas": list(lojas.values())}
     except Exception as e:
         return {"erro": str(e), "lojas": []}

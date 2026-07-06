@@ -20,6 +20,26 @@ for (const k of KEYS) {
   seletores[k] = { lojaAtiva: null, selecionados: new Set(), ping: {} };
 }
 
+let _modelosPorEcf = {}; // ecf (int) -> {modelo_id, modelo} — populado pelo ERP
+
+function categoriaModelo(modelo_id) {
+  const MAP = {
+    1: { label: "PDV",          cor: "#3b82f6", bg: "#3b82f620" },
+    2: { label: "SELFCHECKOUT", cor: "#8b5cf6", bg: "#8b5cf620" },
+    3: { label: "PDV TOUCH",    cor: "#06b6d4", bg: "#06b6d420" },
+    4: { label: "PDV SMART",    cor: "#f97316", bg: "#f9731620" },
+    5: { label: "CAIXA",        cor: "#22c55e", bg: "#22c55e20" },
+  };
+  return MAP[modelo_id] || { label: "PDV", cor: "#6b7280", bg: "#6b728020" };
+}
+
+function tagModelo(modelo_id, modelo) {
+  if (!modelo_id && !modelo) return "";
+  const cat = categoriaModelo(modelo_id);
+  const label = modelo || cat.label;
+  return `<span class="modelo-tag" style="--tag-cor:${cat.cor};--tag-bg:${cat.bg}">${label}</span>`;
+}
+
 let pollReplicacaoTimer = null;
 let _sysinfoTimer = null;
 const _SYSINFO_INTERVALO_MS = 20000;
@@ -177,10 +197,14 @@ function renderPDVs(key) {
     const versaoAgente = key === "agente"
       ? `<div class="pdv-versao-agente">agente v${ping && ping.versao_agente ? ping.versao_agente : "—"}</div>`
       : "";
+    const ecfNum = parseInt(pdv.id.replace("PDV-", ""), 10);
+    const mInfo = _modelosPorEcf[ecfNum];
+    const modelTag = mInfo ? tagModelo(mInfo.modelo_id, mInfo.modelo) : "";
     return `
       <div class="pdv-card ${sel ? 'selected' : ''}" onclick="togglePDV('${key}','${pdv.id}')">
         <div class="pdv-name">${pdv.nome || pdv.id}</div>
         <div class="pdv-ip">${pdv.ip}</div>
+        ${modelTag}
         ${versaoPdv}
         ${badge}
         ${versaoAgente}
@@ -985,7 +1009,10 @@ function cruzarLojasErpComOnline(lojasErp, lojasDescoberta, statusPorLoja) {
     const lojaId = `loja${String(grupo.id_loja).padStart(2, "0")}`;
     const lojaDescoberta = lojasDescoberta.find(l => l.id === lojaId);
     const ping = statusPorLoja[lojaId] || {};
-    const pdvs = grupo.pdvs.map(ecf => {
+    const pdvs = grupo.pdvs.map(pdvErp => {
+      const ecf = typeof pdvErp === "object" ? pdvErp.ecf : pdvErp;
+      const modelo_id = typeof pdvErp === "object" ? pdvErp.modelo_id : null;
+      const modelo = typeof pdvErp === "object" ? pdvErp.modelo : null;
       const pdvId = `PDV-${ecf}`;
       const pdvDescoberto = lojaDescoberta ? lojaDescoberta.pdvs.find(p => p.id === pdvId) : null;
       const statusPing = ping[pdvId];
@@ -993,7 +1020,7 @@ function cruzarLojasErpComOnline(lojasErp, lojasDescoberta, statusPorLoja) {
       if (!pdvDescoberto) status = "sem_comunicacao";
       else if (statusPing && statusPing.online) status = "online";
       else status = "offline";
-      return { ecf, pdvId, pdv: pdvDescoberto, status };
+      return { ecf, pdvId, pdv: pdvDescoberto, status, modelo_id, modelo };
     });
     return { id_loja: grupo.id_loja, nome: grupo.loja || lojaId, pdvs };
   });
@@ -1023,10 +1050,13 @@ function renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, erroErp, ocultarOffline) 
       const versao = p.pdv && p.pdv.versao ? `<div class="pdv-versao">v${p.pdv.versao}</div>` : "";
       const replicacao = p.status === "online" ? cardReplicacaoPdv(ultimaPorPdv[p.pdvId]) : "";
       const sysinfoSlot = p.status === "online" ? `<div id="pdvsysinfo-${p.pdvId}"></div>` : "";
+      const cat = categoriaModelo(p.modelo_id);
+      const modelTag = tagModelo(p.modelo_id, p.modelo);
       return `
-        <div class="pdv-card" style="cursor:default;">
+        <div class="pdv-card" style="cursor:default;border-left:3px solid ${cat.cor};">
           <div class="pdv-name">${nome}</div>
           ${ip}
+          ${modelTag}
           ${versao}
           <div class="badge ${classe}"><span class="dot"></span>${texto}</div>
           ${replicacao}
@@ -1174,6 +1204,10 @@ function _dashFase2(lojasList, historico) {
   ]).then(([pdvsAtivosErp, statusPorLoja]) => {
     pdvsAtivosErp = pdvsAtivosErp || { erro: "timeout", lojas: [] };
     const lojasErp = pdvsAtivosErp.lojas || [];
+    // Atualiza mapa global ecf→modelo para renderPDVs (seletores) usar
+    lojasErp.forEach(g => g.pdvs.forEach(p => {
+      if (typeof p === "object") _modelosPorEcf[p.ecf] = { modelo_id: p.modelo_id, modelo: p.modelo };
+    }));
     const lojasCruzadas = cruzarLojasErpComOnline(lojasErp, lojasList, statusPorLoja);
     const ultimaPorPdv = ultimaReplicacaoPorPdv(historico);
     const ocultarOffline = localStorage.getItem("dashOcultarOffline") === "1";
