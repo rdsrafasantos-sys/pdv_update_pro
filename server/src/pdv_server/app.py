@@ -54,7 +54,7 @@ def exigir_login():
     rota = request.endpoint or ""
     # Callback do script de instalacao roda sem sessao de usuario --
     # autenticado pelo token de uso unico na propria URL (ver gestao.py).
-    if rota.startswith("auth.") or rota == "static" or rota == "painel.api_callback_instalacao":
+    if rota.startswith("auth.") or rota in ("static", "painel.api_callback_instalacao", "download_agente_publico"):
         return None
     if not current_user.is_authenticated:
         return login_manager.unauthorized()
