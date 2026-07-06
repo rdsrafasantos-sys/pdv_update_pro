@@ -1,0 +1,27 @@
+services:
+  pdv-server-staging:
+    build: .
+    container_name: pdv-server-staging
+    restart: always
+    network_mode: host
+    dns:
+      - 1.1.1.1
+      - 100.100.100.100
+    environment:
+      - PDV_SERVER_PORTA=8889
+      - PDV_AMBIENTE=staging
+      - PDV_SERVER_TOKEN=${PDV_SERVER_TOKEN:-pdv-agent-2024}
+      - PDV_SERVER_MONGO_URI=${PDV_SERVER_MONGO_URI:-mongodb://localhost:27016}
+      - PDV_MASTER_KEY=${PDV_MASTER_KEY}
+      - PDV_SECRET_KEY=${PDV_SECRET_KEY}
+      - PDV_TAILSCALE_AUTH_KEY_SERVICE_MANAGER=${PDV_TAILSCALE_AUTH_KEY_SERVICE_MANAGER:-}
+      - PDV_TAILSCALE_OAUTH_CLIENT_ID=${PDV_TAILSCALE_OAUTH_CLIENT_ID:-}
+      - PDV_TAILSCALE_OAUTH_CLIENT_SECRET=${PDV_TAILSCALE_OAUTH_CLIENT_SECRET:-}
+      - PDV_TAILSCALE_TAILNET=${PDV_TAILSCALE_TAILNET:--}
+      - PDV_PAINEL_CALLBACK_URL=${PDV_PAINEL_CALLBACK_URL:-}
+    volumes:
+      - ./data/uploads-staging:/opt/pdv-server/uploads
+      - ./data/replicacao-staging:/opt/pdv-server/replicacao
+      - ./data/erp_db-staging:/opt/pdv-server/erp_db
+      - ./data/integrador-staging:/opt/pdv-server/integrador
+      - ./data/auth-staging:/opt/pdv-server/auth

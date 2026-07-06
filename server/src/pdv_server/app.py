@@ -23,7 +23,7 @@ from pdv_server.discovery import (
     encontrar_pdv, endereco_alcancavel, get_lojas, invalidar_cache,
     resolver_endereco, _tentar_requisicao,
 )
-from pdv_server import erp_db, integrador, replication
+from pdv_server import VERSION, erp_db, integrador, replication
 from pdv_server.versioning import eh_downgrade, extrair_versao
 
 if not SECRET_KEY:
@@ -43,6 +43,11 @@ app.secret_key = SECRET_KEY
 
 init_db()
 
+
+@app.route("/api/versao")
+def api_versao():
+    return jsonify({"versao": VERSION, "ambiente": os.environ.get("PDV_AMBIENTE", "prod")})
+
 login_manager.init_app(app)
 limiter.init_app(app)
 app.register_blueprint(auth_bp)
@@ -54,7 +59,7 @@ def exigir_login():
     rota = request.endpoint or ""
     # Callback do script de instalacao roda sem sessao de usuario --
     # autenticado pelo token de uso unico na propria URL (ver gestao.py).
-    if rota.startswith("auth.") or rota in ("static", "painel.api_callback_instalacao", "download_agente_publico"):
+    if rota.startswith("auth.") or rota in ("static", "painel.api_callback_instalacao", "download_agente_publico", "api_versao"):
         return None
     if not current_user.is_authenticated:
         return login_manager.unauthorized()
@@ -102,7 +107,9 @@ def index():
 @app.route("/r/<int:rede_id>/")
 @com_rede
 def painel_rede(contexto):
-    return render_template("index.html", rede_id=contexto.rede_id, rede_nome=contexto.nome)
+    return render_template("index.html", rede_id=contexto.rede_id, rede_nome=contexto.nome,
+                           server_version=VERSION,
+                           ambiente=os.environ.get("PDV_AMBIENTE", "prod"))
 
 
 @app.route("/api/<int:rede_id>/lojas", methods=["GET"])
