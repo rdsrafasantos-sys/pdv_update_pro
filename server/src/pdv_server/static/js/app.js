@@ -101,7 +101,7 @@ function _dashOcultarLoading() {
 // NAVEGACAO (sidebar + views)
 // ──────────────────────────────────────────────
 function mostrarView(nome) {
-  for (const v of ["dashboard", "agente", "pdv", "replicacao", "config"]) {
+  for (const v of ["dashboard", "agente", "pdv", "replicacao", "config", "fiscal"]) {
     const el = document.getElementById(`view-${v}`);
     if (el) el.style.display = v === nome ? "flex" : "none";
   }
@@ -109,6 +109,7 @@ function mostrarView(nome) {
     el.classList.toggle("active", el.dataset.view === nome);
   });
   if (nome === "dashboard") { carregarDashboard(); _iniciarPolingSysinfo(); }
+  else if (nome === "fiscal") { carregarPendenciasFiscais(); }
   else { _pararPolingSysinfo(); _pararPolingSysinfoLojas(); }
 }
 window.mostrarView = mostrarView;
@@ -1196,6 +1197,9 @@ function _dashFase2(lojasList, historico) {
     const el = document.getElementById("kpiErpDbStats");
     if (el) el.innerHTML = renderErpStats(d);
   });
+  _f(API("/erp_db/pendencias_fiscais"), 12000).then(d => {
+    if (d) { _fiscalCache = d; _renderKpiFiscal(d); }
+  });
 
   // Grupo B: PDVs ativos ERP + pings — dependem um do outro, mas não bloqueiam o resto
   Promise.all([
@@ -1306,6 +1310,94 @@ function _atualizarBannerAlertas() {
     alertas.push(`<div class="dash-alerta ${cls}">${icone} <span><b>${titulo}</b>${d}</span></div>`);
   }
   dashAlertas.innerHTML = alertas.join("");
+}
+
+// ──────────────────────────────────────────────
+// PENDÊNCIAS FISCAIS
+// ──────────────────────────────────────────────
+let _fiscalCache = null;
+
+async function carregarPendenciasFiscais() {
+  try {
+    const r = await fetch(API("/erp_db/pendencias_fiscais"));
+    const dados = await r.json();
+    _fiscalCache = dados;
+    _renderKpiFiscal(dados);
+    _renderFiscalView(dados);
+  } catch (_) { /* ERP pode não estar configurado */ }
+}
+
+function _renderKpiFiscal(dados) {
+  const dias = dados.consistencia?.total ?? 0;
+  const nfce = dados.nfce?.total ?? 0;
+  const elDias = document.getElementById("kpiFiscalDias");
+  const elNfce = document.getElementById("kpiFiscalNfcePend");
+  const dotDias = document.getElementById("kpiFiscalDotDias");
+  const dotNfce = document.getElementById("kpiFiscalDotNfce");
+  const card = document.getElementById("kpiCardFiscal");
+  if (elDias) elDias.textContent = dias;
+  if (elNfce) elNfce.textContent = nfce;
+  if (dotDias) dotDias.style.background = dias === 0 ? "var(--green)" : "var(--amber)";
+  if (dotNfce) dotNfce.style.background = nfce === 0 ? "var(--green)" : (nfce > 20 ? "var(--red)" : "var(--amber)");
+  if (card) {
+    card.classList.remove("kpi-card--ok", "kpi-card--warning", "kpi-card--error");
+    if (dados.erro) { /* sem ERP configurado — não pinta */ }
+    else if (dias === 0 && nfce === 0) card.classList.add("kpi-card--ok");
+    else if (nfce > 20 || dias > 5) card.classList.add("kpi-card--error");
+    else card.classList.add("kpi-card--warning");
+  }
+}
+
+function _renderFiscalView(dados) {
+  const elC = document.getElementById("fiscalConsistenciaTabela");
+  const elN = document.getElementById("fiscalNfceTabela");
+  if (!elC && !elN) return;
+
+  if (dados.erro) {
+    const msg = `<div class="empty">Erro ao consultar o ERP: ${dados.erro}</div>`;
+    if (elC) elC.innerHTML = msg;
+    if (elN) elN.innerHTML = msg;
+    return;
+  }
+
+  if (elC) {
+    const dias = dados.consistencia.dias;
+    if (dias.length === 0) {
+      elC.innerHTML = '<div class="empty ok-empty">✔ Todos os dias com consistência finalizada.</div>';
+    } else {
+      const rows = dias.map(d => `<tr><td>${d.data}</td><td>${d.loja}</td></tr>`).join("");
+      elC.innerHTML = `
+        <table class="fiscal-table">
+          <thead><tr><th>Data</th><th>Loja</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+  }
+
+  if (elN) {
+    const pend = dados.nfce.pendentes;
+    if (pend.length === 0) {
+      elN.innerHTML = '<div class="empty ok-empty">✔ Nenhum NFC-e pendente de transmissão.</div>';
+    } else {
+      const rows = pend.map(p => {
+        const sit = p.situacao.toLowerCase().replace(/ /g, "_");
+        const cont = p.contingencia
+          ? `<span class="modelo-tag" style="--tag-cor:#f97316;--tag-bg:#f9731620;margin-left:4px;">CONT.</span>` : "";
+        const valor = `R$ ${p.valor.toFixed(2).replace(".", ",")}`;
+        return `<tr>
+          <td>${p.data}</td><td>${p.loja}</td><td>${p.ecf}</td><td class="mono">${p.numerocupom}</td>
+          <td><span class="fiscal-sit fiscal-sit--${sit}">${p.situacao}</span>${cont}</td>
+          <td class="mono">${valor}</td>
+          <td class="text-muted" style="font-size:11px;max-width:180px;">${p.motivo}</td>
+        </tr>`;
+      }).join("");
+      elN.innerHTML = `<div style="overflow-x:auto;">
+        <table class="fiscal-table">
+          <thead><tr><th>Data</th><th>Loja</th><th>ECF</th><th>Cupom</th><th>Situação</th><th>Valor</th><th>Motivo</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+    }
+  }
 }
 
 // ──────────────────────────────────────────────

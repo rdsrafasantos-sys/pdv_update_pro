@@ -84,6 +84,13 @@
       </div>
 
       <div class="menu-group">
+        <div class="menu-section" onclick="toggleMenuGroup(this)">Fiscal<span class="menu-chevron">▾</span></div>
+        <div class="menu-items">
+          <div class="menu-item" data-view="fiscal" onclick="mostrarView('fiscal')">📋 Pendências Fiscais</div>
+        </div>
+      </div>
+
+      <div class="menu-group">
         <div class="menu-section" onclick="toggleMenuGroup(this)">Configurações<span class="menu-chevron">▾</span></div>
         <div class="menu-items">
           <div class="menu-item" data-view="config" onclick="mostrarView('config')">⚙️ Configurações</div>
@@ -124,6 +131,20 @@
               <div class="kpi-value" id="kpiIntegrador" style="font-size:16px;">—</div>
               <div class="kpi-sub" id="kpiIntegradorSub"></div>
               <div id="kpiSysinfo"></div>
+            </div>
+            <div class="kpi-card kpi-card--clickable" id="kpiCardFiscal" ondblclick="mostrarView('fiscal')" title="Duplo clique para ver detalhes">
+              <div class="kpi-label">📋 Pendências Fiscais</div>
+              <div id="kpiFiscalConsistencia" class="kpi-fiscal-linha">
+                <span class="kpi-fiscal-dot" id="kpiFiscalDotDias"></span>
+                <span id="kpiFiscalDias" class="kpi-fiscal-num">—</span>
+                <span class="kpi-fiscal-label">dias sem fechar</span>
+              </div>
+              <div id="kpiFiscalNfce" class="kpi-fiscal-linha">
+                <span class="kpi-fiscal-dot" id="kpiFiscalDotNfce"></span>
+                <span id="kpiFiscalNfcePend" class="kpi-fiscal-num">—</span>
+                <span class="kpi-fiscal-label">NFC-e pendentes</span>
+              </div>
+              <div class="kpi-fiscal-hint">Duplo clique para detalhes</div>
             </div>
           </div>
 
@@ -243,6 +264,21 @@
           <div class="card">
             <div class="section-title">📜 Histórico</div>
             <div id="repHistorico"><div class="empty">Carregando...</div></div>
+          </div>
+        </div>
+
+        <!-- ═══════════════ PENDÊNCIAS FISCAIS ═══════════════ -->
+        <div class="view" id="view-fiscal" style="display:none;">
+          <div class="card">
+            <div class="top-actions">
+              <div class="section-title">📅 Dias sem consistência finalizada</div>
+              <button class="btn-verify" onclick="carregarPendenciasFiscais()">🔄 Atualizar</button>
+            </div>
+            <div id="fiscalConsistenciaTabela"><div class="empty">Carregando...</div></div>
+          </div>
+          <div class="card">
+            <div class="section-title">🧾 NFC-e pendentes de transmissão</div>
+            <div id="fiscalNfceTabela"><div class="empty">Carregando...</div></div>
           </div>
         </div>
 

@@ -492,6 +492,12 @@ def api_erp_db_pdvs_ativos(contexto):
     return jsonify(erp_db.listar_pdvs_ativos(contexto))
 
 
+@app.route("/api/<int:rede_id>/erp_db/pendencias_fiscais", methods=["GET"])
+@com_rede
+def api_erp_db_pendencias_fiscais(contexto):
+    return jsonify(erp_db.pendencias_fiscais(contexto))
+
+
 # ──────────────────────────────────────────────
 # INTEGRADOR VR — Configuracoes
 # ──────────────────────────────────────────────
