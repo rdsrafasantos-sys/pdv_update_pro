@@ -325,6 +325,9 @@ input:checked + .slider:before { transform: translateX(17px); background: #1a0f0
 .kpi-fiscal-num { font-weight: 700; font-size: 16px; }
 .kpi-fiscal-label { color: var(--text-dim); font-size: 12px; }
 .kpi-fiscal-hint { font-size: 11px; color: var(--text-faint); margin-top: 8px; }
+.kpi-fiscal-secao-titulo { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); margin-top: 9px; margin-bottom: 2px; }
+.kpi-fiscal-loja-linha { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 0; }
+.kpi-fiscal-loja-nome { flex: 1; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
 .fiscal-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .fiscal-table th { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border-strong); color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; white-space: nowrap; }
 .fiscal-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }

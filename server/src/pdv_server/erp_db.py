@@ -69,6 +69,39 @@ def pendencias_fiscais(contexto):
         conn = _conectar(cfg, contexto.tailscale_site_id)
         try:
             with conn.cursor() as cur:
+                # Todas as lojas com registro de consistência nos últimos 180 dias
+                cur.execute("""
+                    SELECT DISTINCT l.descricao
+                    FROM pdv.consistencia c
+                    JOIN loja l ON l.id = c.id_loja
+                    WHERE c.data >= CURRENT_DATE - INTERVAL '180 days'
+                    ORDER BY l.descricao
+                """)
+                todas_lojas = [r[0] for r in cur.fetchall()]
+
+                # Dias pendentes por loja
+                cur.execute("""
+                    SELECT l.descricao, COUNT(*) AS dias_pendentes,
+                           MIN(c.data)::text AS mais_antiga
+                    FROM pdv.consistencia c
+                    JOIN loja l ON l.id = c.id_loja
+                    WHERE c.calculovendamedia = false
+                      AND c.data >= CURRENT_DATE - INTERVAL '180 days'
+                    GROUP BY l.descricao
+                    ORDER BY l.descricao
+                """)
+                pend_por_loja = {r[0]: {"dias": r[1], "mais_antiga": r[2]}
+                                 for r in cur.fetchall()}
+
+                consistencia_lojas = [
+                    {"loja": loja,
+                     "dias_pendentes": pend_por_loja.get(loja, {}).get("dias", 0),
+                     "mais_antiga": pend_por_loja.get(loja, {}).get("mais_antiga")}
+                    for loja in todas_lojas
+                ]
+                dias_total = sum(v["dias_pendentes"] for v in consistencia_lojas)
+
+                # Detalhe por dia (para a view de detalhe)
                 cur.execute("""
                     SELECT c.data, l.descricao AS loja
                     FROM pdv.consistencia c
@@ -79,6 +112,24 @@ def pendencias_fiscais(contexto):
                 """)
                 dias = [{"data": str(r[0]), "loja": r[1]} for r in cur.fetchall()]
 
+                # NFC-e pendentes por loja
+                cur.execute("""
+                    SELECT l.descricao, COUNT(*) AS pendentes
+                    FROM pdv.vendanfce vn
+                    JOIN pdv.venda v ON v.id = vn.id_venda
+                    JOIN loja l ON l.id = v.id_loja
+                    WHERE vn.transmitido = false
+                    GROUP BY l.descricao
+                    ORDER BY l.descricao
+                """)
+                nfce_por_loja_raw = {r[0]: r[1] for r in cur.fetchall()}
+                nfce_lojas = [
+                    {"loja": loja,
+                     "pendentes": nfce_por_loja_raw.get(loja, 0)}
+                    for loja in todas_lojas
+                ]
+
+                # Detalhe cupom a cupom (para a view de detalhe)
                 cur.execute("""
                     SELECT v.data, l.descricao AS loja, v.ecf, v.numerocupom,
                            s.descricao AS situacao, vn.contingencia,
@@ -99,13 +150,22 @@ def pendencias_fiscais(contexto):
                      "motivo": r[7] or ""}
                     for r in cur.fetchall()
                 ]
+                nfce_total = len(pendentes)
         finally:
             conn.close()
 
         return {
             "erro": None,
-            "consistencia": {"total": len(dias), "dias": dias},
-            "nfce": {"total": len(pendentes), "pendentes": pendentes},
+            "consistencia": {
+                "total": dias_total,
+                "por_loja": consistencia_lojas,
+                "dias": dias,
+            },
+            "nfce": {
+                "total": nfce_total,
+                "por_loja": nfce_lojas,
+                "pendentes": pendentes,
+            },
         }
     except Exception as e:
         return {"erro": str(e),

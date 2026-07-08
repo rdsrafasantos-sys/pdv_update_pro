@@ -1328,23 +1328,68 @@ async function carregarPendenciasFiscais() {
 }
 
 function _renderKpiFiscal(dados) {
-  const dias = dados.consistencia?.total ?? 0;
-  const nfce = dados.nfce?.total ?? 0;
-  const elDias = document.getElementById("kpiFiscalDias");
-  const elNfce = document.getElementById("kpiFiscalNfcePend");
-  const dotDias = document.getElementById("kpiFiscalDotDias");
-  const dotNfce = document.getElementById("kpiFiscalDotNfce");
+  const totalDias = dados.consistencia?.total ?? 0;
+  const totalNfce = dados.nfce?.total ?? 0;
   const card = document.getElementById("kpiCardFiscal");
-  if (elDias) elDias.textContent = dias;
-  if (elNfce) elNfce.textContent = nfce;
-  if (dotDias) dotDias.style.background = dias === 0 ? "var(--green)" : "var(--amber)";
-  if (dotNfce) dotNfce.style.background = nfce === 0 ? "var(--green)" : (nfce > 20 ? "var(--red)" : "var(--amber)");
+
+  // ─── Consistência por loja ───────────────────
+  const elConsist = document.getElementById("kpiFiscalConsistencia");
+  if (elConsist) {
+    if (dados.erro || !dados.consistencia?.por_loja?.length) {
+      elConsist.innerHTML = `
+        <span class="kpi-fiscal-dot" id="kpiFiscalDotDias" style="background:${totalDias === 0 ? "var(--green)" : "var(--amber)"}"></span>
+        <span class="kpi-fiscal-num">${totalDias}</span>
+        <span class="kpi-fiscal-label">dias sem fechar</span>`;
+    } else {
+      const linhas = dados.consistencia.por_loja.map(l => {
+        const ok = l.dias_pendentes === 0;
+        const cor = ok ? "var(--green)" : "var(--amber)";
+        const txt = ok
+          ? `<span style="color:var(--green);font-size:11px;">✔ em dia</span>`
+          : `<span style="color:var(--amber);font-weight:700;font-size:13px">${l.dias_pendentes}</span><span class="kpi-fiscal-label"> dias</span>`;
+        return `<div class="kpi-fiscal-loja-linha">
+          <span class="kpi-fiscal-dot" style="background:${cor}"></span>
+          <span class="kpi-fiscal-loja-nome">${l.loja}</span>
+          ${txt}
+        </div>`;
+      }).join("");
+      elConsist.innerHTML = `<div class="kpi-fiscal-secao-titulo">Consistência</div>${linhas}`;
+    }
+  }
+
+  // ─── NFC-e por loja ──────────────────────────
+  const elNfce = document.getElementById("kpiFiscalNfce");
+  if (elNfce) {
+    if (dados.erro || !dados.nfce?.por_loja?.length) {
+      elNfce.innerHTML = `
+        <span class="kpi-fiscal-dot" id="kpiFiscalDotNfce" style="background:${totalNfce === 0 ? "var(--green)" : (totalNfce > 20 ? "var(--red)" : "var(--amber)")}"></span>
+        <span class="kpi-fiscal-num">${totalNfce}</span>
+        <span class="kpi-fiscal-label">NFC-e pendentes</span>`;
+    } else {
+      const linhas = dados.nfce.por_loja.map(l => {
+        const ok = l.pendentes === 0;
+        const cor = ok ? "var(--green)" : (l.pendentes > 20 ? "var(--red)" : "var(--amber)");
+        const txt = ok
+          ? `<span style="color:var(--green);font-size:11px;">✔ em dia</span>`
+          : `<span style="color:${cor};font-weight:700;font-size:13px">${l.pendentes}</span><span class="kpi-fiscal-label"> pendentes</span>`;
+        return `<div class="kpi-fiscal-loja-linha">
+          <span class="kpi-fiscal-dot" style="background:${cor}"></span>
+          <span class="kpi-fiscal-loja-nome">${l.loja}</span>
+          ${txt}
+        </div>`;
+      }).join("");
+      elNfce.innerHTML = `<div class="kpi-fiscal-secao-titulo">NFC-e</div>${linhas}`;
+    }
+  }
+
+  // ─── Cor do card ─────────────────────────────
   if (card) {
     card.classList.remove("kpi-card--ok", "kpi-card--warning", "kpi-card--error");
-    if (dados.erro) { /* sem ERP configurado — não pinta */ }
-    else if (dias === 0 && nfce === 0) card.classList.add("kpi-card--ok");
-    else if (nfce > 20 || dias > 5) card.classList.add("kpi-card--error");
-    else card.classList.add("kpi-card--warning");
+    if (!dados.erro) {
+      if (totalDias === 0 && totalNfce === 0) card.classList.add("kpi-card--ok");
+      else if (totalNfce > 20 || totalDias > 5) card.classList.add("kpi-card--error");
+      else card.classList.add("kpi-card--warning");
+    }
   }
 }
 
