@@ -1399,6 +1399,31 @@ function _renderKpiFiscal(dados) {
   }
 }
 
+// Agrupa array por campo string, mantendo ordem de primeira aparição
+function _agrupar(arr, campo) {
+  const mapa = new Map();
+  for (const item of arr) {
+    const chave = item[campo];
+    if (!mapa.has(chave)) mapa.set(chave, []);
+    mapa.get(chave).push(item);
+  }
+  return mapa;
+}
+
+// Gera um id único para blocos expansíveis
+let _fid = 0;
+function _fuid() { return "fi" + (++_fid); }
+
+function _toggleFiscal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const aberto = el.style.display !== "none";
+  el.style.display = aberto ? "none" : "block";
+  const btn = el.previousElementSibling?.querySelector(".fiscal-chevron");
+  if (btn) btn.textContent = aberto ? "▶" : "▼";
+}
+window._toggleFiscal = _toggleFiscal;
+
 function _renderFiscalView(dados) {
   const elC = document.getElementById("fiscalConsistenciaTabela");
   const elN = document.getElementById("fiscalNfceTabela");
@@ -1411,42 +1436,81 @@ function _renderFiscalView(dados) {
     return;
   }
 
+  // ── Consistência: agrupa por loja → data ───────────────────────────
   if (elC) {
     const dias = dados.consistencia.dias;
     if (dias.length === 0) {
       elC.innerHTML = '<div class="empty ok-empty">✔ Todos os dias com consistência finalizada.</div>';
     } else {
-      const rows = dias.map(d => `<tr><td>${d.data}</td><td>${d.loja}</td></tr>`).join("");
-      elC.innerHTML = `
-        <table class="fiscal-table">
-          <thead><tr><th>Data</th><th>Loja</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`;
+      const porLoja = _agrupar(dias, "loja");
+      let html = "";
+      for (const [loja, itens] of porLoja) {
+        const idBloco = _fuid();
+        html += `
+          <div class="fiscal-grupo-header" onclick="_toggleFiscal('${idBloco}')">
+            <span class="fiscal-chevron">▼</span>
+            <span class="fiscal-grupo-nome">${loja}</span>
+            <span class="fiscal-grupo-badge">${itens.length} dia${itens.length > 1 ? "s" : ""}</span>
+          </div>
+          <div id="${idBloco}" class="fiscal-grupo-corpo">
+            <table class="fiscal-table fiscal-table--sub">
+              <thead><tr><th>Data</th></tr></thead>
+              <tbody>${itens.map(d => `<tr><td>${d.data}</td></tr>`).join("")}</tbody>
+            </table>
+          </div>`;
+      }
+      elC.innerHTML = html;
     }
   }
 
+  // ── NFC-e: agrupa por loja → data → cupons ─────────────────────────
   if (elN) {
     const pend = dados.nfce.pendentes;
     if (pend.length === 0) {
       elN.innerHTML = '<div class="empty ok-empty">✔ Nenhum NFC-e pendente de transmissão.</div>';
     } else {
-      const rows = pend.map(p => {
-        const sit = p.situacao.toLowerCase().replace(/ /g, "_");
-        const cont = p.contingencia
-          ? `<span class="modelo-tag" style="--tag-cor:#f97316;--tag-bg:#f9731620;margin-left:4px;">CONT.</span>` : "";
-        const valor = `R$ ${p.valor.toFixed(2).replace(".", ",")}`;
-        return `<tr>
-          <td>${p.data}</td><td>${p.loja}</td><td>${p.ecf}</td><td class="mono">${p.numerocupom}</td>
-          <td><span class="fiscal-sit fiscal-sit--${sit}">${p.situacao}</span>${cont}</td>
-          <td class="mono">${valor}</td>
-          <td class="text-muted" style="font-size:11px;max-width:180px;">${p.motivo}</td>
-        </tr>`;
-      }).join("");
-      elN.innerHTML = `<div style="overflow-x:auto;">
-        <table class="fiscal-table">
-          <thead><tr><th>Data</th><th>Loja</th><th>ECF</th><th>Cupom</th><th>Situação</th><th>Valor</th><th>Motivo</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table></div>`;
+      const porLoja = _agrupar(pend, "loja");
+      let html = "";
+      for (const [loja, itenLoja] of porLoja) {
+        const idLoja = _fuid();
+        const porData = _agrupar(itenLoja, "data");
+        let htmlDatas = "";
+        for (const [data, cupons] of porData) {
+          const idData = _fuid();
+          const totalValor = cupons.reduce((s, c) => s + c.valor, 0);
+          htmlDatas += `
+            <div class="fiscal-grupo-header fiscal-grupo-header--sub" onclick="_toggleFiscal('${idData}')">
+              <span class="fiscal-chevron">▼</span>
+              <span class="fiscal-grupo-nome">${data}</span>
+              <span class="fiscal-grupo-badge">${cupons.length} cupom${cupons.length > 1 ? "s" : ""} · R$ ${totalValor.toFixed(2).replace(".", ",")}</span>
+            </div>
+            <div id="${idData}" class="fiscal-grupo-corpo">
+              <table class="fiscal-table fiscal-table--sub">
+                <thead><tr><th>ECF</th><th>Cupom</th><th>Situação</th><th>Valor</th><th>Motivo</th></tr></thead>
+                <tbody>${cupons.map(p => {
+                  const sit = p.situacao.toLowerCase().replace(/ /g, "_");
+                  const cont = p.contingencia
+                    ? `<span class="modelo-tag" style="--tag-cor:#f97316;--tag-bg:#f9731620;margin-left:4px;font-size:9px;">CONT.</span>` : "";
+                  return `<tr>
+                    <td>${p.ecf}</td>
+                    <td class="mono">${p.numerocupom}</td>
+                    <td><span class="fiscal-sit fiscal-sit--${sit}">${p.situacao}</span>${cont}</td>
+                    <td class="mono">R$ ${p.valor.toFixed(2).replace(".", ",")}</td>
+                    <td class="text-muted" style="font-size:11px;">${p.motivo}</td>
+                  </tr>`;
+                }).join("")}</tbody>
+              </table>
+            </div>`;
+        }
+        html += `
+          <div class="fiscal-grupo-header" onclick="_toggleFiscal('${idLoja}')">
+            <span class="fiscal-chevron">▼</span>
+            <span class="fiscal-grupo-nome">${loja}</span>
+            <span class="fiscal-grupo-badge">${itenLoja.length} cupom${itenLoja.length > 1 ? "s" : ""}</span>
+          </div>
+          <div id="${idLoja}" class="fiscal-grupo-corpo">${htmlDatas}</div>`;
+      }
+      elN.innerHTML = html;
     }
   }
 }
