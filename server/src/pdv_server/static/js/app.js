@@ -1336,10 +1336,10 @@ function _renderKpiFiscal(dados) {
   const elConsist = document.getElementById("kpiFiscalConsistencia");
   if (elConsist) {
     if (dados.erro || !dados.consistencia?.por_loja?.length) {
-      elConsist.innerHTML = `
-        <span class="kpi-fiscal-dot" id="kpiFiscalDotDias" style="background:${totalDias === 0 ? "var(--green)" : "var(--amber)"}"></span>
+      elConsist.innerHTML = `<div class="kpi-fiscal-linha">
+        <span class="kpi-fiscal-dot" style="background:${totalDias === 0 ? "var(--green)" : "var(--amber)"}"></span>
         <span class="kpi-fiscal-num">${totalDias}</span>
-        <span class="kpi-fiscal-label">dias sem fechar</span>`;
+        <span class="kpi-fiscal-label">dias sem fechar</span></div>`;
     } else {
       const linhas = dados.consistencia.por_loja.map(l => {
         const ok = l.dias_pendentes === 0;
@@ -1361,10 +1361,10 @@ function _renderKpiFiscal(dados) {
   const elNfce = document.getElementById("kpiFiscalNfce");
   if (elNfce) {
     if (dados.erro || !dados.nfce?.por_loja?.length) {
-      elNfce.innerHTML = `
-        <span class="kpi-fiscal-dot" id="kpiFiscalDotNfce" style="background:${totalNfce === 0 ? "var(--green)" : (totalNfce > 20 ? "var(--red)" : "var(--amber)")}"></span>
+      elNfce.innerHTML = `<div class="kpi-fiscal-linha">
+        <span class="kpi-fiscal-dot" style="background:${totalNfce === 0 ? "var(--green)" : (totalNfce > 20 ? "var(--red)" : "var(--amber)")}"></span>
         <span class="kpi-fiscal-num">${totalNfce}</span>
-        <span class="kpi-fiscal-label">NFC-e pendentes</span>`;
+        <span class="kpi-fiscal-label">NFC-e pendentes</span></div>`;
     } else {
       const linhas = dados.nfce.por_loja.map(l => {
         const ok = l.pendentes === 0;
