@@ -1128,10 +1128,16 @@ async function carregarDashboard() {
   const grafico = document.getElementById("dashGrafico");
   if (grafico) grafico.innerHTML = svgGraficoBarras(historico);
 
-  const elUltima = document.getElementById("kpiUltima");
-  if (elUltima) {
-    elUltima.textContent = historico.length === 0 ? "—"
-      : historico[0].tem_divergencia ? "⚠️ Com divergência" : "✔ Sem divergência";
+  const elUltimaRow = document.getElementById("kpiUltimaVerifRow");
+  if (elUltimaRow) {
+    if (historico.length === 0) {
+      elUltimaRow.innerHTML = "";
+    } else {
+      const div = historico[0].tem_divergencia;
+      const cor = div ? "var(--amber)" : "var(--green)";
+      const txt = div ? "⚠️ Com divergência" : "✔ Sem divergência";
+      elUltimaRow.innerHTML = `<div class="kpi-integrador-verif" style="color:${cor}">${txt}</div>`;
+    }
   }
 
   // KPIs básicos de lojas/PDVs (sem cruzamento ERP ainda)
