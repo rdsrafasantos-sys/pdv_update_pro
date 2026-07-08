@@ -88,7 +88,7 @@ def pendencias_fiscais(contexto):
                     JOIN loja l ON l.id = v.id_loja
                     JOIN public.situacaonfe s ON s.id = vn.id_situacaonfce
                     WHERE vn.transmitido = false
-                    ORDER BY v.data DESC, v.id_loja, v.ecf, vn.numerocupom
+                    ORDER BY v.data DESC, v.id_loja, v.ecf, v.numerocupom
                     LIMIT 500
                 """)
                 pendentes = [
