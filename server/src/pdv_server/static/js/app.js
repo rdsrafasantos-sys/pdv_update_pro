@@ -1424,6 +1424,15 @@ function _toggleFiscal(id) {
 }
 window._toggleFiscal = _toggleFiscal;
 
+function _toggleDateRows(trHeader, grpId) {
+  const rows = trHeader.closest("table").querySelectorAll(`tr[data-grp="${grpId}"]`);
+  const aberto = rows.length > 0 && rows[0].style.display !== "none";
+  rows.forEach(r => { r.style.display = aberto ? "none" : ""; });
+  const ch = trHeader.querySelector(".fiscal-chevron");
+  if (ch) ch.textContent = aberto ? "▶" : "▼";
+}
+window._toggleDateRows = _toggleDateRows;
+
 function _renderFiscalView(dados) {
   const elC = document.getElementById("fiscalConsistenciaTabela");
   const elN = document.getElementById("fiscalNfceTabela");
@@ -1436,7 +1445,7 @@ function _renderFiscalView(dados) {
     return;
   }
 
-  // ── Consistência: agrupa por loja → data ───────────────────────────
+  // ── Consistência: loja > tabela única com datas ────────────────────
   if (elC) {
     const dias = dados.consistencia.dias;
     if (dias.length === 0) {
@@ -1446,6 +1455,7 @@ function _renderFiscalView(dados) {
       let html = "";
       for (const [loja, itens] of porLoja) {
         const idBloco = _fuid();
+        const rows = itens.map(d => `<tr><td class="fiscal-td-data">${d.data}</td></tr>`).join("");
         html += `
           <div class="fiscal-grupo-header" onclick="_toggleFiscal('${idBloco}')">
             <span class="fiscal-chevron">▼</span>
@@ -1454,8 +1464,7 @@ function _renderFiscalView(dados) {
           </div>
           <div id="${idBloco}" class="fiscal-grupo-corpo">
             <table class="fiscal-table fiscal-table--sub">
-              <thead><tr><th>Data</th></tr></thead>
-              <tbody>${itens.map(d => `<tr><td>${d.data}</td></tr>`).join("")}</tbody>
+              <tbody>${rows}</tbody>
             </table>
           </div>`;
       }
@@ -1463,7 +1472,7 @@ function _renderFiscalView(dados) {
     }
   }
 
-  // ── NFC-e: agrupa por loja → data → cupons ─────────────────────────
+  // ── NFC-e: loja > tabela única, datas como linhas colspan ─────────
   if (elN) {
     const pend = dados.nfce.pendentes;
     if (pend.length === 0) {
@@ -1474,33 +1483,32 @@ function _renderFiscalView(dados) {
       for (const [loja, itenLoja] of porLoja) {
         const idLoja = _fuid();
         const porData = _agrupar(itenLoja, "data");
-        let htmlDatas = "";
+        let tbody = "";
         for (const [data, cupons] of porData) {
           const idData = _fuid();
           const totalValor = cupons.reduce((s, c) => s + c.valor, 0);
-          htmlDatas += `
-            <div class="fiscal-grupo-header fiscal-grupo-header--sub" onclick="_toggleFiscal('${idData}')">
+          const totalStr = `R$ ${totalValor.toFixed(2).replace(".", ",")}`;
+          // Linha de data — clique toggle nas linhas do grupo
+          tbody += `<tr class="fiscal-tr-data" onclick="_toggleDateRows(this,'${idData}')">
+            <td colspan="5">
               <span class="fiscal-chevron">▼</span>
-              <span class="fiscal-grupo-nome">${data}</span>
-              <span class="fiscal-grupo-badge">${cupons.length} cupom${cupons.length > 1 ? "s" : ""} · R$ ${totalValor.toFixed(2).replace(".", ",")}</span>
-            </div>
-            <div id="${idData}" class="fiscal-grupo-corpo">
-              <table class="fiscal-table fiscal-table--sub">
-                <thead><tr><th>ECF</th><th>Cupom</th><th>Situação</th><th>Valor</th><th>Motivo</th></tr></thead>
-                <tbody>${cupons.map(p => {
-                  const sit = p.situacao.toLowerCase().replace(/ /g, "_");
-                  const cont = p.contingencia
-                    ? `<span class="modelo-tag" style="--tag-cor:#f97316;--tag-bg:#f9731620;margin-left:4px;font-size:9px;">CONT.</span>` : "";
-                  return `<tr>
-                    <td>${p.ecf}</td>
-                    <td class="mono">${p.numerocupom}</td>
-                    <td><span class="fiscal-sit fiscal-sit--${sit}">${p.situacao}</span>${cont}</td>
-                    <td class="mono">R$ ${p.valor.toFixed(2).replace(".", ",")}</td>
-                    <td class="text-muted" style="font-size:11px;">${p.motivo}</td>
-                  </tr>`;
-                }).join("")}</tbody>
-              </table>
-            </div>`;
+              <span class="fiscal-tr-data-label">${data}</span>
+              <span class="fiscal-grupo-badge">${cupons.length} cupom${cupons.length > 1 ? "s" : ""} · ${totalStr}</span>
+            </td>
+          </tr>`;
+          // Linhas dos cupons
+          for (const p of cupons) {
+            const sit = p.situacao.toLowerCase().replace(/ /g, "_");
+            const cont = p.contingencia
+              ? `<span class="modelo-tag" style="--tag-cor:#f97316;--tag-bg:#f9731620;margin-left:4px;font-size:9px;">CONT.</span>` : "";
+            tbody += `<tr data-grp="${idData}">
+              <td class="text-muted">${p.ecf}</td>
+              <td class="mono">${p.numerocupom}</td>
+              <td><span class="fiscal-sit fiscal-sit--${sit}">${p.situacao}</span>${cont}</td>
+              <td class="mono">R$ ${p.valor.toFixed(2).replace(".", ",")}</td>
+              <td class="text-muted" style="font-size:11px;">${p.motivo}</td>
+            </tr>`;
+          }
         }
         html += `
           <div class="fiscal-grupo-header" onclick="_toggleFiscal('${idLoja}')">
@@ -1508,7 +1516,12 @@ function _renderFiscalView(dados) {
             <span class="fiscal-grupo-nome">${loja}</span>
             <span class="fiscal-grupo-badge">${itenLoja.length} cupom${itenLoja.length > 1 ? "s" : ""}</span>
           </div>
-          <div id="${idLoja}" class="fiscal-grupo-corpo">${htmlDatas}</div>`;
+          <div id="${idLoja}" class="fiscal-grupo-corpo">
+            <table class="fiscal-table fiscal-table--sub">
+              <thead><tr><th>ECF</th><th>Cupom</th><th>Situação</th><th>Valor</th><th>Motivo</th></tr></thead>
+              <tbody>${tbody}</tbody>
+            </table>
+          </div>`;
       }
       elN.innerHTML = html;
     }

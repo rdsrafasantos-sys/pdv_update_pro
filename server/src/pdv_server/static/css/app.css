@@ -343,11 +343,16 @@ input:checked + .slider:before { transform: translateX(17px); background: #1a0f0
 /* grupos expansíveis na view fiscal */
 .fiscal-grupo-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; border-radius: 6px; user-select: none; font-size: 13px; font-weight: 600; background: var(--surface-2); margin-bottom: 2px; }
 .fiscal-grupo-header:hover { background: var(--surface-3); }
-.fiscal-grupo-header--sub { background: transparent; padding: 7px 12px 7px 28px; font-size: 12px; font-weight: 500; border-bottom: 1px solid var(--border); margin-bottom: 0; border-radius: 0; }
-.fiscal-grupo-header--sub:hover { background: var(--surface-2); }
 .fiscal-chevron { font-size: 10px; color: var(--text-faint); flex-shrink: 0; width: 12px; }
 .fiscal-grupo-nome { flex: 1; }
 .fiscal-grupo-badge { font-size: 11px; font-weight: 500; color: var(--text-dim); background: var(--surface-3); padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
-.fiscal-grupo-corpo { margin-bottom: 8px; }
+.fiscal-grupo-corpo { margin-bottom: 10px; border-radius: 0 0 6px 6px; overflow: hidden; border: 1px solid var(--border); border-top: none; }
 .fiscal-table--sub { margin: 0; }
-.fiscal-table--sub td, .fiscal-table--sub th { padding: 6px 12px 6px 28px; }
+.fiscal-table--sub td, .fiscal-table--sub th { padding: 7px 14px; }
+/* linha de data dentro da tabela */
+.fiscal-tr-data { background: var(--surface-2); cursor: pointer; user-select: none; }
+.fiscal-tr-data:hover { background: var(--surface-3); }
+.fiscal-tr-data td { padding: 6px 14px !important; font-size: 12px; font-weight: 600; color: var(--text-dim); border-bottom: 1px solid var(--border) !important; }
+.fiscal-tr-data .fiscal-chevron { display: inline-block; margin-right: 6px; }
+.fiscal-tr-data-label { margin-right: 10px; }
+.fiscal-td-data { color: var(--text-dim); font-size: 13px; }
