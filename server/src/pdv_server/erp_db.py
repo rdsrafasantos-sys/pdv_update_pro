@@ -80,7 +80,7 @@ def pendencias_fiscais(contexto):
                 dias = [{"data": str(r[0]), "loja": r[1]} for r in cur.fetchall()]
 
                 cur.execute("""
-                    SELECT v.data, l.descricao AS loja, v.ecf, vn.numerocupom,
+                    SELECT v.data, l.descricao AS loja, v.ecf, v.numerocupom,
                            s.descricao AS situacao, vn.contingencia,
                            v.subtotalimpressora AS valor, vn.motivorejeicao
                     FROM pdv.vendanfce vn
