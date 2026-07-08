@@ -69,29 +69,48 @@ def pendencias_fiscais(contexto):
         conn = _conectar(cfg, contexto.tailscale_site_id)
         try:
             with conn.cursor() as cur:
-                # Todas as lojas com registro de consistência nos últimos 180 dias
+                # Dia sem consistência finalizada = tem vendas naquele dia
+                # mas NÃO existe registro em pdv.consistencia com calculovendamedia=true.
+                # Isso captura: (a) dias com linha calculovendamedia=false
+                #               (b) dias sem linha alguma na tabela (ex: 28/29 jan)
+                PENDENTE_SQL = """
+                    SELECT DISTINCT v.data, l.descricao AS loja
+                    FROM pdv.venda v
+                    JOIN loja l ON l.id = v.id_loja
+                    WHERE v.data >= CURRENT_DATE - INTERVAL '180 days'
+                      AND v.data < CURRENT_DATE
+                      AND v.cancelado = false
+                      AND NOT EXISTS (
+                          SELECT 1 FROM pdv.consistencia c
+                          WHERE c.data = v.data
+                            AND c.id_loja = v.id_loja
+                            AND c.calculovendamedia = true
+                      )
+                    ORDER BY v.data DESC, l.descricao
+                """
+
+                # Todas as lojas com vendas nos últimos 180 dias
                 cur.execute("""
                     SELECT DISTINCT l.descricao
-                    FROM pdv.consistencia c
-                    JOIN loja l ON l.id = c.id_loja
-                    WHERE c.data >= CURRENT_DATE - INTERVAL '180 days'
+                    FROM pdv.venda v
+                    JOIN loja l ON l.id = v.id_loja
+                    WHERE v.data >= CURRENT_DATE - INTERVAL '180 days'
+                      AND v.cancelado = false
                     ORDER BY l.descricao
                 """)
                 todas_lojas = [r[0] for r in cur.fetchall()]
 
-                # Dias pendentes por loja
-                cur.execute("""
-                    SELECT l.descricao, COUNT(*) AS dias_pendentes,
-                           MIN(c.data)::text AS mais_antiga
-                    FROM pdv.consistencia c
-                    JOIN loja l ON l.id = c.id_loja
-                    WHERE c.calculovendamedia = false
-                      AND c.data >= CURRENT_DATE - INTERVAL '180 days'
-                    GROUP BY l.descricao
-                    ORDER BY l.descricao
-                """)
-                pend_por_loja = {r[0]: {"dias": r[1], "mais_antiga": r[2]}
-                                 for r in cur.fetchall()}
+                # Dias pendentes — detalhe (para a view) e resumo por loja
+                cur.execute(PENDENTE_SQL)
+                dias_raw = cur.fetchall()
+                dias = [{"data": str(r[0]), "loja": r[1]} for r in dias_raw]
+
+                pend_por_loja: dict = {}
+                for data, loja in dias_raw:
+                    e = pend_por_loja.setdefault(loja, {"dias": 0, "mais_antiga": str(data)})
+                    e["dias"] += 1
+                    if str(data) < e["mais_antiga"]:
+                        e["mais_antiga"] = str(data)
 
                 consistencia_lojas = [
                     {"loja": loja,
@@ -100,17 +119,6 @@ def pendencias_fiscais(contexto):
                     for loja in todas_lojas
                 ]
                 dias_total = sum(v["dias_pendentes"] for v in consistencia_lojas)
-
-                # Detalhe por dia (para a view de detalhe)
-                cur.execute("""
-                    SELECT c.data, l.descricao AS loja
-                    FROM pdv.consistencia c
-                    JOIN loja l ON l.id = c.id_loja
-                    WHERE c.calculovendamedia = false
-                      AND c.data >= CURRENT_DATE - INTERVAL '180 days'
-                    ORDER BY c.data DESC, l.descricao
-                """)
-                dias = [{"data": str(r[0]), "loja": r[1]} for r in cur.fetchall()]
 
                 # NFC-e pendentes por loja
                 cur.execute("""
