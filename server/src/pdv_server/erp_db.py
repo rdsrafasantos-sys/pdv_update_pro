@@ -119,13 +119,15 @@ def pendencias_fiscais(contexto):
                 ]
                 dias_total = sum(v["dias_pendentes"] for v in consistencia_lojas)
 
-                # NFC-e pendentes por loja
-                cur.execute("""
+                # NFC-e: apenas Rejeitada (2) e Não Transmitida (0)
+                NFCE_FILTER = "vn.transmitido = false AND vn.id_situacaonfce IN (0, 2)"
+
+                cur.execute(f"""
                     SELECT l.descricao, COUNT(*) AS pendentes
                     FROM pdv.vendanfce vn
                     JOIN pdv.venda v ON v.id = vn.id_venda
                     JOIN loja l ON l.id = v.id_loja
-                    WHERE vn.transmitido = false
+                    WHERE {NFCE_FILTER}
                     GROUP BY l.descricao
                     ORDER BY l.descricao
                 """)
@@ -137,7 +139,7 @@ def pendencias_fiscais(contexto):
                 ]
 
                 # Detalhe cupom a cupom (para a view de detalhe)
-                cur.execute("""
+                cur.execute(f"""
                     SELECT v.data, l.descricao AS loja, v.ecf, v.numerocupom,
                            s.descricao AS situacao, vn.contingencia,
                            v.subtotalimpressora AS valor, vn.motivorejeicao
@@ -145,7 +147,7 @@ def pendencias_fiscais(contexto):
                     JOIN pdv.venda v ON v.id = vn.id_venda
                     JOIN loja l ON l.id = v.id_loja
                     JOIN public.situacaonfe s ON s.id = vn.id_situacaonfce
-                    WHERE vn.transmitido = false
+                    WHERE {NFCE_FILTER}
                     ORDER BY v.data DESC, v.id_loja, v.ecf, v.numerocupom
                     LIMIT 500
                 """)
