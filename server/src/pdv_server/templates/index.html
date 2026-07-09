@@ -73,6 +73,7 @@
         <div class="menu-items">
           <div class="menu-item" data-view="agente" onclick="mostrarView('agente')">🤖 Atualização de Agente</div>
           <div class="menu-item" data-view="pdv" onclick="mostrarView('pdv')">📦 Atualização de PDV</div>
+          <div class="menu-item" data-view="integrador-update" onclick="mostrarView('integrador-update')">🔗 Atualização do Integrador</div>
         </div>
       </div>
 
@@ -283,6 +284,56 @@
           </div>
         </div>
 
+        <!-- ═══════════════ ATUALIZAÇÃO DO INTEGRADOR ═══════════════ -->
+        <div class="view" id="view-integrador-update" style="display:none;">
+
+          <!-- Cabeçalho com versão atual -->
+          <div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+              <div class="section-title" style="margin-bottom:4px;">🔗 Atualização do Integrador VR</div>
+              <div style="font-size:12px;color:var(--text-dim);">Versão atual detectada via SSH no host do integrador</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="kpi-label" style="font-size:11px;">VERSÃO ATUAL</span>
+              <span id="intUpdVersaoAtual" class="intupd-versao-badge">—</span>
+              <button class="btn-verify" onclick="intUpdVerificarVersao()" style="white-space:nowrap;">🔄 Verificar</button>
+            </div>
+          </div>
+
+          <!-- Painel de atualização -->
+          <div class="card">
+            <div class="section-title">⬆ Nova versão</div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+              <label class="form-field" style="flex:1;min-width:180px;max-width:260px;">
+                Versão alvo
+                <input type="text" id="intUpdNovaVersao" placeholder="ex: v2.3.0" style="font-family:monospace;">
+              </label>
+              <button class="btn-update" id="btnIntUpd" onclick="intUpdIniciar()" style="margin-top:18px;white-space:nowrap;" disabled>
+                🚀 Atualizar Integrador
+              </button>
+            </div>
+            <div id="intUpdAviso" style="font-size:12px;color:var(--amber);display:none;margin-bottom:8px;">
+              ⚠ Configure o acesso SSH do integrador em Configurações antes de atualizar.
+            </div>
+          </div>
+
+          <!-- Progresso passo a passo -->
+          <div class="card" id="intUpdCardProgresso" style="display:none;">
+            <div class="section-title">📋 Progresso</div>
+            <div id="intUpdPassos"></div>
+          </div>
+
+          <!-- Log ao vivo -->
+          <div class="card" id="intUpdCardLog" style="display:none;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div class="section-title" style="margin:0;">🖥 Log do container</div>
+              <button class="btn-verify" onclick="document.getElementById('intUpdLog').innerHTML=''" style="font-size:11px;padding:3px 10px;">Limpar</button>
+            </div>
+            <div id="intUpdLog" class="intupd-log"></div>
+          </div>
+
+        </div>
+
         <!-- ═══════════════ CONFIGURAÇÕES ═══════════════ -->
         <div class="view" id="view-config" style="display:none;">
           <div class="card">
@@ -333,6 +384,32 @@
             </div>
             <div id="integradorResultado" class="text-muted" style="margin-top:10px;font-size:12px;"></div>
             <div id="integradorColecoes" style="margin-top:8px;"></div>
+          </div>
+
+          <div class="card">
+            <div class="section-title">🔐 Acesso SSH ao servidor do Integrador</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">
+              Necessário para a funcionalidade de Atualização do Integrador
+            </div>
+            <div class="form-grid">
+              <label class="form-field">IP SSH (host do integrador)
+                <input type="text" id="integradorSshIp" placeholder="192.168.1.20">
+              </label>
+              <label class="form-field">Porta SSH
+                <input type="number" id="integradorSshPorta" placeholder="22">
+              </label>
+              <label class="form-field">Usuário SSH
+                <input type="text" id="integradorSshUsuario" placeholder="ubuntu">
+              </label>
+              <label class="form-field">Senha SSH
+                <input type="password" id="integradorSshSenha">
+              </label>
+            </div>
+            <div class="actions-row">
+              <div></div>
+              <button class="btn-update" onclick="salvarConfigIntegradorSsh()">💾 Salvar SSH</button>
+            </div>
+            <div id="integradorSshResultado" class="text-muted" style="margin-top:10px;font-size:12px;"></div>
           </div>
         </div>
 

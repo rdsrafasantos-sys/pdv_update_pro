@@ -9,3 +9,4 @@ pyotp
 qrcode
 cryptography
 SQLAlchemy
+paramiko

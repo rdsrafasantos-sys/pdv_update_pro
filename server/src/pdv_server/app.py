@@ -23,7 +23,7 @@ from pdv_server.discovery import (
     encontrar_pdv, endereco_alcancavel, get_lojas, invalidar_cache,
     resolver_endereco, _tentar_requisicao,
 )
-from pdv_server import VERSION, erp_db, integrador, replication
+from pdv_server import VERSION, erp_db, integrador, integrador_update, replication
 from pdv_server.versioning import eh_downgrade, extrair_versao
 
 if not SECRET_KEY:
@@ -519,6 +519,39 @@ def api_integrador_config_set(contexto):
 @com_rede
 def api_integrador_status(contexto):
     return jsonify(integrador.testar_status(contexto))
+
+
+# ──────────────────────────────────────────────
+# INTEGRADOR VR — Atualização via SSH
+# ──────────────────────────────────────────────
+@app.route("/api/<int:rede_id>/integrador/versao_atual", methods=["GET"])
+@com_rede
+def api_integrador_versao_atual(contexto):
+    cfg = integrador.carregar_config(contexto)
+    if not integrador_update.config_ssh_completa(cfg):
+        return jsonify({"erro": "SSH não configurado", "versao": None})
+    return jsonify(integrador_update.versao_atual(cfg))
+
+
+@app.route("/api/<int:rede_id>/integrador/atualizar_stream", methods=["GET"])
+@com_rede
+def api_integrador_atualizar_stream(contexto):
+    nova_versao = request.args.get("versao", "").strip()
+    if not nova_versao:
+        return jsonify({"erro": "Parâmetro 'versao' obrigatório"}), 400
+    cfg = integrador.carregar_config(contexto)
+    if not integrador_update.config_ssh_completa(cfg):
+        return jsonify({"erro": "SSH não configurado"}), 400
+
+    import json as _json
+
+    def gerar():
+        for evento in integrador_update.atualizar_stream(cfg, nova_versao):
+            yield f"data: {_json.dumps(evento, ensure_ascii=False)}\n\n"
+
+    return app.response_class(gerar(), mimetype="text/event-stream",
+                              headers={"Cache-Control": "no-cache",
+                                       "X-Accel-Buffering": "no"})
 
 
 @app.route("/api/<int:rede_id>/sysinfo_loja/<loja_id>", methods=["GET"])

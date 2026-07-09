@@ -6,8 +6,10 @@ from datetime import datetime, timezone
 from pdv_server.config import REPLICACAO_DB
 from pdv_server.replication import COLECOES
 
-CONFIG_PADRAO = {"ip": "", "porta": 0, "mongo_ip": "", "mongo_porta": 27016}
-CAMPOS_CONFIG = ("ip", "porta", "mongo_ip", "mongo_porta")
+CONFIG_PADRAO = {"ip": "", "porta": 0, "mongo_ip": "", "mongo_porta": 27016,
+                 "ssh_ip": "", "ssh_porta": 22, "ssh_usuario": "", "ssh_senha": ""}
+CAMPOS_CONFIG = ("ip", "porta", "mongo_ip", "mongo_porta",
+                 "ssh_ip", "ssh_porta", "ssh_usuario", "ssh_senha")
 
 # Se nenhuma colecao monitorada recebeu um documento novo nas ultimas N horas,
 # trata como sinal de que a replicacao do integrador pode estar parada (mesmo

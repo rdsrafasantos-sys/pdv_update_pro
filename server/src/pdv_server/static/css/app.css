@@ -340,6 +340,18 @@ input:checked + .slider:before { transform: translateX(17px); background: #1a0f0
 .fiscal-sit--rejeitada,.fiscal-sit--denegada { color: var(--red); background: var(--red-dim); }
 .fiscal-sit--inutilizada,.fiscal-sit--não_transmitida { color: var(--text-dim); background: var(--surface-2); }
 .ok-empty { color: var(--green) !important; }
+
+/* ── Atualização do Integrador ── */
+.intupd-versao-badge { font-family: monospace; font-size: 15px; font-weight: 700; padding: 4px 14px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim); }
+.intupd-versao-badge--ok { color: var(--green); border-color: var(--green); background: var(--green-dim); }
+.intupd-versao-badge--erro { color: var(--red); border-color: var(--red); background: var(--red-dim); }
+.intupd-passo { padding: 7px 12px; font-size: 13px; border-left: 3px solid var(--border); margin-bottom: 4px; border-radius: 0 4px 4px 0; background: var(--surface-2); }
+.intupd-passo--ok { border-color: var(--green); color: var(--green); }
+.intupd-passo--info { border-color: var(--amber); color: var(--amber); }
+.intupd-passo--erro { border-color: var(--red); color: var(--red); background: var(--red-dim); }
+.intupd-log { font-family: monospace; font-size: 11px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; max-height: 400px; overflow-y: auto; }
+.intupd-log-linha { padding: 1px 0; color: var(--text-dim); white-space: pre-wrap; word-break: break-all; }
+
 /* grupos expansíveis na view fiscal */
 .fiscal-grupo-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; border-radius: 6px; user-select: none; font-size: 13px; font-weight: 600; background: var(--surface-2); margin-bottom: 2px; }
 .fiscal-grupo-header:hover { background: var(--surface-3); }

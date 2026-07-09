@@ -101,7 +101,7 @@ function _dashOcultarLoading() {
 // NAVEGACAO (sidebar + views)
 // ──────────────────────────────────────────────
 function mostrarView(nome) {
-  for (const v of ["dashboard", "agente", "pdv", "replicacao", "config", "fiscal"]) {
+  for (const v of ["dashboard", "agente", "pdv", "replicacao", "config", "fiscal", "integrador-update"]) {
     const el = document.getElementById(`view-${v}`);
     if (el) el.style.display = v === nome ? "flex" : "none";
   }
@@ -110,6 +110,7 @@ function mostrarView(nome) {
   });
   if (nome === "dashboard") { carregarDashboard(); _iniciarPolingSysinfo(); }
   else if (nome === "fiscal") { carregarPendenciasFiscais(); }
+  else if (nome === "integrador-update") { intUpdCarregar(); }
   else { _pararPolingSysinfo(); _pararPolingSysinfoLojas(); }
 }
 window.mostrarView = mostrarView;
@@ -827,6 +828,7 @@ async function carregarConfigIntegrador() {
   if (porta) porta.value = cfg.porta || "";
   if (mongoIp) mongoIp.value = cfg.mongo_ip || "";
   if (mongoPorta) mongoPorta.value = cfg.mongo_porta || 27016;
+  _preencherConfigIntegradorSsh(cfg);
 }
 
 async function salvarConfigIntegrador() {
@@ -1527,6 +1529,149 @@ function _renderFiscalView(dados) {
     }
   }
 }
+
+// ──────────────────────────────────────────────
+// CONFIG INTEGRADOR — SSH
+// ──────────────────────────────────────────────
+async function salvarConfigIntegradorSsh() {
+  const dados = {
+    ssh_ip:      document.getElementById("integradorSshIp")?.value.trim() || "",
+    ssh_porta:   parseInt(document.getElementById("integradorSshPorta")?.value, 10) || 22,
+    ssh_usuario: document.getElementById("integradorSshUsuario")?.value.trim() || "",
+    ssh_senha:   document.getElementById("integradorSshSenha")?.value || "",
+  };
+  await fetch(API("/integrador/config"), {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dados),
+  });
+  const el = document.getElementById("integradorSshResultado");
+  if (el) { el.textContent = "✔ Configuração SSH salva."; el.style.color = "var(--green)"; }
+}
+window.salvarConfigIntegradorSsh = salvarConfigIntegradorSsh;
+
+function _preencherConfigIntegradorSsh(cfg) {
+  const f = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ""; };
+  f("integradorSshIp", cfg.ssh_ip);
+  f("integradorSshPorta", cfg.ssh_porta || 22);
+  f("integradorSshUsuario", cfg.ssh_usuario);
+  // senha não preenche por segurança
+}
+
+// ──────────────────────────────────────────────
+// ATUALIZAÇÃO DO INTEGRADOR
+// ──────────────────────────────────────────────
+let _intUpdStream = null;
+
+async function intUpdCarregar() {
+  // Preenche campos SSH da config
+  const cfg = await fetch(API("/integrador/config")).then(r => r.json()).catch(() => null);
+  if (cfg) _preencherConfigIntegradorSsh(cfg);
+
+  const temSsh = cfg?.ssh_ip && cfg?.ssh_usuario;
+  const aviso = document.getElementById("intUpdAviso");
+  const btn = document.getElementById("btnIntUpd");
+  if (aviso) aviso.style.display = temSsh ? "none" : "block";
+  if (btn) btn.disabled = !temSsh;
+
+  if (temSsh) intUpdVerificarVersao();
+}
+window.intUpdCarregar = intUpdCarregar;
+
+async function intUpdVerificarVersao() {
+  const badge = document.getElementById("intUpdVersaoAtual");
+  if (badge) { badge.textContent = "..."; badge.className = "intupd-versao-badge"; }
+  const d = await fetch(API("/integrador/versao_atual")).then(r => r.json()).catch(() => null);
+  if (!badge) return;
+  if (!d || d.erro) {
+    badge.textContent = d?.erro || "Erro";
+    badge.className = "intupd-versao-badge intupd-versao-badge--erro";
+    return;
+  }
+  badge.textContent = d.versao;
+  badge.className = "intupd-versao-badge intupd-versao-badge--ok";
+  // Sugerir próxima versão no campo de input
+  const input = document.getElementById("intUpdNovaVersao");
+  if (input && !input.value) {
+    const prox = _sugerirProximaVersao(d.versao);
+    if (prox) input.placeholder = `ex: ${prox}`;
+  }
+}
+window.intUpdVerificarVersao = intUpdVerificarVersao;
+
+function _sugerirProximaVersao(versao) {
+  const m = versao?.match(/^v?(\d+)\.(\d+)\.(\d+)/);
+  if (!m) return null;
+  return `v${m[1]}.${m[2]}.${parseInt(m[3]) + 1}`;
+}
+
+function intUpdIniciar() {
+  const input = document.getElementById("intUpdNovaVersao");
+  const nova = input?.value.trim();
+  if (!nova) { alert("Informe a versão alvo."); return; }
+
+  // Fechar stream anterior se existir
+  if (_intUpdStream) { _intUpdStream.close(); _intUpdStream = null; }
+
+  // Mostrar cards de progresso e log
+  const cardProg = document.getElementById("intUpdCardProgresso");
+  const cardLog = document.getElementById("intUpdCardLog");
+  const elPassos = document.getElementById("intUpdPassos");
+  const elLog = document.getElementById("intUpdLog");
+  if (cardProg) cardProg.style.display = "block";
+  if (cardLog) cardLog.style.display = "block";
+  if (elPassos) elPassos.innerHTML = "";
+  if (elLog) elLog.innerHTML = "";
+
+  const btn = document.getElementById("btnIntUpd");
+  if (btn) btn.disabled = true;
+
+  const url = API(`/integrador/atualizar_stream?versao=${encodeURIComponent(nova)}`);
+  _intUpdStream = new EventSource(url);
+
+  _intUpdStream.onmessage = (ev) => {
+    const d = JSON.parse(ev.data);
+
+    if (d.tipo === "passo") {
+      const div = document.createElement("div");
+      div.className = "intupd-passo" + (d.texto.startsWith("✅") ? " intupd-passo--ok" : d.texto.startsWith("✔") ? " intupd-passo--ok" : d.texto.startsWith("ℹ") ? " intupd-passo--info" : "");
+      div.textContent = d.texto;
+      if (elPassos) elPassos.appendChild(div);
+      elPassos?.lastElementChild?.scrollIntoView({ behavior: "smooth" });
+
+    } else if (d.tipo === "log") {
+      const pre = document.createElement("div");
+      pre.className = "intupd-log-linha";
+      pre.textContent = d.texto;
+      if (elLog) { elLog.appendChild(pre); elLog.scrollTop = elLog.scrollHeight; }
+
+    } else if (d.tipo === "erro") {
+      const div = document.createElement("div");
+      div.className = "intupd-passo intupd-passo--erro";
+      div.textContent = "✖ " + d.texto;
+      if (elPassos) elPassos.appendChild(div);
+
+    } else if (d.tipo === "fim") {
+      _intUpdStream.close();
+      _intUpdStream = null;
+      if (btn) btn.disabled = false;
+      if (d.sucesso && d.versao) {
+        const badge = document.getElementById("intUpdVersaoAtual");
+        if (badge) { badge.textContent = d.versao; badge.className = "intupd-versao-badge intupd-versao-badge--ok"; }
+      }
+    }
+  };
+
+  _intUpdStream.onerror = () => {
+    _intUpdStream?.close();
+    _intUpdStream = null;
+    if (btn) btn.disabled = false;
+    const div = document.createElement("div");
+    div.className = "intupd-passo intupd-passo--erro";
+    div.textContent = "✖ Conexão com o servidor perdida.";
+    if (elPassos) elPassos.appendChild(div);
+  };
+}
+window.intUpdIniciar = intUpdIniciar;
 
 // ──────────────────────────────────────────────
 // TEMA
