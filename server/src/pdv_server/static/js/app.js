@@ -1194,6 +1194,14 @@ function _dashFase2(lojasList, historico) {
     atualizarKpiIntegrador(d || { status: "erro", erro: "Falha." });
     _atualizarBannerAlertas();
   });
+  // Versão do integrador via SSH — chamada separada pois pode ser lenta
+  fetch(API("/integrador/versao_atual")).then(r => r.json()).catch(() => null).then(d => {
+    const el = document.getElementById("kpiIntegradorVersao");
+    if (!el) return;
+    if (d?.versao) {
+      el.innerHTML = `<div class="kpi-integrador-versao">🏷 ${d.versao}</div>`;
+    }
+  });
   _f(API("/sysinfo")).then(d => {
     const el = document.getElementById("kpiSysinfo");
     if (el && d) {
