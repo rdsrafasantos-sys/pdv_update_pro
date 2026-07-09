@@ -47,7 +47,7 @@ def versao_atual(cfg: dict) -> dict:
         client.close()
         if code != 0:
             return {"erro": err.strip() or "Arquivo não encontrado", "versao": None}
-        m = re.search(rf"{re.escape(IMAGE_PREFIX)}(\S+)", out)
+        m = re.search(rf"{re.escape(IMAGE_PREFIX)}([^\s\"']+)", out)
         if not m:
             return {"erro": "Tag de versão não encontrada no docker-compose", "versao": None}
         return {"erro": None, "versao": m.group(1), "compose": out}
@@ -91,7 +91,7 @@ def atualizar_stream(cfg: dict, nova_versao: str):
             yield {"tipo": "fim", "sucesso": False}
             return
 
-        m = re.search(rf"{re.escape(IMAGE_PREFIX)}(\S+)", out)
+        m = re.search(rf"{re.escape(IMAGE_PREFIX)}([^\s\"']+)", out)
         if not m:
             yield erro("Tag de versão não encontrada no arquivo compose.")
             client.close()
