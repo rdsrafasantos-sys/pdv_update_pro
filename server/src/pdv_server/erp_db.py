@@ -73,13 +73,13 @@ def pendencias_fiscais(contexto):
                 # mas NÃO existe registro em pdv.consistencia com calculovendamedia=true.
                 # Isso captura: (a) dias com linha calculovendamedia=false
                 #               (b) dias sem linha alguma na tabela (ex: 28/29 jan)
+                # Qualquer movimentação (venda ou cancelamento) sem consistência finalizada
                 PENDENTE_SQL = """
                     SELECT DISTINCT v.data, l.descricao AS loja
                     FROM pdv.venda v
                     JOIN loja l ON l.id = v.id_loja
                     WHERE v.data >= CURRENT_DATE - INTERVAL '180 days'
                       AND v.data < CURRENT_DATE
-                      AND v.cancelado = false
                       AND NOT EXISTS (
                           SELECT 1 FROM pdv.consistencia c
                           WHERE c.data = v.data
@@ -89,13 +89,12 @@ def pendencias_fiscais(contexto):
                     ORDER BY v.data DESC, l.descricao
                 """
 
-                # Todas as lojas com vendas nos últimos 180 dias
+                # Todas as lojas com qualquer movimentação nos últimos 180 dias
                 cur.execute("""
                     SELECT DISTINCT l.descricao
                     FROM pdv.venda v
                     JOIN loja l ON l.id = v.id_loja
                     WHERE v.data >= CURRENT_DATE - INTERVAL '180 days'
-                      AND v.cancelado = false
                     ORDER BY l.descricao
                 """)
                 todas_lojas = [r[0] for r in cur.fetchall()]
