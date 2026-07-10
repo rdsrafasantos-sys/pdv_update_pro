@@ -59,7 +59,7 @@ def exigir_login():
     rota = request.endpoint or ""
     # Callback do script de instalacao roda sem sessao de usuario --
     # autenticado pelo token de uso unico na propria URL (ver gestao.py).
-    if rota.startswith("auth.") or rota in ("static", "painel.api_callback_instalacao", "download_agente_publico", "api_versao"):
+    if rota.startswith("auth.") or rota in ("static", "painel.api_callback_instalacao", "download_agente_publico", "download_status_pdv_publico", "api_versao"):
         return None
     if not current_user.is_authenticated:
         return login_manager.unauthorized()
@@ -250,27 +250,42 @@ def api_limpar_arquivos(contexto):
 
 @app.route("/download/agente.exe")
 def download_agente_publico():
-    """Download publico do agente.exe — sem autenticacao, para recuperacao de PDVs."""
+    """Download publico do agente.exe — sem autenticacao, para instalacao inicial em PDVs."""
     import glob
     for caminho in glob.glob("/opt/pdv-server/uploads/*/agente.exe"):
         return send_file(caminho, as_attachment=True, download_name="agente.exe")
     return "agente.exe nao disponivel", 404
 
 
+@app.route("/download/status_pdv.exe")
+def download_status_pdv_publico():
+    """Download publico do status_pdv.exe — sem autenticacao, para instalacao inicial em PDVs."""
+    import glob
+    for caminho in glob.glob("/opt/pdv-server/uploads/*/status_pdv.exe"):
+        return send_file(caminho, as_attachment=True, download_name="status_pdv.exe")
+    return "status_pdv.exe nao disponivel", 404
+
+
 @app.route("/api/agente/info", methods=["GET"])
 @login_required
 def api_agente_info():
-    """Retorna metadados do agente.exe mais recente disponivel no servidor."""
+    """Retorna metadados dos instaladores disponíveis para download (agente + status_pdv)."""
     import glob as _glob
-    candidatos = _glob.glob("/opt/pdv-server/uploads/*/agente.exe")
-    if not candidatos:
-        return jsonify({"disponivel": False})
-    # escolhe o mais recente por data de modificação
-    caminho = max(candidatos, key=os.path.getmtime)
+
+    def _info(nome):
+        candidatos = _glob.glob(f"/opt/pdv-server/uploads/*/{nome}")
+        if not candidatos:
+            return {"disponivel": False}
+        caminho = max(candidatos, key=os.path.getmtime)
+        return {
+            "disponivel": True,
+            "tamanho_mb": round(os.path.getsize(caminho) / 1024 / 1024, 2),
+            "data": time.strftime("%d/%m/%Y %H:%M", time.localtime(os.path.getmtime(caminho))),
+        }
+
     return jsonify({
-        "disponivel": True,
-        "tamanho_mb": round(os.path.getsize(caminho) / 1024 / 1024, 2),
-        "data": time.strftime("%d/%m/%Y %H:%M", time.localtime(os.path.getmtime(caminho))),
+        "agente": _info("agente.exe"),
+        "status_pdv": _info("status_pdv.exe"),
     })
 
 

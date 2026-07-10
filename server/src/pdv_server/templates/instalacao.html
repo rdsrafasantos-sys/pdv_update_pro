@@ -215,25 +215,20 @@
         </div>
       </div>
 
-      <!-- ── Download do agente ── -->
+      <!-- ── Download dos instaladores ── -->
       <div class="card" id="cardDownloadAgente">
-        <div class="section-title">Download do instalador do agente</div>
-        <div class="siteid-hint" style="margin:0 0 16px;">
-          O agente (<code>agente.exe</code>) deve ser instalado em cada PDV. Baixe aqui a
-          versão mais recente que foi enviada para o servidor via upload.
+        <div class="section-title">Instaladores para o PDV</div>
+        <div class="siteid-hint" style="margin:0 0 18px;">
+          Instale os dois arquivos em cada PDV antes de conectá-lo à rede.
+          As versões disponíveis são as que foram enviadas via upload no painel de uma Rede.
         </div>
-        <div id="agenteInfo" style="margin-bottom:14px;">
+
+        <div style="display:flex; flex-direction:column; gap:12px;" id="listaInstaladores">
           <div class="text-muted" style="font-size:12.5px;">Verificando disponibilidade...</div>
         </div>
-        <a id="btnBaixarAgente" class="btn btn-primary" href="/download/agente.exe" download="agente.exe"
-           style="display:none; text-decoration:none; width:fit-content;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;margin-right:6px;">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          Baixar agente.exe
-        </a>
-        <div id="agenteSemArquivo" style="display:none;">
-          <span class="status-badge status-erro">Nenhum agente.exe disponível — faça upload primeiro pelo painel de uma Rede.</span>
+
+        <div id="instaladoresSemArquivo" style="display:none; margin-top:8px;">
+          <span class="status-badge status-erro">Nenhum instalador disponível — faça upload de agente.exe e status_pdv.exe pelo painel de uma Rede.</span>
         </div>
       </div>
 
@@ -563,20 +558,45 @@ async function criarRede() {
 carregarHistorico();
 carregarInfoAgente();
 
+const ICONE_DOWNLOAD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+
 async function carregarInfoAgente() {
-  const info = await fetch('/api/agente/info').then(r => r.json()).catch(() => ({ disponivel: false }));
-  const infoEl = document.getElementById('agenteInfo');
-  const btnEl  = document.getElementById('btnBaixarAgente');
-  const semEl  = document.getElementById('agenteSemArquivo');
-  if (info.disponivel) {
-    infoEl.innerHTML = `<span class="status-badge status-ok" style="font-size:12px;">
-      Disponível · ${info.tamanho_mb} MB · atualizado em ${info.data}
-    </span>`;
-    btnEl.style.display = 'inline-flex';
-  } else {
-    infoEl.innerHTML = '';
-    semEl.style.display = 'block';
-  }
+  const dados = await fetch('/api/agente/info').then(r => r.json()).catch(() => ({}));
+  const lista = document.getElementById('listaInstaladores');
+  const semEl = document.getElementById('instaladoresSemArquivo');
+
+  const instaladores = [
+    { key: 'agente',     label: 'Agente PDV',    desc: 'Responsável por receber atualizações e comunicar com o servidor', url: '/download/agente.exe',     nome: 'agente.exe' },
+    { key: 'status_pdv', label: 'Status PDV',    desc: 'Exibe o progresso da atualização na tela do caixa',              url: '/download/status_pdv.exe', nome: 'status_pdv.exe' },
+  ];
+
+  const linhas = instaladores.map(inst => {
+    const info = dados[inst.key] || { disponivel: false };
+    return `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;
+                  background:var(--bg-elevated); border:1px solid var(--border-strong);
+                  border-radius:var(--radius-sm); padding:12px 14px;">
+        <div style="display:flex; flex-direction:column; gap:3px;">
+          <div style="font-size:13px; font-weight:650;">${inst.label}
+            <code style="font-size:11px; color:var(--text-faint); font-weight:400; margin-left:4px;">${inst.nome}</code>
+          </div>
+          <div style="font-size:11.5px; color:var(--text-faint);">${inst.desc}</div>
+          ${info.disponivel
+            ? `<div style="font-size:11px; color:var(--green); margin-top:2px;">✔ ${info.tamanho_mb} MB · atualizado em ${info.data}</div>`
+            : `<div style="font-size:11px; color:var(--amber); margin-top:2px;">⚠ Não disponível — faça upload pelo painel de uma Rede</div>`}
+        </div>
+        ${info.disponivel
+          ? `<a href="${inst.url}" download="${inst.nome}"
+               style="display:inline-flex; align-items:center; gap:6px; white-space:nowrap; text-decoration:none;"
+               class="btn btn-ghost btn-sm">${ICONE_DOWNLOAD} Baixar</a>`
+          : `<button class="btn btn-ghost btn-sm" disabled style="opacity:.4; white-space:nowrap;">${ICONE_DOWNLOAD} Baixar</button>`}
+      </div>`;
+  });
+
+  const algumDisponivel = instaladores.some(i => (dados[i.key] || {}).disponivel);
+  lista.innerHTML = linhas.join('');
+  semEl.style.display = algumDisponivel ? 'none' : 'block';
+  if (!algumDisponivel) lista.innerHTML = '';
 }
 </script>
 </body>
