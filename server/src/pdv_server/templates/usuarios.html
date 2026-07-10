@@ -22,9 +22,23 @@
     width: 100%; background: var(--bg-elevated); border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 13px;
   }
-  .modal-card select[multiple] { height: 90px; }
   .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin-bottom: 10px; }
   .checkbox-row input { width: auto; }
+
+  /* Lista de checkboxes (substitui select[multiple]) */
+  .check-list {
+    background: var(--bg-elevated); border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm); padding: 6px 4px; max-height: 130px;
+    overflow-y: auto;
+  }
+  .check-list-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 8px; border-radius: 6px; cursor: pointer;
+    font-size: 12.5px; color: var(--text); user-select: none;
+  }
+  .check-list-item:hover { background: var(--bg-hover, rgba(255,255,255,.06)); }
+  .check-list-item input[type=checkbox] { width: auto; accent-color: var(--accent); cursor: pointer; }
+  .check-list-vazio { padding: 8px 10px; font-size: 12px; color: var(--text-faint); }
   .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
   .erro-msg { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
 
@@ -183,11 +197,15 @@
     <div id="blocoAcessoEspecifico">
       <div class="field">
         <label>Unidades (acesso a todas as redes delas)</label>
-        <select id="campoUnidadesUsuario" multiple></select>
+        <div id="campoUnidadesUsuario" class="check-list">
+          <div class="check-list-vazio">Carregando...</div>
+        </div>
       </div>
       <div class="field">
         <label>Redes específicas</label>
-        <select id="campoRedesUsuario" multiple></select>
+        <div id="campoRedesUsuario" class="check-list">
+          <div class="check-list-vazio">Carregando...</div>
+        </div>
       </div>
     </div>
     <div class="checkbox-row" id="linhaAtivo" style="display:none;">
@@ -282,6 +300,34 @@ let redesCache = [];
 let perfisCache = [];
 let senhaEdicaoAberta = false;
 
+// ── Helpers para lista de checkboxes ──
+function _renderCheckList(id, itens, selecionados = []) {
+  const el = document.getElementById(id);
+  if (!itens || itens.length === 0) {
+    el.innerHTML = '<div class="check-list-vazio">Nenhum item disponível</div>';
+    return;
+  }
+  el.innerHTML = itens.map(item => `
+    <label class="check-list-item">
+      <input type="checkbox" value="${item.id}"
+        ${selecionados.includes(item.id) ? 'checked' : ''}>
+      ${item.nome}
+    </label>
+  `).join('');
+}
+
+function _getChecked(id) {
+  return Array.from(
+    document.getElementById(id).querySelectorAll('input[type=checkbox]:checked')
+  ).map(cb => parseInt(cb.value, 10));
+}
+
+function _setChecked(id, ids) {
+  document.getElementById(id)
+    .querySelectorAll('input[type=checkbox]')
+    .forEach(cb => { cb.checked = ids.includes(parseInt(cb.value, 10)); });
+}
+
 function atualizarVisibilidadeAcesso() {
   document.getElementById('blocoAcessoEspecifico').style.display =
     document.getElementById('campoAcessoTotal').checked ? 'none' : 'block';
@@ -313,11 +359,8 @@ async function carregarTudo() {
   selPerfil.innerHTML = '<option value="">Sem perfil (sem permissões)</option>' +
     perfis.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
 
-  document.getElementById('campoUnidadesUsuario').innerHTML =
-    unidades.map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
-
-  document.getElementById('campoRedesUsuario').innerHTML =
-    redes.map(r => `<option value="${r.id}">${r.nome}</option>`).join('');
+  _renderCheckList('campoUnidadesUsuario', unidades);
+  _renderCheckList('campoRedesUsuario', redes);
 
   renderUsuarios(usuarios);
   renderPerfis(perfis);
@@ -400,8 +443,8 @@ function abrirModalNovoUsuario() {
   document.getElementById('campoPerfilUsuario').value = '';
   document.getElementById('campoAcessoTotal').checked = false;
   document.getElementById('linhaAtivo').style.display = 'none';
-  Array.from(document.getElementById('campoUnidadesUsuario').options).forEach(o => o.selected = false);
-  Array.from(document.getElementById('campoRedesUsuario').options).forEach(o => o.selected = false);
+  _setChecked('campoUnidadesUsuario', []);
+  _setChecked('campoRedesUsuario', []);
   atualizarVisibilidadeAcesso();
   document.getElementById('erroUsuario').style.display = 'none';
   document.getElementById('modalUsuario').classList.add('aberto');
@@ -456,8 +499,8 @@ async function editarUsuario(id) {
   document.getElementById('campoAcessoTotal').checked = u.acesso_total;
   document.getElementById('linhaAtivo').style.display = 'flex';
   document.getElementById('campoAtivoUsuario').checked = u.ativo;
-  Array.from(document.getElementById('campoUnidadesUsuario').options).forEach(o => o.selected = u.unidade_ids.includes(parseInt(o.value, 10)));
-  Array.from(document.getElementById('campoRedesUsuario').options).forEach(o => o.selected = u.rede_ids.includes(parseInt(o.value, 10)));
+  _setChecked('campoUnidadesUsuario', u.unidade_ids);
+  _setChecked('campoRedesUsuario', u.rede_ids);
   atualizarVisibilidadeAcesso();
   document.getElementById('erroUsuario').style.display = 'none';
   document.getElementById('modalUsuario').classList.add('aberto');
@@ -470,8 +513,8 @@ function fecharModalUsuario() {
 
 async function salvarUsuario() {
   const id = document.getElementById('usuarioId').value;
-  const unidadeIds = Array.from(document.getElementById('campoUnidadesUsuario').selectedOptions).map(o => parseInt(o.value, 10));
-  const redeIds    = Array.from(document.getElementById('campoRedesUsuario').selectedOptions).map(o => parseInt(o.value, 10));
+  const unidadeIds = _getChecked('campoUnidadesUsuario');
+  const redeIds    = _getChecked('campoRedesUsuario');
   const perfilVal  = document.getElementById('campoPerfilUsuario').value;
 
   let corpo, url, metodo;
