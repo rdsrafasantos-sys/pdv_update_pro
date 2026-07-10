@@ -10,3 +10,5 @@ qrcode
 cryptography
 SQLAlchemy
 paramiko
+gunicorn
+gevent

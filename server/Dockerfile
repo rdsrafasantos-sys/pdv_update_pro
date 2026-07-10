@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 8888
 
-CMD ["python", "main.py"]
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "wsgi:app"]
