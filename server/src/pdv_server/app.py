@@ -59,7 +59,7 @@ def exigir_login():
     rota = request.endpoint or ""
     # Callback do script de instalacao roda sem sessao de usuario --
     # autenticado pelo token de uso unico na propria URL (ver gestao.py).
-    if rota.startswith("auth.") or rota in ("static", "painel.api_callback_instalacao", "download_agente_publico", "download_status_pdv_publico", "download_setup_publico", "api_versao"):
+    if rota.startswith("auth.") or rota in ("static", "painel.api_callback_instalacao", "download_agente_publico", "download_status_pdv_publico", "download_setup_publico", "api_upload_setup", "api_versao"):
         return None
     if not current_user.is_authenticated:
         return login_manager.unauthorized()
@@ -277,10 +277,20 @@ def download_setup_publico():
     return "PDVAgent_Setup.exe não disponível", 404
 
 
+def _autenticar_setup_upload():
+    """Aceita sessão de usuário logado OU token Bearer de deploy."""
+    if current_user.is_authenticated:
+        return True
+    token = os.environ.get("PDV_SETUP_UPLOAD_TOKEN", "")
+    auth = request.headers.get("Authorization", "")
+    return token and auth == f"Bearer {token}"
+
+
 @app.route("/api/setup/upload", methods=["POST"])
-@login_required
 def api_upload_setup():
-    """Recebe PDVAgent_Setup.exe e armazena no servidor."""
+    """Recebe PDVAgent_Setup.exe via painel (sessão) ou script de build (token Bearer)."""
+    if not _autenticar_setup_upload():
+        return jsonify({"erro": "Não autorizado"}), 401
     if "arquivo" not in request.files:
         return jsonify({"erro": "Nenhum arquivo enviado"}), 400
     arquivo = request.files["arquivo"]

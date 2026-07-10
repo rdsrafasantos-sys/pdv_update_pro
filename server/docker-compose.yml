@@ -35,9 +35,11 @@ services:
       - PDV_TAILSCALE_OAUTH_CLIENT_SECRET=${PDV_TAILSCALE_OAUTH_CLIENT_SECRET:-}
       - PDV_TAILSCALE_TAILNET=${PDV_TAILSCALE_TAILNET:--}
       - PDV_PAINEL_CALLBACK_URL=${PDV_PAINEL_CALLBACK_URL:-}
+      - PDV_SETUP_UPLOAD_TOKEN=${PDV_SETUP_UPLOAD_TOKEN:-}
     volumes:
       - ./data/uploads:/opt/pdv-server/uploads
       - ./data/replicacao:/opt/pdv-server/replicacao
       - ./data/erp_db:/opt/pdv-server/erp_db
       - ./data/integrador:/opt/pdv-server/integrador
       - ./data/auth:/opt/pdv-server/auth
+      - ./data/setup:/opt/pdv-server/setup
