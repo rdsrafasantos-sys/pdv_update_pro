@@ -298,104 +298,6 @@
       <!-- ══════════════════════════════════════════════════════ -->
       <div class="tab-content" id="tab-pdv">
 
-        <!-- Passos resumidos -->
-        <div class="card">
-          <div class="section-title">O que você vai precisar</div>
-          <div class="pdv-steps" style="margin-top:14px;">
-            <div class="pdv-step">
-              <div class="step-num">1</div>
-              <div class="step-body">
-                <div class="step-title">Token de Acesso ao Servidor</div>
-                <div class="step-desc">Copie o token abaixo e tenha-o em mãos. O instalador vai pedir esse valor durante a instalação.</div>
-              </div>
-            </div>
-            <div class="pdv-step">
-              <div class="step-num">2</div>
-              <div class="step-body">
-                <div class="step-title">Auth Key do Tailscale <span class="text-muted" style="font-weight:400;">(opcional)</span></div>
-                <div class="step-desc">Cole no instalador para conectar o PDV à VPN automaticamente. A mesma key serve todos os PDVs desta instalação.</div>
-                <div id="authKeyArea" style="margin-top:10px;">
-                  <div id="authKeyCarregando" class="text-muted" style="font-size:12px;">Carregando...</div>
-
-                  <div id="authKeyResultado" style="display:none;">
-                    <div class="token-row">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                           style="width:15px;height:15px;flex-shrink:0;color:var(--text-faint);">
-                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                      </svg>
-                      <span id="authKeyValor" class="token-valor">—</span>
-                      <button class="btn btn-ghost btn-sm" id="btnRevelarAuthKey" onclick="toggleAuthKey()">Revelar</button>
-                      <button class="btn btn-ghost btn-sm" id="btnCopiarAuthKey" onclick="copiarAuthKey()">Copiar</button>
-                    </div>
-                    <div id="authKeyExpiry" style="margin-top:7px; font-size:12px;"></div>
-                  </div>
-
-                  <div id="authKeyNaoConfigurada" style="display:none;">
-                    {% if usuario_atual.is_super_admin %}
-                    <div style="font-size:12px; line-height:1.8; padding:10px 12px;
-                                background:rgba(255,170,0,.08); border:1px solid rgba(255,170,0,.3);
-                                border-radius:var(--radius-sm);">
-                      <div style="font-weight:650; color:#ffaa00; margin-bottom:6px;">
-                        ⚠️ Auth key não configurada
-                      </div>
-                      <div class="text-muted">
-                        Crie uma auth key no
-                        <b>Tailscale Admin Console → Settings → Keys</b>
-                        com <code>reusable=true</code> e tag <code>pdv-terminal</code>,
-                        depois adicione ao <code>.env</code> do servidor:
-                      </div>
-                      <div style="margin-top:6px; font-family:monospace; font-size:11.5px; color:var(--text);">
-                        PDV_TAILSCALE_AUTH_KEY_PDV=tskey-auth-...<br>
-                        PDV_TAILSCALE_AUTH_KEY_PDV_ID=kXXXXXXXXXX
-                      </div>
-                      <div class="text-muted" style="margin-top:6px; font-size:11px;">
-                        O ID aparece na URL da key no admin console ou na resposta da API ao criar.
-                        Reinicie o servidor após editar o <code>.env</code>.
-                      </div>
-                    </div>
-                    {% else %}
-                    <div class="text-muted" style="font-size:12px;">
-                      Auth key do Tailscale não configurada. Solicite ao administrador do sistema.
-                    </div>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="pdv-step">
-              <div class="step-num">3</div>
-              <div class="step-body">
-                <div class="step-title">Baixar e rodar o PDVAgent_Setup.exe</div>
-                <div class="step-desc">Execute o instalador no PDV como Administrador. Ele instala o agente, o monitor de status e o Tailscale de uma vez só.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Token de Acesso -->
-        <div class="card">
-          <div class="section-title">Token de Acesso ao Servidor</div>
-          <div class="siteid-hint" style="margin:0 0 16px;">
-            Informe este valor quando o instalador <code>PDVAgent_Setup.exe</code> perguntar pelo
-            <b>Token de Acesso ao Servidor</b>. É o mesmo para todos os PDVs desta instalação.
-          </div>
-          <div class="token-row">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                 style="width:16px;height:16px;flex-shrink:0;color:var(--orange);">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0110 0v4"/>
-            </svg>
-            <span id="tokenValor" class="token-valor">Carregando...</span>
-            <button class="btn btn-ghost btn-sm" id="btnRevelarToken" onclick="toggleToken()">Revelar</button>
-            <button class="btn btn-ghost btn-sm" id="btnCopiarToken" onclick="copiarToken()">Copiar</button>
-          </div>
-          <div class="text-muted" style="font-size:12px; margin-top:10px;">
-            🔒 Mantenha em sigilo — quem tiver este valor e acesso à rede pode comunicar com os agentes PDV.
-          </div>
-        </div>
-
-        <!-- Instalador -->
         <div class="card">
           <div class="section-title">Instalador do PDV Agent</div>
 
@@ -403,32 +305,45 @@
             <div class="text-muted" style="font-size:12.5px;">Verificando disponibilidade...</div>
           </div>
 
-          <!-- Arquivo de configuração -->
-          <div style="border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:14px; margin-bottom:14px;">
-            <div style="font-size:13px; font-weight:650; margin-bottom:4px;">
-              Arquivo de configuração
-              <span class="status-badge status-ok" style="font-size:11px; padding:2px 8px; margin-left:8px;">Recomendado</span>
-            </div>
-            <div class="text-muted" style="font-size:12px; margin-bottom:12px;">
-              Baixe o <code>pdv_config.ini</code> e importe no instalador com um clique — sem digitar token nem auth key.
-            </div>
-            <a href="/api/pdv/config-arquivo" download="pdv_config.ini" class="btn btn-primary btn-sm"
-               style="display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-              </svg>
-              Baixar pdv_config.ini
-            </a>
-            <div class="text-muted" style="font-size:11px; margin-top:10px;">
-              No instalador: clique em <b>"Importar pdv_config.ini baixado do painel..."</b> e selecione o arquivo — token e auth key preenchem automaticamente.
+          <!-- Passo 1: Config -->
+          <div style="display:flex; gap:14px; align-items:flex-start; margin-bottom:16px;">
+            <div class="step-num">1</div>
+            <div style="flex:1;">
+              <div style="font-size:13px; font-weight:650; margin-bottom:4px;">Baixar o arquivo de configuração</div>
+              <div class="text-muted" style="font-size:12px; margin-bottom:10px;">
+                Contém o token e a auth key pré-configurados. Importe no instalador para preencher tudo automaticamente.
+              </div>
+              <a href="/api/pdv/config-arquivo" download="pdv_config.ini"
+                 class="btn btn-primary btn-sm"
+                 style="display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Baixar pdv_config.ini
+              </a>
             </div>
           </div>
 
-          <!-- Upload de novo exe -->
-          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div style="border-top:1px solid var(--border); margin-bottom:16px;"></div>
+
+          <!-- Passo 2: Setup -->
+          <div style="display:flex; gap:14px; align-items:flex-start; margin-bottom:16px;">
+            <div class="step-num">2</div>
+            <div style="flex:1;">
+              <div style="font-size:13px; font-weight:650; margin-bottom:4px;">Baixar e rodar o instalador</div>
+              <div class="text-muted" style="font-size:12px; margin-bottom:10px;">
+                Execute o <code>PDVAgent_Setup.exe</code> no PDV como Administrador.
+                Na tela de configuração, clique em <b>"Importar pdv_config.ini..."</b> e selecione o arquivo baixado.
+              </div>
+              <div id="setupDownloadArea"></div>
+            </div>
+          </div>
+
+          {% if usuario_atual.is_super_admin %}
+          <div style="border-top:1px solid var(--border); padding-top:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <span class="text-muted" style="font-size:12px;">Atualizar instalador:</span>
             <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;">
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
               Enviar novo Setup.exe
@@ -436,7 +351,27 @@
             </label>
             <span id="uploadSetupStatus" style="font-size:12px; color:var(--text-faint);"></span>
           </div>
+          {% endif %}
         </div>
+
+        {% if usuario_atual.is_super_admin %}
+        <!-- Aviso de auth key (só para admin, só se não configurada) -->
+        <div id="authKeyAdminAviso" style="display:none;">
+          <div class="card" style="border-color:rgba(255,170,0,.35);">
+            <div style="font-weight:650; color:#ffaa00; margin-bottom:8px;">⚠️ Auth key do Tailscale não configurada</div>
+            <div class="text-muted" style="font-size:12.5px; line-height:1.8;">
+              O <code>pdv_config.ini</code> será gerado sem auth key — o PDV não entrará na VPN automaticamente.<br>
+              Para configurar, crie uma key em <b>Tailscale Admin Console → Settings → Keys</b>
+              (reusable, tag <code>pdv-terminal</code>) e adicione ao <code>.env</code>:
+            </div>
+            <div style="margin-top:8px; font-family:monospace; font-size:11.5px; background:var(--bg-elevated);
+                        padding:8px 12px; border-radius:var(--radius-sm); color:var(--text);">
+              PDV_TAILSCALE_AUTH_KEY_PDV=tskey-auth-...<br>
+              PDV_TAILSCALE_AUTH_KEY_PDV_ID=kXXXXXXXXXX
+            </div>
+          </div>
+        </div>
+        {% endif %}
 
       </div><!-- /tab-pdv -->
 
@@ -756,73 +691,32 @@ async function criarRede() {
   }
 }
 
-// ── PDV — Token de acesso ─────────────────────────────────────────────────────
-let _tokenAgente  = null;
-let _tokenVisivel = false;
-
+// ── Service Manager — Token (preenchimento do passo 3) ───────────────────────
 async function carregarTokenAgente() {
   try {
     const d = await fetch('/api/token-agente').then(r => r.json());
-    if (d.token) {
-      _tokenAgente = d.token;
-      document.getElementById('campoPasso3Token').value = d.token;
-    }
+    if (d.token) document.getElementById('campoPasso3Token').value = d.token;
   } catch (_) {}
-  _renderToken();
 }
 
-function _renderToken() {
-  const el  = document.getElementById('tokenValor');
-  const btn = document.getElementById('btnRevelarToken');
-  if (!_tokenAgente) { el.textContent = '— erro ao carregar —'; return; }
-  el.textContent = _tokenVisivel ? _tokenAgente : '●'.repeat(Math.min(_tokenAgente.length, 40));
-  btn.textContent = _tokenVisivel ? 'Ocultar' : 'Revelar';
-}
-
-function toggleToken() {
-  _tokenVisivel = !_tokenVisivel;
-  _renderToken();
-}
-
-async function copiarToken() {
-  if (!_tokenAgente) return;
-  try { await navigator.clipboard.writeText(_tokenAgente); } catch (_) {}
-  const btn = document.getElementById('btnCopiarToken');
-  const orig = btn.textContent;
-  btn.textContent = 'Copiado!';
-  setTimeout(() => { btn.textContent = orig; }, 2000);
-}
-
-// ── PDV — Instalador ──────────────────────────────────────────────────────────
+// ── PDV — Instalador ─────────────────────────────────────────────────────────
 async function carregarInfoAgente() {
   const info = await fetch('/api/setup/info').then(r => r.json()).catch(() => ({ disponivel: false }));
-  const el = document.getElementById('setupStatus');
+  const statusEl = document.getElementById('setupStatus');
+  const areaEl   = document.getElementById('setupDownloadArea');
   if (info.disponivel) {
-    el.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;
-                  background:var(--bg-elevated); border:1px solid var(--border-strong);
-                  border-radius:var(--radius-sm); padding:12px 14px;">
-        <div>
-          <div style="font-size:13px; font-weight:650;">PDVAgent_Setup.exe
-            <span style="font-size:11px; color:var(--green); font-weight:400; margin-left:8px;">
-              ✔ ${info.tamanho_mb} MB · atualizado em ${info.data}
-            </span>
-          </div>
-          <div style="font-size:11.5px; color:var(--text-faint); margin-top:3px;">
-            Instala agente, monitor de status e Tailscale de uma vez só
-          </div>
-        </div>
-        <a href="/download/PDVAgent_Setup.exe" download="PDVAgent_Setup.exe"
-           class="btn btn-primary btn-sm"
-           style="display:inline-flex; align-items:center; gap:6px; white-space:nowrap; text-decoration:none;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          Baixar Setup
-        </a>
-      </div>`;
+    statusEl.innerHTML = `<span style="font-size:12px; color:var(--green);">✔ PDVAgent_Setup.exe · ${info.tamanho_mb} MB · ${info.data}</span>`;
+    areaEl.innerHTML = `
+      <a href="/download/PDVAgent_Setup.exe" download="PDVAgent_Setup.exe"
+         class="btn btn-primary btn-sm" style="display:inline-flex; align-items:center; gap:6px; text-decoration:none; margin-top:8px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Baixar PDVAgent_Setup.exe
+      </a>`;
   } else {
-    el.innerHTML = `<span class="status-badge status-aguardando">Nenhum Setup.exe disponível — faça o upload abaixo.</span>`;
+    statusEl.innerHTML = '';
+    areaEl.innerHTML = `<span class="text-muted" style="font-size:12.5px;">Nenhum Setup disponível — aguarde o upload do administrador.</span>`;
   }
 }
 
@@ -845,77 +739,23 @@ async function uploadSetup(input) {
   input.value = '';
 }
 
-// ── PDV — Auth Key Tailscale ──────────────────────────────────────────────────
-let _authKey        = null;
-let _authKeyVisivel = false;
-
-const _AVISO_CFG = {
-  ok:       { cor: 'var(--green)',      icone: '✔', texto: d => `Válida · ${d} dias restantes · tag pdv-terminal` },
-  atencao:  { cor: '#ffaa00',           icone: '⚠️', texto: d => `Expira em ${d} dias — renove em breve` },
-  critico:  { cor: 'var(--red)',        icone: '🔴', texto: d => `Atenção: expira em ${d} dias! Renove agora.` },
-  expirada: { cor: 'var(--red)',        icone: '❌', texto: _  => `Auth key expirada — configure uma nova no .env` },
-};
-
-async function carregarAuthKeyPdv() {
+// ── PDV — Aviso auth key não configurada (só para admin) ─────────────────────
+async function verificarAuthKeyPdv() {
+  const aviso = document.getElementById('authKeyAdminAviso');
+  if (!aviso) return;
   try {
     const d = await fetch('/api/tailscale/auth-key-pdv').then(r => r.json());
-    document.getElementById('authKeyCarregando').style.display = 'none';
-
-    if (d.erro) {
-      document.getElementById('authKeyNaoConfigurada').style.display = 'block';
-      return;
-    }
-
-    _authKey = d.key;
-    _authKeyVisivel = false;
-    document.getElementById('authKeyResultado').style.display = 'block';
-    _renderAuthKey();
-
-    const expiryEl = document.getElementById('authKeyExpiry');
-    if (d.nivel_aviso && d.nivel_aviso !== 'ok') {
-      const cfg = _AVISO_CFG[d.nivel_aviso] || _AVISO_CFG.ok;
-      expiryEl.innerHTML =
-        `<span style="color:${cfg.cor}; font-weight:600;">${cfg.icone} ${cfg.texto(d.dias_restantes)}</span>`;
-    } else if (d.nivel_aviso === 'ok') {
-      const cfg = _AVISO_CFG.ok;
-      expiryEl.innerHTML =
-        `<span style="color:${cfg.cor};">${cfg.icone} ${cfg.texto(d.dias_restantes)}</span>`;
-    } else {
-      expiryEl.innerHTML = '<span class="text-muted">tag pdv-terminal · reutilizável</span>';
-    }
-  } catch (e) {
-    document.getElementById('authKeyCarregando').style.display = 'none';
-    document.getElementById('authKeyNaoConfigurada').style.display = 'block';
+    if (d.erro) aviso.style.display = 'block';
+  } catch (_) {
+    aviso.style.display = 'block';
   }
 }
 
-function _renderAuthKey() {
-  const el  = document.getElementById('authKeyValor');
-  const btn = document.getElementById('btnRevelarAuthKey');
-  if (!_authKey) return;
-  el.textContent = _authKeyVisivel ? _authKey : '●'.repeat(Math.min(_authKey.length, 40));
-  btn.textContent = _authKeyVisivel ? 'Ocultar' : 'Revelar';
-}
-
-function toggleAuthKey() {
-  _authKeyVisivel = !_authKeyVisivel;
-  _renderAuthKey();
-}
-
-async function copiarAuthKey() {
-  if (!_authKey) return;
-  try { await navigator.clipboard.writeText(_authKey); } catch (_) {}
-  const btn = document.getElementById('btnCopiarAuthKey');
-  const orig = btn.textContent;
-  btn.textContent = 'Copiado!';
-  setTimeout(() => { btn.textContent = orig; }, 2000);
-}
-
-// ── Init ──────────────────────────────────────────────────────────────────────
+// ── Init ─────────────────────────────────────────────────────────────────────
 carregarHistorico();
 carregarInfoAgente();
 carregarTokenAgente();
-carregarAuthKeyPdv();
+verificarAuthKeyPdv();
 </script>
 </body>
 </html>
