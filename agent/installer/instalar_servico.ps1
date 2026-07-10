@@ -6,6 +6,19 @@
 
 Write-Host "=== Instalando PDV Agent como Servico Windows ===" -ForegroundColor Cyan
 
+# Token de acesso (obrigatorio — mesmo valor de PDV_SERVER_TOKEN no servidor)
+$AgentToken = ""
+while ($true) {
+    $AgentToken = Read-Host "Token de Acesso ao Servidor (PDV_SERVER_TOKEN)"
+    if ($AgentToken.Length -lt 16) {
+        Write-Host "ERRO: o token deve ter pelo menos 16 caracteres." -ForegroundColor Red
+    } elseif ($AgentToken -eq "pdv-agent-2024") {
+        Write-Host "ERRO: nao use o valor padrao inseguro." -ForegroundColor Red
+    } else {
+        break
+    }
+}
+
 $NomeServico = "PDVAgent"
 $PastaAgente = "C:\PDVAgent"
 $ExeAgente   = "C:\PDVAgent\agente.exe"
@@ -104,6 +117,7 @@ Write-Host "[5/6] Instalando servico com NSSM..." -ForegroundColor Yellow
 & $NssmExe set $NomeServico Start SERVICE_AUTO_START
 & $NssmExe set $NomeServico AppStdout "C:\PDVAgent\agente_pdv.log"
 & $NssmExe set $NomeServico AppStderr "C:\PDVAgent\agente_pdv.log"
+& $NssmExe set $NomeServico AppEnvironmentExtra "PDV_AGENT_TOKEN=$AgentToken"
 & $NssmExe start $NomeServico
 Start-Sleep -Seconds 3
 
@@ -117,7 +131,7 @@ if (-not $regra) {
         -Protocol TCP `
         -LocalPort 5000 `
         -Action Allow `
-        -Profile Any | Out-Null
+        -Profile Domain, Private | Out-Null
     Write-Host "Regra de firewall criada." -ForegroundColor Green
 } else {
     Write-Host "Regra de firewall ja existe." -ForegroundColor Green

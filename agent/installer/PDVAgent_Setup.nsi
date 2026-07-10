@@ -29,8 +29,10 @@ Unicode true
 !define MSI_TAILSCALE  "tailscale-setup-amd64.msi"
 !define PORTA          "5000"
 
+Var AgentToken
 Var TailscaleAuthKey
 Var TailscaleHostname
+Var hCtlAgentToken
 Var hCtlTailscaleAuthKey
 Var hCtlTailscaleHostname
 
@@ -79,25 +81,55 @@ Function TailscalePageCreate
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateLabel} 0 0u 100% 30u "Tailscale (opcional): cole abaixo a auth key marcada com tag:pdv-terminal (a mesma para todo PDV, de qualquer cliente) para conectar este PDV automaticamente a VPN. Deixe em branco para pular esta etapa (pode ser configurado depois)."
+  ; ── Token de acesso (OBRIGATORIO) ────────────────────────────────────────
+  ${NSD_CreateLabel} 0 0u 100% 10u "Token de Acesso ao Servidor *"
+  Pop $0
+  ${NSD_CreateText} 0 11u 100% 12u ""
+  Pop $hCtlAgentToken
+
+  ${NSD_CreateLabel} 0 25u 100% 16u "Obrigatorio. Obtena com o administrador do sistema (mesmo valor de PDV_SERVER_TOKEN configurado no servidor PDV Updater)."
   Pop $0
 
-  ${NSD_CreateLabel} 0 36u 100% 10u "Auth Key:"
+  ; ── Tailscale (OPCIONAL) ──────────────────────────────────────────────────
+  ${NSD_CreateLabel} 0 46u 100% 10u "Auth Key Tailscale (opcional):"
   Pop $0
-  ${NSD_CreateText} 0 47u 100% 12u ""
+  ${NSD_CreateText} 0 57u 100% 12u ""
   Pop $hCtlTailscaleAuthKey
 
-  ${NSD_CreateLabel} 0 64u 100% 10u "Nome deste PDV na rede Tailscale (opcional, ex: bonna-loja01-pdv03):"
+  ${NSD_CreateLabel} 0 73u 100% 10u "Nome deste PDV na rede Tailscale (opcional, ex: bonna-loja01-pdv03):"
   Pop $0
-  ${NSD_CreateText} 0 75u 100% 12u ""
+  ${NSD_CreateText} 0 84u 100% 12u ""
   Pop $hCtlTailscaleHostname
+
+  ${NSD_CreateLabel} 0 99u 100% 18u "Cole a auth key marcada com tag:pdv-terminal para conectar este PDV automaticamente a VPN. Deixe em branco para configurar depois."
+  Pop $0
 
   nsDialogs::Show
 FunctionEnd
 
 Function TailscalePageLeave
+  ${NSD_GetText} $hCtlAgentToken $AgentToken
   ${NSD_GetText} $hCtlTailscaleAuthKey $TailscaleAuthKey
   ${NSD_GetText} $hCtlTailscaleHostname $TailscaleHostname
+
+  ; Validar token: nao pode ser vazio
+  ${If} $AgentToken == ""
+    MessageBox MB_ICONEXCLAMATION "O Token de Acesso ao Servidor e obrigatorio.$\r$\nObtena com o administrador do sistema."
+    Abort
+  ${EndIf}
+
+  ; Validar token: minimo 16 caracteres
+  StrLen $R0 $AgentToken
+  ${If} $R0 < 16
+    MessageBox MB_ICONEXCLAMATION "O Token de Acesso deve ter pelo menos 16 caracteres.$\r$\nVerifique com o administrador."
+    Abort
+  ${EndIf}
+
+  ; Validar token: nao pode ser o valor padrao inseguro
+  ${If} $AgentToken == "pdv-agent-2024"
+    MessageBox MB_ICONEXCLAMATION "Token invalido: nao use o valor padrao 'pdv-agent-2024'.$\r$\nObtena o token correto com o administrador."
+    Abort
+  ${EndIf}
 FunctionEnd
 
 ;--------------------------------
@@ -132,6 +164,10 @@ Section "PDV Agent" SecPrincipal
   nsExec::ExecToLog '"${PASTA_DESTINO}\${EXE_NSSM}" set ${NOME_SERVICO} AppStdout "${PASTA_DESTINO}\agente_pdv.log"'
   nsExec::ExecToLog '"${PASTA_DESTINO}\${EXE_NSSM}" set ${NOME_SERVICO} AppStderr "${PASTA_DESTINO}\agente_pdv.log"'
 
+  ; Configurar token de seguranca ANTES de iniciar o servico
+  DetailPrint "Configurando token de acesso..."
+  nsExec::ExecToLog '"${PASTA_DESTINO}\${EXE_NSSM}" set ${NOME_SERVICO} AppEnvironmentExtra "PDV_AGENT_TOKEN=$AgentToken"'
+
   DetailPrint "Serviço instalado."
 
   ; ── 3. Inicia o serviço ───────────────────────
@@ -142,9 +178,10 @@ Section "PDV Agent" SecPrincipal
   DetailPrint "Serviço iniciado."
 
   ; ── 4. Firewall ───────────────────────────────
+  ; profile=domain,private impede exposicao em redes publicas (Wi-Fi de eventos etc.)
   DetailPrint "Configurando firewall (porta ${PORTA})..."
   nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="PDV Agent"'
-  nsExec::ExecToLog 'netsh advfirewall firewall add rule name="PDV Agent" dir=in action=allow protocol=TCP localport=${PORTA}'
+  nsExec::ExecToLog 'netsh advfirewall firewall add rule name="PDV Agent" dir=in action=allow protocol=TCP localport=${PORTA} profile=domain,private'
 
   DetailPrint "Firewall configurado."
 
