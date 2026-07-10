@@ -313,15 +313,11 @@
               <div class="step-num">2</div>
               <div class="step-body">
                 <div class="step-title">Auth Key do Tailscale <span class="text-muted" style="font-weight:400;">(opcional)</span></div>
-                <div class="step-desc">Se o PDV precisar entrar na VPN automaticamente, gere uma auth key abaixo e cole no instalador. A mesma key serve para todos os PDVs da instalação.</div>
-                <div style="margin-top:10px;">
-                  <button class="btn btn-ghost btn-sm" id="btnGerarAuthKey" onclick="gerarAuthKeyPdv()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;vertical-align:middle;">
-                      <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
-                    </svg>
-                    Gerar Auth Key para PDV
-                  </button>
-                  <div id="authKeyResultado" style="display:none; margin-top:10px;">
+                <div class="step-desc">Cole no instalador para conectar o PDV à VPN automaticamente. A mesma key serve todos os PDVs desta instalação.</div>
+                <div id="authKeyArea" style="margin-top:10px;">
+                  <div id="authKeyCarregando" class="text-muted" style="font-size:12px;">Carregando...</div>
+
+                  <div id="authKeyResultado" style="display:none;">
                     <div class="token-row">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                            style="width:15px;height:15px;flex-shrink:0;color:var(--text-faint);">
@@ -332,11 +328,19 @@
                       <button class="btn btn-ghost btn-sm" id="btnRevelarAuthKey" onclick="toggleAuthKey()">Revelar</button>
                       <button class="btn btn-ghost btn-sm" id="btnCopiarAuthKey" onclick="copiarAuthKey()">Copiar</button>
                     </div>
-                    <div class="text-muted" style="font-size:11.5px; margin-top:6px;">
-                      ✔ Reutilizável · expira em 7 dias · tag <code>pdv-terminal</code>
+                    <div id="authKeyExpiry" style="margin-top:7px; font-size:12px;"></div>
+                  </div>
+
+                  <div id="authKeyNaoConfigurada" style="display:none;">
+                    <div class="text-muted" style="font-size:12px; line-height:1.7;">
+                      Nenhuma auth key configurada. Crie em
+                      <b>Tailscale Admin Console → Settings → Keys</b>
+                      (reusable, tag <code>pdv-terminal</code>) e adicione ao <code>.env</code>
+                      do servidor:<br>
+                      <code>PDV_TAILSCALE_AUTH_KEY_PDV=tskey-auth-...</code><br>
+                      <code>PDV_TAILSCALE_AUTH_KEY_PDV_ID=kXXXXXXXXXX</code>
                     </div>
                   </div>
-                  <div id="authKeyErro" style="display:none; color:var(--red); font-size:12px; margin-top:6px;"></div>
                 </div>
               </div>
             </div>
@@ -804,33 +808,46 @@ async function uploadSetup(input) {
 }
 
 // ── PDV — Auth Key Tailscale ──────────────────────────────────────────────────
-let _authKey       = null;
+let _authKey        = null;
 let _authKeyVisivel = false;
 
-async function gerarAuthKeyPdv() {
-  const btn   = document.getElementById('btnGerarAuthKey');
-  const erroEl = document.getElementById('authKeyErro');
-  erroEl.style.display = 'none';
-  btn.disabled = true;
-  btn.textContent = 'Gerando...';
+const _AVISO_CFG = {
+  ok:       { cor: 'var(--green)',      icone: '✔', texto: d => `Válida · ${d} dias restantes · tag pdv-terminal` },
+  atencao:  { cor: '#ffaa00',           icone: '⚠️', texto: d => `Expira em ${d} dias — renove em breve` },
+  critico:  { cor: 'var(--red)',        icone: '🔴', texto: d => `Atenção: expira em ${d} dias! Renove agora.` },
+  expirada: { cor: 'var(--red)',        icone: '❌', texto: _  => `Auth key expirada — configure uma nova no .env` },
+};
+
+async function carregarAuthKeyPdv() {
   try {
-    const r = await fetch('/api/tailscale/gerar-auth-key-pdv', { method: 'POST' });
-    const d = await r.json();
+    const d = await fetch('/api/tailscale/auth-key-pdv').then(r => r.json());
+    document.getElementById('authKeyCarregando').style.display = 'none';
+
     if (d.erro) {
-      erroEl.textContent = '❌ ' + d.erro;
-      erroEl.style.display = 'block';
+      document.getElementById('authKeyNaoConfigurada').style.display = 'block';
       return;
     }
+
     _authKey = d.key;
     _authKeyVisivel = false;
     document.getElementById('authKeyResultado').style.display = 'block';
     _renderAuthKey();
+
+    const expiryEl = document.getElementById('authKeyExpiry');
+    if (d.nivel_aviso && d.nivel_aviso !== 'ok') {
+      const cfg = _AVISO_CFG[d.nivel_aviso] || _AVISO_CFG.ok;
+      expiryEl.innerHTML =
+        `<span style="color:${cfg.cor}; font-weight:600;">${cfg.icone} ${cfg.texto(d.dias_restantes)}</span>`;
+    } else if (d.nivel_aviso === 'ok') {
+      const cfg = _AVISO_CFG.ok;
+      expiryEl.innerHTML =
+        `<span style="color:${cfg.cor};">${cfg.icone} ${cfg.texto(d.dias_restantes)}</span>`;
+    } else {
+      expiryEl.innerHTML = '<span class="text-muted">tag pdv-terminal · reutilizável</span>';
+    }
   } catch (e) {
-    erroEl.textContent = '❌ Erro inesperado: ' + e.message;
-    erroEl.style.display = 'block';
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;vertical-align:middle;"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg> Gerar nova Auth Key`;
+    document.getElementById('authKeyCarregando').style.display = 'none';
+    document.getElementById('authKeyNaoConfigurada').style.display = 'block';
   }
 }
 
@@ -860,6 +877,7 @@ async function copiarAuthKey() {
 carregarHistorico();
 carregarInfoAgente();
 carregarTokenAgente();
+carregarAuthKeyPdv();
 </script>
 </body>
 </html>

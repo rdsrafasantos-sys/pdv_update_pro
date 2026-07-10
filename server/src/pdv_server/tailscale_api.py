@@ -118,6 +118,12 @@ def adicionar_prefixos_ao_grant(tag_dst, prefixos):
     salvar_acl(politica)
 
 
+def obter_info_key(key_id: str) -> dict:
+    """Retorna metadados de uma auth key pelo ID (kXXXXXXXXXX).
+    Inclui 'expires' (ISO 8601) e 'invalid' (bool)."""
+    return _get(f"/tailnet/{TAILSCALE_TAILNET}/keys/{key_id}").json()
+
+
 def listar_dispositivos():
     return _get(f"/tailnet/{TAILSCALE_TAILNET}/devices", params={"fields": "all"}).json()["devices"]
 

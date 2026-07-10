@@ -328,31 +328,56 @@ def api_token_agente():
     return jsonify({"token": TOKEN_SEGURANCA})
 
 
-@app.route("/api/tailscale/gerar-auth-key-pdv", methods=["POST"])
+@app.route("/api/tailscale/auth-key-pdv", methods=["GET"])
 @login_required
-def api_gerar_auth_key_pdv():
-    """Gera uma auth key Tailscale reutilizável (7 dias) com tag:pdv-terminal.
-    Reutilizável para que o mesmo link sirva múltiplos PDVs na mesma instalação."""
+def api_auth_key_pdv():
+    """Retorna a auth key PDV configurada no .env e, se o ID também estiver
+    configurado e a API Tailscale disponível, informa quantos dias restam
+    para expirar (para o aviso no painel)."""
     import datetime
     from pdv_server import tailscale_api
+    from pdv_server.config import TAILSCALE_AUTH_KEY_PDV, TAILSCALE_AUTH_KEY_PDV_ID
 
-    if not tailscale_api.automacao_disponivel():
+    if not TAILSCALE_AUTH_KEY_PDV:
         return jsonify({
-            "erro": "API do Tailscale não configurada neste servidor. "
-                    "Configure PDV_TAILSCALE_OAUTH_CLIENT_ID e PDV_TAILSCALE_OAUTH_CLIENT_SECRET no .env."
-        }), 503
+            "erro": "PDV_TAILSCALE_AUTH_KEY_PDV não configurado. "
+                    "Crie uma auth key com tag:pdv-terminal no admin console do Tailscale "
+                    "e adicione no .env do servidor."
+        }), 404
 
-    try:
-        descricao = f"pdv-terminal-painel-{datetime.datetime.utcnow().strftime('%Y%m%d-%H%M')}"
-        key = tailscale_api.criar_auth_key(
-            tags=["tag:pdv-terminal"],
-            descricao=descricao,
-            expiry_seconds=3600 * 24 * 7,
-            reusable=True,
-        )
-        return jsonify({"key": key, "expira_em_dias": 7})
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
+    resultado = {
+        "key": TAILSCALE_AUTH_KEY_PDV,
+        "dias_restantes": None,
+        "nivel_aviso": None,  # None | "ok" | "atencao" | "critico" | "expirada"
+    }
+
+    if TAILSCALE_AUTH_KEY_PDV_ID and tailscale_api.automacao_disponivel():
+        try:
+            info = tailscale_api.obter_info_key(TAILSCALE_AUTH_KEY_PDV_ID)
+            if info.get("invalid"):
+                resultado["nivel_aviso"] = "expirada"
+                resultado["dias_restantes"] = 0
+            else:
+                expira_str = info.get("expires", "")
+                if expira_str:
+                    expira_dt = datetime.datetime.fromisoformat(
+                        expira_str.replace("Z", "+00:00")
+                    )
+                    agora = datetime.datetime.now(datetime.timezone.utc)
+                    dias = (expira_dt - agora).days
+                    resultado["dias_restantes"] = dias
+                    if dias < 0:
+                        resultado["nivel_aviso"] = "expirada"
+                    elif dias <= 14:
+                        resultado["nivel_aviso"] = "critico"
+                    elif dias <= 30:
+                        resultado["nivel_aviso"] = "atencao"
+                    else:
+                        resultado["nivel_aviso"] = "ok"
+        except Exception:
+            pass  # não bloqueia exibição da key se a checagem de expiração falhar
+
+    return jsonify(resultado)
 
 
 @app.route("/api/agente/info", methods=["GET"])

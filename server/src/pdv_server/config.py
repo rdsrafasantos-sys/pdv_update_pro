@@ -95,6 +95,14 @@ SECRET_KEY = os.environ.get("PDV_SECRET_KEY", "")
 # antes de expirar. Esta e a forma recomendada para uso em producao.
 TAILSCALE_AUTH_KEY_SERVICE_MANAGER = os.environ.get("PDV_TAILSCALE_AUTH_KEY_SERVICE_MANAGER", "")
 
+# Auth key reutilizavel para PDV terminals (tag:pdv-terminal). Crie UMA VEZ em
+# Settings > Keys (reusable=true, ephemeral=false, tag:pdv-terminal), copie o
+# valor da key (tskey-auth-...) e o ID da key (kXXXXXXXXXX, mostrado na URL ou
+# na resposta da API). O ID e necessario para checar a validade automaticamente
+# e exibir aviso de expiração no painel. Validade maxima 90 dias -- renove antes.
+TAILSCALE_AUTH_KEY_PDV       = os.environ.get("PDV_TAILSCALE_AUTH_KEY_PDV", "")
+TAILSCALE_AUTH_KEY_PDV_ID    = os.environ.get("PDV_TAILSCALE_AUTH_KEY_PDV_ID", "")
+
 TAILSCALE_OAUTH_CLIENT_ID = os.environ.get("PDV_TAILSCALE_OAUTH_CLIENT_ID", "")
 TAILSCALE_OAUTH_CLIENT_SECRET = os.environ.get("PDV_TAILSCALE_OAUTH_CLIENT_SECRET", "")
 
