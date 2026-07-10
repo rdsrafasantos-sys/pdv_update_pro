@@ -25,6 +25,7 @@ from pdv_server.discovery import (
 )
 from pdv_server import VERSION, erp_db, integrador, integrador_update, replication
 from pdv_server.versioning import eh_downgrade, extrair_versao
+from pdv_server.auth.audit import registrar_auditoria
 
 if not SECRET_KEY:
     raise RuntimeError(
@@ -45,6 +46,26 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 # Secure flag ativo apenas em produção (HTTPS); staging roda em HTTP
 _em_producao = os.environ.get("PDV_AMBIENTE", "prod").lower() not in ("staging", "dev")
 app.config["SESSION_COOKIE_SECURE"] = _em_producao
+
+
+@app.after_request
+def _headers_seguranca(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "font-src 'self' data:;"
+    )
+    if _em_producao:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
 
 init_db()
 
@@ -74,6 +95,10 @@ def exigir_login():
 @app.context_processor
 def injetar_usuario():
     return {"usuario_atual": current_user}
+
+
+def _ip():
+    return request.headers.get("X-Forwarded-For", request.remote_addr or "")
 
 
 def com_rede(view):
@@ -205,6 +230,11 @@ def api_upload(contexto):
     caminho = os.path.join(contexto.upload_dir, nome)
     arquivo.save(caminho)
     tamanho = os.path.getsize(caminho)
+    registrar_auditoria(
+        current_user.email, "upload_zip",
+        detalhes=f"rede={contexto.rede_id} arquivo={nome} tamanho={round(tamanho / 1024 / 1024, 2)}MB",
+        ip=_ip(),
+    )
     return jsonify({
         "mensagem": "Upload concluído",
         "arquivo": nome,
@@ -304,6 +334,12 @@ def api_upload_setup():
     os.makedirs(os.path.dirname(_SETUP_PATH), exist_ok=True)
     arquivo.save(_SETUP_PATH)
     tamanho = os.path.getsize(_SETUP_PATH)
+    _autor = getattr(current_user, "email", None) or "build-script"
+    registrar_auditoria(
+        _autor, "upload_setup",
+        detalhes=f"tamanho={round(tamanho / 1024 / 1024, 2)}MB",
+        ip=_ip(),
+    )
     return jsonify({
         "ok": True,
         "tamanho_mb": round(tamanho / 1024 / 1024, 2),
@@ -415,6 +451,7 @@ def api_salvar_auth_key_pdv():
         return jsonify({"erro": "Auth key inválida — deve começar com tskey-auth-"}), 400
     from pdv_server import pdv_auth_key
     pdv_auth_key.salvar(key, key_id)
+    registrar_auditoria(current_user.email, "salvar_auth_key_pdv", ip=_ip())
     return jsonify({"ok": True})
 
 
@@ -455,6 +492,11 @@ def api_upload_agente(contexto):
     caminho = os.path.join(contexto.upload_dir, nome)
     arquivo.save(caminho)
     tamanho = os.path.getsize(caminho)
+    registrar_auditoria(
+        current_user.email, "upload_agente",
+        detalhes=f"rede={contexto.rede_id} arquivo={nome} tamanho={round(tamanho / 1024 / 1024, 2)}MB",
+        ip=_ip(),
+    )
     return jsonify({
         "mensagem": f"Upload de {nome} concluido",
         "tamanho_mb": round(tamanho / 1024 / 1024, 2)
@@ -504,6 +546,11 @@ def api_atualizar_agente(contexto):
         contexto, caminho_exe, pdvs_alvo,
         caminho_status=caminho_status if os.path.exists(caminho_status) else None
     )
+    registrar_auditoria(
+        current_user.email, "atualizar_agente",
+        detalhes=f"rede={contexto.rede_id} loja={loja_id} pdvs={len(pdvs_alvo)}",
+        ip=_ip(),
+    )
     return jsonify({"resultados": resultados})
 
 
@@ -551,7 +598,11 @@ def api_atualizar(contexto):
         }), 409
 
     iniciar_envio_zip(contexto, loja_id, pdv, caminho_zip)
-
+    registrar_auditoria(
+        current_user.email, "atualizar_pdv",
+        detalhes=f"rede={contexto.rede_id} loja={loja_id} pdv={pdv['id']} zip={arquivo}",
+        ip=_ip(),
+    )
     return jsonify({
         "mensagem": f"Atualização iniciada para {pdv['id']}",
         "pdvs": [pdv["id"]]
@@ -661,7 +712,9 @@ def api_erp_db_config_get(contexto):
 @exigir_escrita
 def api_erp_db_config_set(contexto):
     dados = request.json or {}
-    return jsonify(erp_db.salvar_config(contexto, dados))
+    cfg = erp_db.salvar_config(contexto, dados)
+    registrar_auditoria(current_user.email, "config_erp_db", detalhes=f"rede={contexto.rede_id}", ip=_ip())
+    return jsonify(cfg)
 
 
 @app.route("/api/<int:rede_id>/erp_db/status", methods=["GET"])
@@ -696,7 +749,9 @@ def api_integrador_config_get(contexto):
 @exigir_escrita
 def api_integrador_config_set(contexto):
     dados = request.json or {}
-    return jsonify(integrador.salvar_config(contexto, dados))
+    cfg = integrador.salvar_config(contexto, dados)
+    registrar_auditoria(current_user.email, "config_integrador", detalhes=f"rede={contexto.rede_id}", ip=_ip())
+    return jsonify(cfg)
 
 
 @app.route("/api/<int:rede_id>/integrador/status", methods=["GET"])
