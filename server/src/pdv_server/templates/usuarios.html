@@ -398,10 +398,12 @@ function renderUsuarios(usuarios) {
         ? '<span class="badge badge-green"><span class="badge-dot"></span>Ativo</span>'
         : '<span class="badge badge-red"><span class="badge-dot"></span>Inativo</span>'}</td>
       <td style="text-align:right;">
-        ${u.is_super_admin ? '' : `
-          <button class="btn btn-ghost btn-sm" onclick="editarUsuario(${u.id})">Editar</button>
-          <button class="btn btn-ghost btn-sm" onclick="excluirUsuario(${u.id})">Excluir</button>
-        `}
+        ${u.is_super_admin
+          ? (u.id === EU_ID ? `<button class="btn btn-ghost btn-sm" onclick="editarUsuario(${u.id})">Editar</button>` : '')
+          : `
+            <button class="btn btn-ghost btn-sm" onclick="editarUsuario(${u.id})">Editar</button>
+            <button class="btn btn-ghost btn-sm" onclick="excluirUsuario(${u.id})">Excluir</button>
+          `}
       </td>
     </tr>`;
   }).join('');
