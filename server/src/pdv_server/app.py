@@ -257,6 +257,23 @@ def download_agente_publico():
     return "agente.exe nao disponivel", 404
 
 
+@app.route("/api/agente/info", methods=["GET"])
+@login_required
+def api_agente_info():
+    """Retorna metadados do agente.exe mais recente disponivel no servidor."""
+    import glob as _glob
+    candidatos = _glob.glob("/opt/pdv-server/uploads/*/agente.exe")
+    if not candidatos:
+        return jsonify({"disponivel": False})
+    # escolhe o mais recente por data de modificação
+    caminho = max(candidatos, key=os.path.getmtime)
+    return jsonify({
+        "disponivel": True,
+        "tamanho_mb": round(os.path.getsize(caminho) / 1024 / 1024, 2),
+        "data": time.strftime("%d/%m/%Y %H:%M", time.localtime(os.path.getmtime(caminho))),
+    })
+
+
 @app.route("/api/<int:rede_id>/upload_agente", methods=["POST"])
 @com_rede
 @exigir_escrita

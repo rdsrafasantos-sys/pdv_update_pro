@@ -215,6 +215,28 @@
         </div>
       </div>
 
+      <!-- ── Download do agente ── -->
+      <div class="card" id="cardDownloadAgente">
+        <div class="section-title">Download do instalador do agente</div>
+        <div class="siteid-hint" style="margin:0 0 16px;">
+          O agente (<code>agente.exe</code>) deve ser instalado em cada PDV. Baixe aqui a
+          versão mais recente que foi enviada para o servidor via upload.
+        </div>
+        <div id="agenteInfo" style="margin-bottom:14px;">
+          <div class="text-muted" style="font-size:12.5px;">Verificando disponibilidade...</div>
+        </div>
+        <a id="btnBaixarAgente" class="btn btn-primary" href="/download/agente.exe" download="agente.exe"
+           style="display:none; text-decoration:none; width:fit-content;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;margin-right:6px;">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Baixar agente.exe
+        </a>
+        <div id="agenteSemArquivo" style="display:none;">
+          <span class="status-badge status-erro">Nenhum agente.exe disponível — faça upload primeiro pelo painel de uma Rede.</span>
+        </div>
+      </div>
+
       <div class="card">
         <div class="section-title">Histórico de Site IDs já alocados</div>
         <div id="historicoContainer"><div class="text-muted">Carregando...</div></div>
@@ -539,6 +561,23 @@ async function criarRede() {
 }
 
 carregarHistorico();
+carregarInfoAgente();
+
+async function carregarInfoAgente() {
+  const info = await fetch('/api/agente/info').then(r => r.json()).catch(() => ({ disponivel: false }));
+  const infoEl = document.getElementById('agenteInfo');
+  const btnEl  = document.getElementById('btnBaixarAgente');
+  const semEl  = document.getElementById('agenteSemArquivo');
+  if (info.disponivel) {
+    infoEl.innerHTML = `<span class="status-badge status-ok" style="font-size:12px;">
+      Disponível · ${info.tamanho_mb} MB · atualizado em ${info.data}
+    </span>`;
+    btnEl.style.display = 'inline-flex';
+  } else {
+    infoEl.innerHTML = '';
+    semEl.style.display = 'block';
+  }
+}
 </script>
 </body>
 </html>

@@ -214,6 +214,70 @@ def configurar_2fa():
         db.close()
 
 
+@auth_bp.route("/api/2fa/setup", methods=["GET"])
+@login_required
+def api_2fa_setup():
+    """Gera novo segredo TOTP e retorna QR SVG para o usuário atual."""
+    db = SessionLocal()
+    try:
+        usuario = db.get(Usuario, int(current_user.id))
+        if usuario.totp_habilitado:
+            return jsonify({"erro": "2FA já está habilitado. Peça ao administrador para redefinir."})
+        segredo = gerar_totp_secret()
+        session["novo_totp_secret"] = segredo
+        uri = totp_uri(segredo, usuario.email)
+        qr_svg = gerar_qr_svg(uri)
+        return jsonify({"segredo": segredo, "qr_svg": qr_svg})
+    finally:
+        db.close()
+
+
+@auth_bp.route("/api/2fa/confirmar", methods=["POST"])
+@login_required
+def api_2fa_confirmar():
+    """Verifica o código TOTP e habilita o 2FA para o usuário atual."""
+    codigo = ((request.json or {}).get("codigo") or "").strip()
+    segredo = session.get("novo_totp_secret")
+    if not segredo:
+        return jsonify({"erro": "Sessão expirada. Gere um novo QR code."})
+    if not verificar_totp(segredo, codigo):
+        return jsonify({"erro": "Código inválido. Verifique o aplicativo autenticador."})
+    db = SessionLocal()
+    try:
+        usuario = db.get(Usuario, int(current_user.id))
+        usuario.totp_secret_cifrado = cifrar(segredo)
+        usuario.totp_habilitado = True
+        db.commit()
+        session.pop("novo_totp_secret", None)
+        registrar_auditoria(usuario.email, "2fa_habilitado", ip=_ip_cliente())
+        return jsonify({"ok": True})
+    finally:
+        db.close()
+
+
+@auth_bp.route("/api/usuarios/<int:usuario_id>/reset-2fa", methods=["POST"])
+@login_required
+def api_reset_2fa(usuario_id):
+    """Super-admin redefine o 2FA de qualquer usuário."""
+    if not current_user.is_super_admin:
+        return jsonify({"erro": "Apenas super-admin pode redefinir o 2FA de outros usuários."}), 403
+    db = SessionLocal()
+    try:
+        usuario = db.get(Usuario, usuario_id)
+        if not usuario:
+            return jsonify({"erro": "Usuário não encontrado."}), 404
+        usuario.totp_habilitado = False
+        usuario.totp_secret_cifrado = None
+        db.commit()
+        registrar_auditoria(
+            current_user.email, "2fa_redefinido",
+            detalhes=f"para {usuario.email}", ip=_ip_cliente(),
+        )
+        return jsonify({"ok": True})
+    finally:
+        db.close()
+
+
 @auth_bp.route("/logout", methods=["POST"])
 @login_required
 def logout():
