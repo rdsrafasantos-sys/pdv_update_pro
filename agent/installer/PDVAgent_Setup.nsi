@@ -36,6 +36,7 @@ Var TailscaleHostname
 Var hCtlAgentToken
 Var hCtlTailscaleAuthKey
 Var hCtlTailscaleHostname
+Var hCtlImportBtn
 
 Name "${PRODUTO} ${VERSAO}"
 OutFile "PDVAgent_Setup.exe"
@@ -103,31 +104,57 @@ FunctionEnd
 ;--------------------------------
 ; Pagina customizada: Tailscale (opcional)
 ;--------------------------------
+Function OnImportConfig
+  ; Abre seletor de arquivo e preenche os campos a partir do pdv_config.ini
+  nsDialogs::SelectFileDialog open "" "Config PDV (*.ini)|*.ini|Todos os arquivos (*.*)|*.*"
+  Pop $R0
+  ${If} $R0 != ""
+    ReadINIStr $R1 "$R0" "PDVAgent" "TOKEN"
+    ${If} $R1 != ""
+      ${NSD_SetText} $hCtlAgentToken $R1
+    ${EndIf}
+    ReadINIStr $R2 "$R0" "PDVAgent" "AUTHKEY"
+    ${NSD_SetText} $hCtlTailscaleAuthKey $R2
+    ReadINIStr $R3 "$R0" "PDVAgent" "HOSTNAME"
+    ${NSD_SetText} $hCtlTailscaleHostname $R3
+  ${EndIf}
+FunctionEnd
+
 Function TailscalePageCreate
   nsDialogs::Create 1018
   Pop $0
 
-  ; ── Token de acesso (OBRIGATORIO) ────────────────────────────────────────
-  ${NSD_CreateLabel} 0 0u 100% 10u "Token de Acesso ao Servidor *"
+  ; ── Importar arquivo de configuração ──────────────────────────────────────
+  ${NSD_CreateLabel} 0 0u 100% 9u "Importar configuracao do painel:"
   Pop $0
-  ${NSD_CreateText} 0 11u 100% 12u ""
+  ${NSD_CreateButton} 0 10u 100% 14u "Importar pdv_config.ini baixado do painel..."
+  Pop $hCtlImportBtn
+  ${NSD_OnClick} $hCtlImportBtn OnImportConfig
+
+  ${NSD_CreateLabel} 0 27u 100% 8u "────────────────── ou preencha manualmente ──────────────────"
+  Pop $0
+
+  ; ── Token de acesso (OBRIGATORIO) ────────────────────────────────────────
+  ${NSD_CreateLabel} 0 38u 100% 9u "Token de Acesso ao Servidor *"
+  Pop $0
+  ${NSD_CreateText} 0 48u 100% 12u ""
   Pop $hCtlAgentToken
 
-  ${NSD_CreateLabel} 0 25u 100% 16u "Obrigatorio. Obtena com o administrador do sistema (mesmo valor de PDV_SERVER_TOKEN configurado no servidor PDV Updater)."
+  ${NSD_CreateLabel} 0 62u 100% 9u "Obrigatorio. Baixe o arquivo acima ou obtenha com o administrador."
   Pop $0
 
   ; ── Tailscale (OPCIONAL) ──────────────────────────────────────────────────
-  ${NSD_CreateLabel} 0 46u 100% 10u "Auth Key Tailscale (opcional):"
-  Pop $0
-  ${NSD_CreateText} 0 57u 100% 12u ""
-  Pop $hCtlTailscaleAuthKey
-
-  ${NSD_CreateLabel} 0 73u 100% 10u "Nome deste PDV na rede Tailscale (opcional, ex: bonna-loja01-pdv03):"
+  ${NSD_CreateLabel} 0 74u 100% 9u "Auth Key Tailscale (opcional):"
   Pop $0
   ${NSD_CreateText} 0 84u 100% 12u ""
+  Pop $hCtlTailscaleAuthKey
+
+  ${NSD_CreateLabel} 0 98u 100% 9u "Nome deste PDV na rede Tailscale (opcional, ex: loja01-pdv03):"
+  Pop $0
+  ${NSD_CreateText} 0 108u 100% 12u ""
   Pop $hCtlTailscaleHostname
 
-  ${NSD_CreateLabel} 0 99u 100% 18u "Cole a auth key marcada com tag:pdv-terminal para conectar este PDV automaticamente a VPN. Deixe em branco para configurar depois."
+  ${NSD_CreateLabel} 0 122u 100% 9u "Deixe os campos opcionais em branco para configurar depois."
   Pop $0
 
   nsDialogs::Show

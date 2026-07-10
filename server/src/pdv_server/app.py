@@ -319,83 +319,23 @@ def api_setup_info():
     })
 
 
-@app.route("/api/pdv/script-instalacao", methods=["GET"])
+@app.route("/api/pdv/config-arquivo", methods=["GET"])
 @login_required
-def api_script_instalacao_pdv():
-    """Gera um .ps1 de instalação silenciosa do PDV Agent com token e auth key
-    embutidos. O script baixa o Setup.exe do servidor (via Tailscale) ou usa
-    uma cópia local se encontrar PDVAgent_Setup.exe na mesma pasta."""
-    import datetime
-    from pdv_server.config import (
-        TOKEN_SEGURANCA, TAILSCALE_AUTH_KEY_PDV, PAINEL_CALLBACK_URL,
+def api_config_arquivo_pdv():
+    """Gera pdv_config.ini com token e auth key para importar no instalador PDVAgent_Setup.exe."""
+    from pdv_server.config import TOKEN_SEGURANCA, TAILSCALE_AUTH_KEY_PDV
+
+    conteudo = (
+        "[PDVAgent]\n"
+        f"TOKEN={TOKEN_SEGURANCA}\n"
+        f"AUTHKEY={TAILSCALE_AUTH_KEY_PDV}\n"
+        "HOSTNAME=\n"
     )
 
-    hostname = request.args.get("hostname", "").strip()
-
-    # URL de download — prefere Tailscale (PAINEL_CALLBACK_URL), fallback para host atual
-    servidor_url = (PAINEL_CALLBACK_URL or request.host_url).rstrip("/")
-
-    token_seguro   = TOKEN_SEGURANCA.replace('"', '')
-    auth_key_seguro = TAILSCALE_AUTH_KEY_PDV.replace('"', '')
-    hostname_seguro = hostname.replace('"', '').replace(' ', '-')
-
-    ts = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M")
-    nome_arquivo = f"instalar-pdv-agent{'-' + hostname_seguro if hostname_seguro else ''}.ps1"
-
-    script = f"""\
-#Requires -RunAsAdministrator
-# PDV Agent — Instalacao silenciosa
-# Gerado em: {ts} UTC pelo painel PDV Updater
-# Execute como Administrador no PDV: clique direito > Executar com PowerShell
-
-$ErrorActionPreference = "Stop"
-
-$ServidorUrl = "{servidor_url}"
-$Token       = "{token_seguro}"
-$AuthKey     = "{auth_key_seguro}"
-$Hostname    = "{hostname_seguro}"
-
-# 1. Localizar o instalador (pasta local primeiro, senao baixa do servidor)
-$Setup = "$env:TEMP\\PDVAgent_Setup.exe"
-$Local = Join-Path $PSScriptRoot "PDVAgent_Setup.exe"
-if (Test-Path $Local) {{
-    Write-Host "Usando PDVAgent_Setup.exe da pasta local..." -ForegroundColor Cyan
-    Copy-Item $Local $Setup -Force
-}} else {{
-    Write-Host "Baixando PDVAgent_Setup.exe do servidor..." -ForegroundColor Cyan
-    try {{
-        Invoke-WebRequest -Uri "$ServidorUrl/download/PDVAgent_Setup.exe" `
-            -OutFile $Setup -UseBasicParsing -TimeoutSec 60
-    }} catch {{
-        Write-Host "ERRO: nao foi possivel baixar o instalador." -ForegroundColor Red
-        Write-Host "Coloque o PDVAgent_Setup.exe na mesma pasta que este script e tente novamente." -ForegroundColor Yellow
-        exit 1
-    }}
-}}
-
-# 2. Instalar silenciosamente
-Write-Host "Instalando PDV Agent..." -ForegroundColor Cyan
-$Argumentos = "/S /TOKEN=$Token"
-if ($AuthKey)  {{ $Argumentos += " /AUTHKEY=$AuthKey" }}
-if ($Hostname) {{ $Argumentos += " /HOSTNAME=$Hostname" }}
-$proc = Start-Process -FilePath $Setup -ArgumentList $Argumentos -Wait -PassThru
-switch ($proc.ExitCode) {{
-    0 {{ Write-Host "PDV Agent instalado com sucesso!" -ForegroundColor Green }}
-    1 {{ Write-Host "ERRO: /TOKEN nao informado." -ForegroundColor Red; exit 1 }}
-    2 {{ Write-Host "ERRO: Token muito curto (minimo 16 caracteres)." -ForegroundColor Red; exit 1 }}
-    3 {{ Write-Host "ERRO: Token inseguro (valor padrao)." -ForegroundColor Red; exit 1 }}
-    default {{ Write-Host "ERRO: Instalacao falhou (codigo $($proc.ExitCode))." -ForegroundColor Red; exit 1 }}
-}}
-Remove-Item $Setup -ErrorAction SilentlyContinue
-Write-Host ""
-Write-Host "Pressione qualquer tecla para fechar..."
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-"""
-
     return Response(
-        script,
+        conteudo,
         mimetype="text/plain; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{nome_arquivo}"'},
+        headers={"Content-Disposition": 'attachment; filename="pdv_config.ini"'},
     )
 
 
