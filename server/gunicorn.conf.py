@@ -1,5 +1,9 @@
 """Configuração do Gunicorn para o PDV Server."""
 import os
+import sys
+
+# Necessário para o post_fork conseguir importar pdv_server.*
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 bind = f"0.0.0.0:{os.environ.get('PDV_SERVER_PORTA', '8888')}"
 
