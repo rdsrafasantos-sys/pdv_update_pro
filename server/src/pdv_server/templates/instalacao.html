@@ -332,14 +332,33 @@
                   </div>
 
                   <div id="authKeyNaoConfigurada" style="display:none;">
-                    <div class="text-muted" style="font-size:12px; line-height:1.7;">
-                      Nenhuma auth key configurada. Crie em
-                      <b>Tailscale Admin Console → Settings → Keys</b>
-                      (reusable, tag <code>pdv-terminal</code>) e adicione ao <code>.env</code>
-                      do servidor:<br>
-                      <code>PDV_TAILSCALE_AUTH_KEY_PDV=tskey-auth-...</code><br>
-                      <code>PDV_TAILSCALE_AUTH_KEY_PDV_ID=kXXXXXXXXXX</code>
+                    {% if usuario_atual.is_super_admin %}
+                    <div style="font-size:12px; line-height:1.8; padding:10px 12px;
+                                background:rgba(255,170,0,.08); border:1px solid rgba(255,170,0,.3);
+                                border-radius:var(--radius-sm);">
+                      <div style="font-weight:650; color:#ffaa00; margin-bottom:6px;">
+                        ⚠️ Auth key não configurada
+                      </div>
+                      <div class="text-muted">
+                        Crie uma auth key no
+                        <b>Tailscale Admin Console → Settings → Keys</b>
+                        com <code>reusable=true</code> e tag <code>pdv-terminal</code>,
+                        depois adicione ao <code>.env</code> do servidor:
+                      </div>
+                      <div style="margin-top:6px; font-family:monospace; font-size:11.5px; color:var(--text);">
+                        PDV_TAILSCALE_AUTH_KEY_PDV=tskey-auth-...<br>
+                        PDV_TAILSCALE_AUTH_KEY_PDV_ID=kXXXXXXXXXX
+                      </div>
+                      <div class="text-muted" style="margin-top:6px; font-size:11px;">
+                        O ID aparece na URL da key no admin console ou na resposta da API ao criar.
+                        Reinicie o servidor após editar o <code>.env</code>.
+                      </div>
                     </div>
+                    {% else %}
+                    <div class="text-muted" style="font-size:12px;">
+                      Auth key do Tailscale não configurada. Solicite ao administrador do sistema.
+                    </div>
+                    {% endif %}
                   </div>
                 </div>
               </div>
