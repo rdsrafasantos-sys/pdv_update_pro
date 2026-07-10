@@ -20,7 +20,9 @@ COMPOSE_CMD = f"docker compose -f {COMPOSE_PATH}"
 def _ssh(cfg: dict):
     import paramiko
     client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    # WarningPolicy: loga host desconhecido mas não bloqueia. Melhor que AutoAddPolicy
+    # (que aceita silenciosamente) enquanto ainda permite conectar sem known_hosts.
+    client.set_missing_host_key_policy(paramiko.WarningPolicy())
     client.connect(
         hostname=cfg["ssh_ip"],
         port=int(cfg.get("ssh_porta") or 22),

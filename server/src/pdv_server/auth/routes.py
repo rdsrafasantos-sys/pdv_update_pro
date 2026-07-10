@@ -1,4 +1,5 @@
 from functools import wraps
+from urllib.parse import urlparse
 
 from flask import (
     Blueprint, current_app, flash, jsonify, redirect, render_template,
@@ -101,6 +102,16 @@ def carregar_usuario(user_id):
         db.close()
 
 
+def _url_segura(url, fallback):
+    """Aceita apenas caminhos relativos neste servidor (sem scheme nem netloc)."""
+    if not url:
+        return fallback
+    parsed = urlparse(url)
+    if parsed.scheme or parsed.netloc:
+        return fallback
+    return url
+
+
 @login_manager.unauthorized_handler
 def nao_autorizado():
     if request.path.startswith("/api/"):
@@ -130,15 +141,16 @@ def login():
             flash("E-mail ou senha invalidos.", "erro")
             return render_template("login.html"), 401
 
+        proximo_login = _url_segura(request.form.get("proximo"), url_for("painel.redes"))
         if usuario.totp_habilitado:
             session["pre_2fa_usuario_id"] = usuario.id
-            session["pre_2fa_proximo"] = request.form.get("proximo") or url_for("painel.redes")
+            session["pre_2fa_proximo"] = proximo_login
             registrar_auditoria(usuario.email, "login_aguardando_2fa", ip=ip)
             return redirect(url_for("auth.verificar_2fa"))
 
         login_user(UsuarioLogado(usuario))
         registrar_auditoria(usuario.email, "login_sucesso", detalhes="sem 2FA habilitado", ip=ip)
-        return redirect(request.form.get("proximo") or url_for("painel.redes"))
+        return redirect(proximo_login)
     finally:
         db.close()
 
@@ -170,7 +182,7 @@ def verificar_2fa():
             return render_template("login_2fa.html"), 401
 
         session.pop("pre_2fa_usuario_id", None)
-        proximo = session.pop("pre_2fa_proximo", url_for("painel.redes"))
+        proximo = _url_segura(session.pop("pre_2fa_proximo", None), url_for("painel.redes"))
         login_user(UsuarioLogado(usuario))
         registrar_auditoria(usuario.email, "login_sucesso", detalhes="com 2FA", ip=ip)
         return redirect(proximo)

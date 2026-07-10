@@ -3,6 +3,7 @@ import os
 import socket
 from datetime import datetime, timezone
 
+from pdv_server.auth.crypto import cifrar, decifrar
 from pdv_server.config import REPLICACAO_DB
 from pdv_server.replication import COLECOES
 
@@ -10,6 +11,8 @@ CONFIG_PADRAO = {"ip": "", "porta": 0, "mongo_ip": "", "mongo_porta": 27016,
                  "ssh_ip": "", "ssh_porta": 22, "ssh_usuario": "", "ssh_senha": ""}
 CAMPOS_CONFIG = ("ip", "porta", "mongo_ip", "mongo_porta",
                  "ssh_ip", "ssh_porta", "ssh_usuario", "ssh_senha")
+
+_CAMPOS_CIFRADOS = ("ssh_senha",)
 
 # Se nenhuma colecao monitorada recebeu um documento novo nas ultimas N horas,
 # trata como sinal de que a replicacao do integrador pode estar parada (mesmo
@@ -21,6 +24,15 @@ def _arquivo_config(contexto):
     return os.path.join(contexto.integrador_dir, "config.json")
 
 
+def _decifrar_seguro(valor):
+    if not valor:
+        return valor
+    try:
+        return decifrar(valor)
+    except Exception:
+        return valor  # plaintext (migração)
+
+
 def carregar_config(contexto):
     arquivo = _arquivo_config(contexto)
     if not os.path.exists(arquivo):
@@ -28,7 +40,10 @@ def carregar_config(contexto):
     try:
         with open(arquivo, "r", encoding="utf-8") as f:
             cfg = json.load(f)
-        return {**CONFIG_PADRAO, **cfg}
+        resultado = {**CONFIG_PADRAO, **cfg}
+        for campo in _CAMPOS_CIFRADOS:
+            resultado[campo] = _decifrar_seguro(resultado.get(campo, ""))
+        return resultado
     except Exception:
         return dict(CONFIG_PADRAO)
 
@@ -36,9 +51,13 @@ def carregar_config(contexto):
 def salvar_config(contexto, alteracoes):
     atual = carregar_config(contexto)
     atual.update({k: v for k, v in alteracoes.items() if k in CAMPOS_CONFIG})
+    para_salvar = dict(atual)
+    for campo in _CAMPOS_CIFRADOS:
+        if para_salvar.get(campo):
+            para_salvar[campo] = cifrar(para_salvar[campo])
     with open(_arquivo_config(contexto), "w", encoding="utf-8") as f:
-        json.dump(atual, f, ensure_ascii=False)
-    return atual
+        json.dump(para_salvar, f, ensure_ascii=False)
+    return atual  # retorna com valores decifrados
 
 
 def _porta_aberta(ip, porta, timeout=3):

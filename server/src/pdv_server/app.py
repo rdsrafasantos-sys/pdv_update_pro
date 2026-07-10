@@ -40,6 +40,11 @@ if not MASTER_KEY:
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
 app.secret_key = SECRET_KEY
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+# Secure flag ativo apenas em produção (HTTPS); staging roda em HTTP
+_em_producao = os.environ.get("PDV_AMBIENTE", "prod").lower() not in ("staging", "dev")
+app.config["SESSION_COOKIE_SECURE"] = _em_producao
 
 init_db()
 

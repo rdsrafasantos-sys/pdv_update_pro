@@ -1,13 +1,27 @@
 import json
 import os
 
+from pdv_server.auth.crypto import cifrar, decifrar
+
 CONFIG_PADRAO = {"host": "", "porta": 5432, "usuario": "", "senha": "", "banco": ""}
 
 CAMPOS_CONFIG = ("host", "porta", "usuario", "senha", "banco")
 
+_CAMPOS_CIFRADOS = ("senha",)
+
 
 def _arquivo_config(contexto):
     return os.path.join(contexto.erp_db_dir, "config.json")
+
+
+def _decifrar_seguro(valor):
+    """Tenta decifrar; se falhar assume plaintext (migração de dados existentes)."""
+    if not valor:
+        return valor
+    try:
+        return decifrar(valor)
+    except Exception:
+        return valor
 
 
 def carregar_config(contexto):
@@ -17,7 +31,10 @@ def carregar_config(contexto):
     try:
         with open(arquivo, "r", encoding="utf-8") as f:
             cfg = json.load(f)
-        return {**CONFIG_PADRAO, **cfg}
+        resultado = {**CONFIG_PADRAO, **cfg}
+        for campo in _CAMPOS_CIFRADOS:
+            resultado[campo] = _decifrar_seguro(resultado.get(campo, ""))
+        return resultado
     except Exception:
         return dict(CONFIG_PADRAO)
 
@@ -25,9 +42,13 @@ def carregar_config(contexto):
 def salvar_config(contexto, alteracoes):
     atual = carregar_config(contexto)
     atual.update({k: v for k, v in alteracoes.items() if k in CAMPOS_CONFIG})
+    para_salvar = dict(atual)
+    for campo in _CAMPOS_CIFRADOS:
+        if para_salvar.get(campo):
+            para_salvar[campo] = cifrar(para_salvar[campo])
     with open(_arquivo_config(contexto), "w", encoding="utf-8") as f:
-        json.dump(atual, f, ensure_ascii=False)
-    return atual
+        json.dump(para_salvar, f, ensure_ascii=False)
+    return atual  # retorna com valores decifrados
 
 
 def _conectar(cfg, tailscale_site_id=""):
