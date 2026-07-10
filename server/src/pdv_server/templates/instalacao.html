@@ -6,12 +6,40 @@
 <title>PDV Updater — Instalação</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
 <style>
+  /* ── Tabs ───────────────────────────────────────────────────── */
+  .tab-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 10px 22px;
+    color: var(--text-faint);
+    font-size: 13.5px;
+    font-weight: 650;
+    cursor: pointer;
+    margin-bottom: -1px;
+    transition: color .15s, border-color .15s;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--orange); border-bottom-color: var(--orange); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Conteúdo ───────────────────────────────────────────────── */
   .siteid-card { text-align: center; padding: 32px 24px; }
   .siteid-valor { font-size: 48px; font-weight: 800; color: var(--orange); margin: 10px 0; font-family: monospace; }
   .siteid-hint { color: var(--text-faint); font-size: 12.5px; max-width: 480px; margin: 0 auto 18px; }
   .field { margin-bottom: 12px; max-width: 360px; margin-left: auto; margin-right: auto; text-align: left; }
   .field label { font-size: 11.5px; color: var(--text-faint); font-weight: 650; display:block; margin-bottom:5px; }
-  .field input {
+  .field input, .field select {
     width: 100%; background: var(--bg-elevated); border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 13px;
   }
@@ -19,13 +47,35 @@
   table.tabela-historico th { text-align: left; color: var(--text-faint); font-weight: 650; padding: 8px 10px; border-bottom: 1px solid var(--border); }
   table.tabela-historico td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
   .text-muted { color: var(--text-faint); }
-  .copy-btn { cursor: pointer; }
   #scriptTexto { width: 100%; height: 260px; background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text); font-family: monospace; font-size: 11.5px; padding: 10px; }
   .status-badge { display:inline-flex; align-items:center; gap:6px; padding: 5px 12px; border-radius: 99px; font-size: 12px; font-weight: 650; }
   .status-aguardando { background: rgba(255,170,0,.15); color: #ffaa00; }
   .status-ok { background: rgba(0,200,120,.15); color: #00c878; }
   .status-erro { background: rgba(255,60,60,.15); color: #ff3c3c; }
   .botoes-script { display:flex; gap:8px; margin-top:10px; }
+
+  /* ── Token display ───────────────────────────────────────────── */
+  .token-row {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg-elevated); border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm); padding: 10px 14px;
+  }
+  .token-valor {
+    flex: 1; font-family: monospace; font-size: 13px; letter-spacing: .04em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text);
+  }
+
+  /* ── Steps do PDV ───────────────────────────────────────────── */
+  .pdv-steps { display: flex; flex-direction: column; gap: 16px; }
+  .pdv-step { display: flex; gap: 14px; align-items: flex-start; }
+  .step-num {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--orange);
+    color: #fff; font-weight: 800; font-size: 13px; display: flex;
+    align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;
+  }
+  .step-body { flex: 1; }
+  .step-title { font-size: 13.5px; font-weight: 650; margin-bottom: 4px; }
+  .step-desc { font-size: 12.5px; color: var(--text-faint); line-height: 1.6; }
 </style>
 </head>
 <body class="app-bg" data-theme="dark">
@@ -83,202 +133,261 @@
     <div class="content">
       <div class="page-head">
         <div>
-          <div class="page-title">Instalação de cliente novo</div>
-          <div class="page-sub">Centraliza os passos manuais que ainda existem ao colocar uma Rede nova no ar.</div>
+          <div class="page-title">Instalação</div>
+          <div class="page-sub">Configure um novo cliente no Service Manager ou instale o agente em um PDV.</div>
         </div>
       </div>
 
-      <div class="card siteid-card">
-        <div class="section-title">1. Tailscale Site ID</div>
-        <div class="siteid-hint">
-          Cada cliente precisa de um número único, que nunca se repete e nunca é reaproveitado —
-          mesmo que a Rede correspondente nunca chegue a ser criada. Gere aqui antes de rodar
-          <code>tailscale debug via &lt;site-id&gt; ...</code> no service manager do cliente.
-        </div>
-        <div class="field">
-          <label>CNPJ do cliente</label>
-          <input id="campoClienteCnpj" placeholder="00.000.000/0000-00">
-        </div>
-        <div class="field">
-          <label>Nome do cliente <span class="text-muted">(opcional, só pra identificar no histórico abaixo)</span></label>
-          <input id="campoClienteNome" placeholder="Ex: Compre Mais">
-        </div>
-        <button class="btn btn-primary" onclick="gerarSiteId()">Gerar próximo Site ID</button>
-        <div class="erro-msg" id="siteIdErro" style="display:none; color:var(--red); font-size:12px; margin-top:10px;"></div>
-        <div id="siteIdResultado" style="display:none; margin-top:18px;">
-          <div class="siteid-valor" id="siteIdValor">—</div>
-          <div class="text-muted" style="font-size:12px;">Copiado ao gerar — cole no comando <code>tailscale debug via</code> e no campo "Tailscale Site ID" da Rede.</div>
-        </div>
-      </div>
-
-      <div class="card" id="cardPasso2" style="display:none;">
-        <div class="section-title">2. Instalar no service manager do cliente</div>
-        <div class="siteid-hint" style="margin:0 0 14px;">
-          O script abaixo instala o Tailscale, conecta com uma auth key de uso único,
-          descobre as faixas de rede lendo o replica set do Mongo local e ativa o
-          subnet router — sozinho. Rode como root na máquina do service manager.
-        </div>
-        <div class="field">
-          <label>IP do banco ERP <span style="color:var(--red);">*</span> <span class="text-muted">(obrigatório — sem ele a faixa do ERP não será roteada via Tailscale)</span></label>
-          <input id="campoErpIp" placeholder="192.168.1.100">
-        </div>
-        <button class="btn btn-primary" id="btnGerarScript" onclick="gerarScript()">Gerar script de instalação</button>
-        <div class="erro-msg" id="scriptErro" style="display:none; color:var(--red); font-size:12px; margin-top:10px;"></div>
-
-        <div id="scriptResultado" style="display:none; margin-top:16px; text-align:left;">
-          <textarea id="scriptTexto" readonly></textarea>
-          <div class="botoes-script">
-            <button class="btn btn-ghost btn-sm" onclick="copiarScript()">Copiar</button>
-            <button class="btn btn-ghost btn-sm" onclick="baixarScript()">Baixar .sh</button>
-          </div>
-        </div>
-
-        <div id="statusInstalacao" style="display:none; margin-top:18px; text-align:left;">
-          <div class="section-title" style="font-size:12px;">Status</div>
-          <span class="status-badge" id="statusBadge">—</span>
-          <div id="statusDetalhe" class="text-muted" style="font-size:12px; margin-top:8px;"></div>
-        </div>
-      </div>
-
-      <div class="card" id="cardPasso3" style="display:none;">
-        <div class="section-title">3. Criar a Rede no painel</div>
-        <div class="siteid-hint" style="margin:0 0 14px;">
-          Tudo pronto do lado do Tailscale. Agora cadastre a Rede no painel com os dados do cliente.
-          O Mongo URI já vem preenchido automaticamente com o IP Tailscale do service manager.
-        </div>
-        <div class="field">
-          <label>Unidade</label>
-          <select id="campoPasso3Unidade"></select>
-        </div>
-        <div class="field">
-          <label>Token compartilhado com os agentes PDV <span class="text-muted">(deve bater com PDV_AGENT_TOKEN no agente de cada PDV)</span></label>
-          <input id="campoPasso3Token" placeholder="Carregando..." type="text">
-        </div>
-        <div class="field">
-          <label>Mongo URI <span class="text-muted">(gerado automaticamente — edite só se necessário)</span></label>
-          <input id="campoPasso3MongoUri" placeholder="mongodb://100.x.x.x:27016">
-        </div>
-        <button class="btn btn-primary" id="btnCriarRede" onclick="criarRede()">Criar Rede automaticamente</button>
-        <div class="erro-msg" id="passo3Erro" style="display:none; color:var(--red); font-size:12px; margin-top:10px;"></div>
-        <div id="passo3Sucesso" style="display:none; margin-top:14px;">
-          <span class="status-badge status-ok">✅ Rede criada com sucesso</span>
-          <div style="margin-top:10px;">
-            <a id="linkRede" class="btn btn-primary" href="#">Abrir painel da Rede →</a>
-          </div>
-          <div class="text-muted" style="font-size:12px; margin-top:8px;">
-            Próximo passo: configure o banco ERP e o integrador em <b>Configurações</b> dentro do painel da Rede.
-          </div>
-        </div>
-      </div>
-
-      <div class="card" id="cardPasso4" style="display:none;">
-        <div class="section-title">4. Configurar conexões</div>
-        <div class="siteid-hint" style="margin:0 0 16px;">
-          Rede criada. Configure as conexões com o banco ERP e o integrador — os IPs já vêm preenchidos.
-        </div>
-
-        <div class="section-title" style="font-size:12px; margin-bottom:10px;">🛢️ Banco ERP (PostgreSQL)</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:600px;">
-          <div class="field"><label>IP do servidor</label><input id="p4ErpHost" placeholder="192.168.1.100"></div>
-          <div class="field"><label>Porta</label><input id="p4ErpPorta" type="number" placeholder="5432" value="5432"></div>
-          <div class="field"><label>Usuário</label><input id="p4ErpUsuario" placeholder="postgres"></div>
-          <div class="field"><label>Senha</label><input id="p4ErpSenha" type="password"></div>
-          <div class="field"><label>Nome do banco</label><input id="p4ErpBanco" placeholder="vr"></div>
-        </div>
-        <div style="display:flex; gap:8px; margin-top:8px;">
-          <button class="btn btn-ghost btn-sm" onclick="testarErp()">🔌 Testar</button>
-          <button class="btn btn-primary btn-sm" onclick="salvarErp()">💾 Salvar e testar</button>
-        </div>
-        <div id="p4ErpResultado" class="text-muted" style="font-size:12px; margin-top:6px;"></div>
-
-        <hr style="border-color:var(--border); margin:18px 0;">
-
-        <div class="section-title" style="font-size:12px; margin-bottom:10px;">🔗 Integrador VR</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:600px;">
-          <div class="field"><label>IP do integrador</label><input id="p4IntIp" placeholder="100.x.x.x"></div>
-          <div class="field"><label>Porta do integrador</label><input id="p4IntPorta" type="number" placeholder="8080" value="8080"></div>
-          <div class="field"><label>IP do MongoDB</label><input id="p4IntMongoIp" placeholder="100.x.x.x"></div>
-          <div class="field"><label>Porta do MongoDB</label><input id="p4IntMongoPorta" type="number" placeholder="27016" value="27016"></div>
-        </div>
-        <div style="display:flex; gap:8px; margin-top:8px;">
-          <button class="btn btn-ghost btn-sm" onclick="testarIntegrador()">🔌 Testar</button>
-          <button class="btn btn-primary btn-sm" onclick="salvarIntegrador()">💾 Salvar e testar</button>
-        </div>
-        <div id="p4IntResultado" class="text-muted" style="font-size:12px; margin-top:6px;"></div>
-
-        <div id="p4Conclusao" style="display:none; margin-top:20px; padding:16px; background:rgba(0,200,120,.1); border:1px solid var(--green); border-radius:10px;">
-          <div style="font-size:14px; font-weight:700; color:var(--green); margin-bottom:8px;">✅ Instalação concluída!</div>
-          <div id="p4CheckList" style="font-size:12px; line-height:1.9;"></div>
-          <div style="margin-top:12px;">
-            <a id="p4LinkRede" class="btn btn-primary btn-sm" href="#">Abrir painel da Rede →</a>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Token de Acesso dos Agentes ── -->
-      <div class="card">
-        <div class="section-title">Token de Acesso dos Agentes</div>
-        <div class="siteid-hint" style="margin:0 0 16px;">
-          Informe este valor quando o instalador <code>PDVAgent_Setup.exe</code> perguntar pelo
-          <b>Token de Acesso ao Servidor</b>. É o mesmo para todos os PDVs desta instalação.
-        </div>
-        <div style="display:flex; align-items:center; gap:8px;
-                    background:var(--bg-elevated); border:1px solid var(--border-strong);
-                    border-radius:var(--radius-sm); padding:10px 14px;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-               style="width:16px;height:16px;flex-shrink:0;color:var(--orange);">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0110 0v4"/>
+      <!-- ── Tabs ─────────────────────────────────────────────── -->
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="service-manager" onclick="mostrarTab('service-manager')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
           </svg>
-          <span id="tokenValor"
-                style="flex:1; font-family:monospace; font-size:13px; letter-spacing:.04em;
-                       overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text);">
-            Carregando...
-          </span>
-          <button class="btn btn-ghost btn-sm" id="btnRevelarToken" onclick="toggleToken()">Revelar</button>
-          <button class="btn btn-ghost btn-sm" id="btnCopiarToken" onclick="copiarToken()">Copiar</button>
-        </div>
-        <div class="text-muted" style="font-size:12px; margin-top:10px;">
-          🔒 Mantenha este valor em sigilo — quem tiver acesso a ele e à rede pode comunicar com os agentes PDV.
-        </div>
+          Service Manager
+        </button>
+        <button class="tab-btn" data-tab="pdv" onclick="mostrarTab('pdv')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;">
+            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>
+          </svg>
+          PDV
+        </button>
       </div>
 
-      <!-- ── Instalador do PDV ── -->
-      <div class="card">
-        <div class="section-title">Instalador do PDV Agent</div>
-        <div class="siteid-hint" style="margin:0 0 16px;">
-          Execute <code>PDVAgent_Setup.exe</code> no PDV para instalar o agente, o monitor de status
-          e o Tailscale de uma vez só. Faça o upload da versão mais recente aqui sempre que compilar
-          uma nova.
+      <!-- ══════════════════════════════════════════════════════ -->
+      <!-- TAB: Service Manager                                   -->
+      <!-- ══════════════════════════════════════════════════════ -->
+      <div class="tab-content active" id="tab-service-manager">
+
+        <div class="card siteid-card">
+          <div class="section-title">1. Tailscale Site ID</div>
+          <div class="siteid-hint">
+            Cada cliente precisa de um número único, que nunca se repete e nunca é reaproveitado —
+            mesmo que a Rede correspondente nunca chegue a ser criada. Gere aqui antes de rodar
+            <code>tailscale debug via &lt;site-id&gt; ...</code> no service manager do cliente.
+          </div>
+          <div class="field">
+            <label>CNPJ do cliente</label>
+            <input id="campoClienteCnpj" placeholder="00.000.000/0000-00">
+          </div>
+          <div class="field">
+            <label>Nome do cliente <span class="text-muted">(opcional, só pra identificar no histórico abaixo)</span></label>
+            <input id="campoClienteNome" placeholder="Ex: Compre Mais">
+          </div>
+          <button class="btn btn-primary" onclick="gerarSiteId()">Gerar próximo Site ID</button>
+          <div class="erro-msg" id="siteIdErro" style="display:none; color:var(--red); font-size:12px; margin-top:10px;"></div>
+          <div id="siteIdResultado" style="display:none; margin-top:18px;">
+            <div class="siteid-valor" id="siteIdValor">—</div>
+            <div class="text-muted" style="font-size:12px;">Copiado ao gerar — cole no comando <code>tailscale debug via</code> e no campo "Tailscale Site ID" da Rede.</div>
+          </div>
         </div>
 
-        <!-- Status + download -->
-        <div id="setupStatus" style="margin-bottom:14px;">
-          <div class="text-muted" style="font-size:12.5px;">Verificando disponibilidade...</div>
+        <div class="card" id="cardPasso2" style="display:none;">
+          <div class="section-title">2. Instalar no service manager do cliente</div>
+          <div class="siteid-hint" style="margin:0 0 14px;">
+            O script abaixo instala o Tailscale, conecta com uma auth key de uso único,
+            descobre as faixas de rede lendo o replica set do Mongo local e ativa o
+            subnet router — sozinho. Rode como root na máquina do service manager.
+          </div>
+          <div class="field">
+            <label>IP do banco ERP <span style="color:var(--red);">*</span> <span class="text-muted">(obrigatório — sem ele a faixa do ERP não será roteada via Tailscale)</span></label>
+            <input id="campoErpIp" placeholder="192.168.1.100">
+          </div>
+          <button class="btn btn-primary" id="btnGerarScript" onclick="gerarScript()">Gerar script de instalação</button>
+          <div class="erro-msg" id="scriptErro" style="display:none; color:var(--red); font-size:12px; margin-top:10px;"></div>
+
+          <div id="scriptResultado" style="display:none; margin-top:16px; text-align:left;">
+            <textarea id="scriptTexto" readonly></textarea>
+            <div class="botoes-script">
+              <button class="btn btn-ghost btn-sm" onclick="copiarScript()">Copiar</button>
+              <button class="btn btn-ghost btn-sm" onclick="baixarScript()">Baixar .sh</button>
+            </div>
+          </div>
+
+          <div id="statusInstalacao" style="display:none; margin-top:18px; text-align:left;">
+            <div class="section-title" style="font-size:12px;">Status</div>
+            <span class="status-badge" id="statusBadge">—</span>
+            <div id="statusDetalhe" class="text-muted" style="font-size:12px; margin-top:8px;"></div>
+          </div>
         </div>
 
-        <!-- Upload -->
-        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-          <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        <div class="card" id="cardPasso3" style="display:none;">
+          <div class="section-title">3. Criar a Rede no painel</div>
+          <div class="siteid-hint" style="margin:0 0 14px;">
+            Tudo pronto do lado do Tailscale. Agora cadastre a Rede no painel com os dados do cliente.
+            O Mongo URI já vem preenchido automaticamente com o IP Tailscale do service manager.
+          </div>
+          <div class="field">
+            <label>Unidade</label>
+            <select id="campoPasso3Unidade"></select>
+          </div>
+          <div class="field">
+            <label>Token compartilhado com os agentes PDV <span class="text-muted">(deve bater com PDV_AGENT_TOKEN no agente de cada PDV)</span></label>
+            <input id="campoPasso3Token" placeholder="Carregando..." type="text">
+          </div>
+          <div class="field">
+            <label>Mongo URI <span class="text-muted">(gerado automaticamente — edite só se necessário)</span></label>
+            <input id="campoPasso3MongoUri" placeholder="mongodb://100.x.x.x:27016">
+          </div>
+          <button class="btn btn-primary" id="btnCriarRede" onclick="criarRede()">Criar Rede automaticamente</button>
+          <div class="erro-msg" id="passo3Erro" style="display:none; color:var(--red); font-size:12px; margin-top:10px;"></div>
+          <div id="passo3Sucesso" style="display:none; margin-top:14px;">
+            <span class="status-badge status-ok">✅ Rede criada com sucesso</span>
+            <div style="margin-top:10px;">
+              <a id="linkRede" class="btn btn-primary" href="#">Abrir painel da Rede →</a>
+            </div>
+            <div class="text-muted" style="font-size:12px; margin-top:8px;">
+              Próximo passo: configure o banco ERP e o integrador em <b>Configurações</b> dentro do painel da Rede.
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="cardPasso4" style="display:none;">
+          <div class="section-title">4. Configurar conexões</div>
+          <div class="siteid-hint" style="margin:0 0 16px;">
+            Rede criada. Configure as conexões com o banco ERP e o integrador — os IPs já vêm preenchidos.
+          </div>
+
+          <div class="section-title" style="font-size:12px; margin-bottom:10px;">🛢️ Banco ERP (PostgreSQL)</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:600px;">
+            <div class="field"><label>IP do servidor</label><input id="p4ErpHost" placeholder="192.168.1.100"></div>
+            <div class="field"><label>Porta</label><input id="p4ErpPorta" type="number" placeholder="5432" value="5432"></div>
+            <div class="field"><label>Usuário</label><input id="p4ErpUsuario" placeholder="postgres"></div>
+            <div class="field"><label>Senha</label><input id="p4ErpSenha" type="password"></div>
+            <div class="field"><label>Nome do banco</label><input id="p4ErpBanco" placeholder="vr"></div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn btn-ghost btn-sm" onclick="testarErp()">🔌 Testar</button>
+            <button class="btn btn-primary btn-sm" onclick="salvarErp()">💾 Salvar e testar</button>
+          </div>
+          <div id="p4ErpResultado" class="text-muted" style="font-size:12px; margin-top:6px;"></div>
+
+          <hr style="border-color:var(--border); margin:18px 0;">
+
+          <div class="section-title" style="font-size:12px; margin-bottom:10px;">🔗 Integrador VR</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:600px;">
+            <div class="field"><label>IP do integrador</label><input id="p4IntIp" placeholder="100.x.x.x"></div>
+            <div class="field"><label>Porta do integrador</label><input id="p4IntPorta" type="number" placeholder="8080" value="8080"></div>
+            <div class="field"><label>IP do MongoDB</label><input id="p4IntMongoIp" placeholder="100.x.x.x"></div>
+            <div class="field"><label>Porta do MongoDB</label><input id="p4IntMongoPorta" type="number" placeholder="27016" value="27016"></div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn btn-ghost btn-sm" onclick="testarIntegrador()">🔌 Testar</button>
+            <button class="btn btn-primary btn-sm" onclick="salvarIntegrador()">💾 Salvar e testar</button>
+          </div>
+          <div id="p4IntResultado" class="text-muted" style="font-size:12px; margin-top:6px;"></div>
+
+          <div id="p4Conclusao" style="display:none; margin-top:20px; padding:16px; background:rgba(0,200,120,.1); border:1px solid var(--green); border-radius:10px;">
+            <div style="font-size:14px; font-weight:700; color:var(--green); margin-bottom:8px;">✅ Instalação concluída!</div>
+            <div id="p4CheckList" style="font-size:12px; line-height:1.9;"></div>
+            <div style="margin-top:12px;">
+              <a id="p4LinkRede" class="btn btn-primary btn-sm" href="#">Abrir painel da Rede →</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Histórico de Site IDs já alocados</div>
+          <div id="historicoContainer"><div class="text-muted">Carregando...</div></div>
+        </div>
+
+      </div><!-- /tab-service-manager -->
+
+      <!-- ══════════════════════════════════════════════════════ -->
+      <!-- TAB: PDV                                               -->
+      <!-- ══════════════════════════════════════════════════════ -->
+      <div class="tab-content" id="tab-pdv">
+
+        <!-- Passos resumidos -->
+        <div class="card">
+          <div class="section-title">O que você vai precisar</div>
+          <div class="pdv-steps" style="margin-top:14px;">
+            <div class="pdv-step">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <div class="step-title">Token de Acesso ao Servidor</div>
+                <div class="step-desc">Copie o token abaixo e tenha-o em mãos. O instalador vai pedir esse valor durante a instalação.</div>
+              </div>
+            </div>
+            <div class="pdv-step">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <div class="step-title">Auth Key do Tailscale <span class="text-muted" style="font-weight:400;">(opcional)</span></div>
+                <div class="step-desc">Se o PDV precisar entrar na VPN automaticamente, tenha a auth key com tag <code>pdv-terminal</code> em mãos antes de rodar o instalador.</div>
+              </div>
+            </div>
+            <div class="pdv-step">
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <div class="step-title">Baixar e rodar o PDVAgent_Setup.exe</div>
+                <div class="step-desc">Execute o instalador no PDV como Administrador. Ele instala o agente, o monitor de status e o Tailscale de uma vez só.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Token de Acesso -->
+        <div class="card">
+          <div class="section-title">Token de Acesso ao Servidor</div>
+          <div class="siteid-hint" style="margin:0 0 16px;">
+            Informe este valor quando o instalador <code>PDVAgent_Setup.exe</code> perguntar pelo
+            <b>Token de Acesso ao Servidor</b>. É o mesmo para todos os PDVs desta instalação.
+          </div>
+          <div class="token-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 style="width:16px;height:16px;flex-shrink:0;color:var(--orange);">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0110 0v4"/>
             </svg>
-            Enviar novo Setup.exe
-            <input type="file" accept=".exe" style="display:none;" onchange="uploadSetup(this)">
-          </label>
-          <span id="uploadSetupStatus" style="font-size:12px; color:var(--text-faint);"></span>
+            <span id="tokenValor" class="token-valor">Carregando...</span>
+            <button class="btn btn-ghost btn-sm" id="btnRevelarToken" onclick="toggleToken()">Revelar</button>
+            <button class="btn btn-ghost btn-sm" id="btnCopiarToken" onclick="copiarToken()">Copiar</button>
+          </div>
+          <div class="text-muted" style="font-size:12px; margin-top:10px;">
+            🔒 Mantenha em sigilo — quem tiver este valor e acesso à rede pode comunicar com os agentes PDV.
+          </div>
         </div>
-      </div>
 
-      <div class="card">
-        <div class="section-title">Histórico de Site IDs já alocados</div>
-        <div id="historicoContainer"><div class="text-muted">Carregando...</div></div>
-      </div>
-    </div>
-  </div>
-</div>
+        <!-- Instalador -->
+        <div class="card">
+          <div class="section-title">Instalador do PDV Agent</div>
+          <div class="siteid-hint" style="margin:0 0 16px;">
+            Execute <code>PDVAgent_Setup.exe</code> no PDV como Administrador para instalar o agente,
+            o monitor de status e o Tailscale de uma vez só.
+          </div>
+
+          <div id="setupStatus" style="margin-bottom:14px;">
+            <div class="text-muted" style="font-size:12.5px;">Verificando disponibilidade...</div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Enviar novo Setup.exe
+              <input type="file" accept=".exe" style="display:none;" onchange="uploadSetup(this)">
+            </label>
+            <span id="uploadSetupStatus" style="font-size:12px; color:var(--text-faint);"></span>
+          </div>
+        </div>
+
+      </div><!-- /tab-pdv -->
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
 
 <script>
+// ── Navegação entre tabs ──────────────────────────────────────────────────────
+function mostrarTab(nome) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + nome).classList.add('active');
+  document.querySelector(`.tab-btn[data-tab="${nome}"]`).classList.add('active');
+}
+
+// ── Service Manager ───────────────────────────────────────────────────────────
 let instalacaoAtual = null;
 let pollingId = null;
 
@@ -335,9 +444,7 @@ async function gerarSiteId() {
   }
   document.getElementById('siteIdValor').textContent = dados.site_id;
   document.getElementById('siteIdResultado').style.display = 'block';
-  try {
-    await navigator.clipboard.writeText(String(dados.site_id));
-  } catch (e) { /* clipboard pode falhar sem HTTPS — sem problema, o numero ja esta na tela */ }
+  try { await navigator.clipboard.writeText(String(dados.site_id)); } catch (_) {}
   carregarHistorico();
   abrirPasso2(dados.id);
 }
@@ -353,9 +460,7 @@ async function continuarInstalacao(instalacaoId) {
   const dados = await fetch(`/api/instalacao/${instalacaoId}`).then(r => r.json());
   if (dados.erro) { alert(dados.erro); return; }
   document.getElementById('campoErpIp').value = dados.erp_ip || '';
-  if (dados.status && dados.status !== 'site_id_gerado') {
-    iniciarPolling();
-  }
+  if (dados.status && dados.status !== 'site_id_gerado') iniciarPolling();
 }
 
 async function gerarScript() {
@@ -372,23 +477,23 @@ async function gerarScript() {
   btn.disabled = true;
   btn.textContent = 'Gerando... (criando auth key no Tailscale)';
   try {
-  const r = await fetch(`/api/instalacao/${instalacaoAtual}/script`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ erp_ip: erpIp }),
-  });
-  const dados = await r.json();
-  if (dados.erro) {
-    erroEl.textContent = dados.erro;
-    erroEl.style.display = 'block';
-    return;
-  }
-  document.getElementById('scriptTexto').value = dados.script;
-  const resultadoEl = document.getElementById('scriptResultado');
-  resultadoEl.style.display = 'block';
-  resultadoEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  iniciarPolling();
-  carregarHistorico();
+    const r = await fetch(`/api/instalacao/${instalacaoAtual}/script`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ erp_ip: erpIp }),
+    });
+    const dados = await r.json();
+    if (dados.erro) {
+      erroEl.textContent = dados.erro;
+      erroEl.style.display = 'block';
+      return;
+    }
+    document.getElementById('scriptTexto').value = dados.script;
+    const resultadoEl = document.getElementById('scriptResultado');
+    resultadoEl.style.display = 'block';
+    resultadoEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    iniciarPolling();
+    carregarHistorico();
   } catch (e) {
     erroEl.textContent = 'Erro inesperado: ' + e.message;
     erroEl.style.display = 'block';
@@ -424,7 +529,6 @@ async function atualizarStatus() {
   const badge = document.getElementById('statusBadge');
   badge.textContent = label;
   badge.className = `status-badge ${classe}`;
-
   const detalhe = document.getElementById('statusDetalhe');
   const partes = [];
   if (dados.tailscale_ip) partes.push(`IP Tailscale: ${dados.tailscale_ip}`);
@@ -432,7 +536,6 @@ async function atualizarStatus() {
   if (dados.prefixos_ipv6) partes.push(`Prefixos 4via6: ${dados.prefixos_ipv6}`);
   if (dados.erro_mensagem) partes.push(`⚠️ ${dados.erro_mensagem}`);
   detalhe.innerHTML = partes.join('<br>');
-
   const TERMINAIS = ['concluido', 'concluido_manual', 'concluido_pendente_acl', 'erro'];
   if (TERMINAIS.includes(dados.status) && pollingId) {
     clearInterval(pollingId);
@@ -455,7 +558,6 @@ async function mostrarPasso3(dados) {
   document.getElementById('cardPasso3').style.display = 'block';
   document.getElementById('campoPasso3MongoUri').value = dados.mongo_uri_sugerida || '';
   document.getElementById('cardPasso3').scrollIntoView({ behavior: 'smooth', block: 'start' });
-
   const unidades = await fetch('/api/unidades').then(r => r.ok ? r.json() : []).catch(() => []);
   const sel = document.getElementById('campoPasso3Unidade');
   sel.innerHTML = unidades.length
@@ -463,7 +565,7 @@ async function mostrarPasso3(dados) {
     : '<option value="">Nenhuma unidade cadastrada</option>';
 }
 
-let redeAtual = null;   // rede_id da Rede criada no passo 3
+let redeAtual = null;
 let _erpOk = false;
 let _intOk = false;
 
@@ -472,14 +574,11 @@ function mostrarPasso4(redeId, tailscaleIp, erpIp) {
   const card = document.getElementById('cardPasso4');
   card.style.display = 'block';
   card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  // Pre-preenche campos com dados ja conhecidos
   if (tailscaleIp) {
     document.getElementById('p4IntIp').value = tailscaleIp;
     document.getElementById('p4IntMongoIp').value = tailscaleIp;
   }
-  if (erpIp) {
-    document.getElementById('p4ErpHost').value = erpIp;
-  }
+  if (erpIp) document.getElementById('p4ErpHost').value = erpIp;
 }
 
 function _verificarConclusao() {
@@ -581,9 +680,7 @@ async function criarRede() {
     document.getElementById('btnCriarRede').style.display = 'none';
     document.getElementById('linkRede').href = `/r/${dados.rede.id}/`;
     carregarHistorico();
-    // Abre passo 4 automaticamente com dados ja conhecidos
-    const inst = dados.instalacao;
-    mostrarPasso4(dados.rede.id, inst.tailscale_ip, inst.erp_ip);
+    mostrarPasso4(dados.rede.id, dados.instalacao.tailscale_ip, dados.instalacao.erp_ip);
   } catch(e) {
     erroEl.textContent = 'Erro inesperado: ' + e.message;
     erroEl.style.display = 'block';
@@ -593,7 +690,7 @@ async function criarRede() {
   }
 }
 
-// ── Token de acesso ──────────────────────────────────────────────────────────
+// ── PDV — Token de acesso ─────────────────────────────────────────────────────
 let _tokenAgente  = null;
 let _tokenVisivel = false;
 
@@ -629,12 +726,8 @@ async function copiarToken() {
   btn.textContent = 'Copiado!';
   setTimeout(() => { btn.textContent = orig; }, 2000);
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
-carregarHistorico();
-carregarInfoAgente();
-carregarTokenAgente();
-
+// ── PDV — Instalador ──────────────────────────────────────────────────────────
 async function carregarInfoAgente() {
   const info = await fetch('/api/setup/info').then(r => r.json()).catch(() => ({ disponivel: false }));
   const el = document.getElementById('setupStatus');
@@ -685,6 +778,11 @@ async function uploadSetup(input) {
   }
   input.value = '';
 }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+carregarHistorico();
+carregarInfoAgente();
+carregarTokenAgente();
 </script>
 </body>
 </html>
