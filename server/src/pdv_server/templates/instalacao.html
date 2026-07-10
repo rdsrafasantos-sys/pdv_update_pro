@@ -215,20 +215,30 @@
         </div>
       </div>
 
-      <!-- ── Download dos instaladores ── -->
-      <div class="card" id="cardDownloadAgente">
-        <div class="section-title">Instaladores para o PDV</div>
-        <div class="siteid-hint" style="margin:0 0 18px;">
-          Instale os dois arquivos em cada PDV antes de conectá-lo à rede.
-          As versões disponíveis são as que foram enviadas via upload no painel de uma Rede.
+      <!-- ── Instalador do PDV ── -->
+      <div class="card">
+        <div class="section-title">Instalador do PDV Agent</div>
+        <div class="siteid-hint" style="margin:0 0 16px;">
+          Execute <code>PDVAgent_Setup.exe</code> no PDV para instalar o agente, o monitor de status
+          e o Tailscale de uma vez só. Faça o upload da versão mais recente aqui sempre que compilar
+          uma nova.
         </div>
 
-        <div style="display:flex; flex-direction:column; gap:12px;" id="listaInstaladores">
+        <!-- Status + download -->
+        <div id="setupStatus" style="margin-bottom:14px;">
           <div class="text-muted" style="font-size:12.5px;">Verificando disponibilidade...</div>
         </div>
 
-        <div id="instaladoresSemArquivo" style="display:none; margin-top:8px;">
-          <span class="status-badge status-erro">Nenhum instalador disponível — faça upload de agente.exe e status_pdv.exe pelo painel de uma Rede.</span>
+        <!-- Upload -->
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Enviar novo Setup.exe
+            <input type="file" accept=".exe" style="display:none;" onchange="uploadSetup(this)">
+          </label>
+          <span id="uploadSetupStatus" style="font-size:12px; color:var(--text-faint);"></span>
         </div>
       </div>
 
@@ -558,45 +568,55 @@ async function criarRede() {
 carregarHistorico();
 carregarInfoAgente();
 
-const ICONE_DOWNLOAD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
-
 async function carregarInfoAgente() {
-  const dados = await fetch('/api/agente/info').then(r => r.json()).catch(() => ({}));
-  const lista = document.getElementById('listaInstaladores');
-  const semEl = document.getElementById('instaladoresSemArquivo');
-
-  const instaladores = [
-    { key: 'agente',     label: 'Agente PDV',    desc: 'Responsável por receber atualizações e comunicar com o servidor', url: '/download/agente.exe',     nome: 'agente.exe' },
-    { key: 'status_pdv', label: 'Status PDV',    desc: 'Exibe o progresso da atualização na tela do caixa',              url: '/download/status_pdv.exe', nome: 'status_pdv.exe' },
-  ];
-
-  const linhas = instaladores.map(inst => {
-    const info = dados[inst.key] || { disponivel: false };
-    return `
+  const info = await fetch('/api/setup/info').then(r => r.json()).catch(() => ({ disponivel: false }));
+  const el = document.getElementById('setupStatus');
+  if (info.disponivel) {
+    el.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;
                   background:var(--bg-elevated); border:1px solid var(--border-strong);
                   border-radius:var(--radius-sm); padding:12px 14px;">
-        <div style="display:flex; flex-direction:column; gap:3px;">
-          <div style="font-size:13px; font-weight:650;">${inst.label}
-            <code style="font-size:11px; color:var(--text-faint); font-weight:400; margin-left:4px;">${inst.nome}</code>
+        <div>
+          <div style="font-size:13px; font-weight:650;">PDVAgent_Setup.exe
+            <span style="font-size:11px; color:var(--green); font-weight:400; margin-left:8px;">
+              ✔ ${info.tamanho_mb} MB · atualizado em ${info.data}
+            </span>
           </div>
-          <div style="font-size:11.5px; color:var(--text-faint);">${inst.desc}</div>
-          ${info.disponivel
-            ? `<div style="font-size:11px; color:var(--green); margin-top:2px;">✔ ${info.tamanho_mb} MB · atualizado em ${info.data}</div>`
-            : `<div style="font-size:11px; color:var(--amber); margin-top:2px;">⚠ Não disponível — faça upload pelo painel de uma Rede</div>`}
+          <div style="font-size:11.5px; color:var(--text-faint); margin-top:3px;">
+            Instala agente, monitor de status e Tailscale de uma vez só
+          </div>
         </div>
-        ${info.disponivel
-          ? `<a href="${inst.url}" download="${inst.nome}"
-               style="display:inline-flex; align-items:center; gap:6px; white-space:nowrap; text-decoration:none;"
-               class="btn btn-ghost btn-sm">${ICONE_DOWNLOAD} Baixar</a>`
-          : `<button class="btn btn-ghost btn-sm" disabled style="opacity:.4; white-space:nowrap;">${ICONE_DOWNLOAD} Baixar</button>`}
+        <a href="/download/PDVAgent_Setup.exe" download="PDVAgent_Setup.exe"
+           class="btn btn-primary btn-sm"
+           style="display:inline-flex; align-items:center; gap:6px; white-space:nowrap; text-decoration:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Baixar Setup
+        </a>
       </div>`;
-  });
+  } else {
+    el.innerHTML = `<span class="status-badge status-aguardando">Nenhum Setup.exe disponível — faça o upload abaixo.</span>`;
+  }
+}
 
-  const algumDisponivel = instaladores.some(i => (dados[i.key] || {}).disponivel);
-  lista.innerHTML = linhas.join('');
-  semEl.style.display = algumDisponivel ? 'none' : 'block';
-  if (!algumDisponivel) lista.innerHTML = '';
+async function uploadSetup(input) {
+  const arquivo = input.files[0];
+  if (!arquivo) return;
+  const statusEl = document.getElementById('uploadSetupStatus');
+  statusEl.textContent = 'Enviando...';
+  const fd = new FormData();
+  fd.append('arquivo', arquivo);
+  try {
+    const r = await fetch('/api/setup/upload', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.erro) { statusEl.textContent = '❌ ' + d.erro; return; }
+    statusEl.textContent = `✔ Enviado — ${d.tamanho_mb} MB`;
+    carregarInfoAgente();
+  } catch (e) {
+    statusEl.textContent = '❌ Erro no upload';
+  }
+  input.value = '';
 }
 </script>
 </body>

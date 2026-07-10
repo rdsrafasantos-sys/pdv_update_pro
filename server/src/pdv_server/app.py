@@ -59,7 +59,7 @@ def exigir_login():
     rota = request.endpoint or ""
     # Callback do script de instalacao roda sem sessao de usuario --
     # autenticado pelo token de uso unico na propria URL (ver gestao.py).
-    if rota.startswith("auth.") or rota in ("static", "painel.api_callback_instalacao", "download_agente_publico", "download_status_pdv_publico", "api_versao"):
+    if rota.startswith("auth.") or rota in ("static", "painel.api_callback_instalacao", "download_agente_publico", "download_status_pdv_publico", "download_setup_publico", "api_versao"):
         return None
     if not current_user.is_authenticated:
         return login_manager.unauthorized()
@@ -264,6 +264,49 @@ def download_status_pdv_publico():
     for caminho in glob.glob("/opt/pdv-server/uploads/*/status_pdv.exe"):
         return send_file(caminho, as_attachment=True, download_name="status_pdv.exe")
     return "status_pdv.exe nao disponivel", 404
+
+
+_SETUP_PATH = "/opt/pdv-server/setup/PDVAgent_Setup.exe"
+
+
+@app.route("/download/PDVAgent_Setup.exe")
+def download_setup_publico():
+    """Download público do instalador completo — sem autenticação."""
+    if os.path.exists(_SETUP_PATH):
+        return send_file(_SETUP_PATH, as_attachment=True, download_name="PDVAgent_Setup.exe")
+    return "PDVAgent_Setup.exe não disponível", 404
+
+
+@app.route("/api/setup/upload", methods=["POST"])
+@login_required
+def api_upload_setup():
+    """Recebe PDVAgent_Setup.exe e armazena no servidor."""
+    if "arquivo" not in request.files:
+        return jsonify({"erro": "Nenhum arquivo enviado"}), 400
+    arquivo = request.files["arquivo"]
+    if not arquivo.filename.lower().endswith(".exe"):
+        return jsonify({"erro": "Apenas arquivos .exe são aceitos"}), 400
+    os.makedirs(os.path.dirname(_SETUP_PATH), exist_ok=True)
+    arquivo.save(_SETUP_PATH)
+    tamanho = os.path.getsize(_SETUP_PATH)
+    return jsonify({
+        "ok": True,
+        "tamanho_mb": round(tamanho / 1024 / 1024, 2),
+        "data": time.strftime("%d/%m/%Y %H:%M"),
+    })
+
+
+@app.route("/api/setup/info", methods=["GET"])
+@login_required
+def api_setup_info():
+    """Retorna metadados do PDVAgent_Setup.exe disponível no servidor."""
+    if not os.path.exists(_SETUP_PATH):
+        return jsonify({"disponivel": False})
+    return jsonify({
+        "disponivel": True,
+        "tamanho_mb": round(os.path.getsize(_SETUP_PATH) / 1024 / 1024, 2),
+        "data": time.strftime("%d/%m/%Y %H:%M", time.localtime(os.path.getmtime(_SETUP_PATH))),
+    })
 
 
 @app.route("/api/agente/info", methods=["GET"])
