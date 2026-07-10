@@ -220,6 +220,7 @@ def api_reiniciar_mongo(contexto, loja_id, pdv_id):
 @app.route("/api/<int:rede_id>/upload", methods=["POST"])
 @com_rede
 @exigir_escrita
+@limiter.limit("10 per minute")
 def api_upload(contexto):
     if "arquivo" not in request.files:
         return jsonify({"erro": "Nenhum arquivo enviado"}), 400
@@ -322,6 +323,7 @@ def _autenticar_setup_upload():
 
 
 @app.route("/api/setup/upload", methods=["POST"])
+@limiter.limit("5 per minute")
 def api_upload_setup():
     """Recebe PDVAgent_Setup.exe via painel (sessão) ou script de build (token Bearer)."""
     if not _autenticar_setup_upload():
@@ -481,6 +483,7 @@ def api_agente_info():
 @app.route("/api/<int:rede_id>/upload_agente", methods=["POST"])
 @com_rede
 @exigir_escrita
+@limiter.limit("10 per minute")
 def api_upload_agente(contexto):
     """Recebe agente.exe ou status_pdv.exe e salva no servidor."""
     if "arquivo" not in request.files:
