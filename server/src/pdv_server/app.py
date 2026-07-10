@@ -328,6 +328,33 @@ def api_token_agente():
     return jsonify({"token": TOKEN_SEGURANCA})
 
 
+@app.route("/api/tailscale/gerar-auth-key-pdv", methods=["POST"])
+@login_required
+def api_gerar_auth_key_pdv():
+    """Gera uma auth key Tailscale reutilizável (7 dias) com tag:pdv-terminal.
+    Reutilizável para que o mesmo link sirva múltiplos PDVs na mesma instalação."""
+    import datetime
+    from pdv_server import tailscale_api
+
+    if not tailscale_api.automacao_disponivel():
+        return jsonify({
+            "erro": "API do Tailscale não configurada neste servidor. "
+                    "Configure PDV_TAILSCALE_OAUTH_CLIENT_ID e PDV_TAILSCALE_OAUTH_CLIENT_SECRET no .env."
+        }), 503
+
+    try:
+        descricao = f"pdv-terminal-painel-{datetime.datetime.utcnow().strftime('%Y%m%d-%H%M')}"
+        key = tailscale_api.criar_auth_key(
+            tags=["tag:pdv-terminal"],
+            descricao=descricao,
+            expiry_seconds=3600 * 24 * 7,
+            reusable=True,
+        )
+        return jsonify({"key": key, "expira_em_dias": 7})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
 @app.route("/api/agente/info", methods=["GET"])
 @login_required
 def api_agente_info():

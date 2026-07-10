@@ -66,16 +66,16 @@ def _post(caminho, json=None, **kwargs):
     return r
 
 
-def criar_auth_key(tags, descricao, expiry_seconds=3600 * 24):
-    """Gera uma auth key de uso unico (reusable=False) ja marcada com as
-    tags certas -- uma por instalacao, em vez de uma key reutilizavel
-    compartilhada entre clientes diferentes (menor exposicao se uma
-    instalacao especifica vazar a key do script)."""
+def criar_auth_key(tags, descricao, expiry_seconds=3600 * 24, reusable=False):
+    """Gera uma auth key Tailscale marcada com as tags informadas.
+    reusable=False (padrão) cria key de uso único — ideal para service manager
+    onde cada instalação tem sua própria key. reusable=True gera key que pode
+    ser usada em múltiplos dispositivos — ideal para instalar vários PDVs."""
     corpo = {
         "capabilities": {
             "devices": {
                 "create": {
-                    "reusable": False,
+                    "reusable": reusable,
                     "ephemeral": False,
                     "preauthorized": True,
                     "tags": tags,
