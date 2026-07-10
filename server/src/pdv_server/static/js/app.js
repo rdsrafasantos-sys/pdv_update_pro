@@ -125,6 +125,16 @@ function mostrarConfigTab(nome) {
 }
 window.mostrarConfigTab = mostrarConfigTab;
 
+function mostrarFiscalTab(nome) {
+  document.querySelectorAll(".cfg-tab-content[id^='fiscal-tab-']").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".cfg-tab-btn[data-fiscal-tab]").forEach(el => el.classList.remove("active"));
+  const painel = document.getElementById("fiscal-tab-" + nome);
+  if (painel) painel.classList.add("active");
+  const btn = document.querySelector(`.cfg-tab-btn[data-fiscal-tab="${nome}"]`);
+  if (btn) btn.classList.add("active");
+}
+window.mostrarFiscalTab = mostrarFiscalTab;
+
 // ──────────────────────────────────────────────
 // SIDEBAR: secoes recolhiveis (clicar no titulo expande/recolhe)
 // ──────────────────────────────────────────────
