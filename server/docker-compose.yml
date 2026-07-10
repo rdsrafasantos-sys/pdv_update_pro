@@ -21,7 +21,7 @@ services:
       - 100.100.100.100
     environment:
       - PDV_SERVER_PORTA=8888
-      - PDV_SERVER_TOKEN=${PDV_SERVER_TOKEN:?PDV_SERVER_TOKEN obrigatorio. Gere com: python -c 'import secrets; print(secrets.token_hex(32))'}
+      - "PDV_SERVER_TOKEN=${PDV_SERVER_TOKEN:?PDV_SERVER_TOKEN nao configurado - defina no .env}"
       - PDV_SERVER_MONGO_URI=${PDV_SERVER_MONGO_URI:-mongodb://localhost:27016}
       # Obrigatorias -- sem elas o processo nao sobe (ver auth/ e app.py).
       # Gere uma vez por instalacao e NUNCA reaproveite entre clientes:

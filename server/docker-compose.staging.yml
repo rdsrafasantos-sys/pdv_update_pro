@@ -10,7 +10,7 @@ services:
     environment:
       - PDV_SERVER_PORTA=8889
       - PDV_AMBIENTE=staging
-      - PDV_SERVER_TOKEN=${PDV_SERVER_TOKEN:?PDV_SERVER_TOKEN obrigatorio. Gere com: python -c 'import secrets; print(secrets.token_hex(32))'}
+      - "PDV_SERVER_TOKEN=${PDV_SERVER_TOKEN:?PDV_SERVER_TOKEN nao configurado - defina no .env}"
       - PDV_SERVER_MONGO_URI=${PDV_SERVER_MONGO_URI:-mongodb://localhost:27016}
       - PDV_MASTER_KEY=${PDV_MASTER_KEY}
       - PDV_SECRET_KEY=${PDV_SECRET_KEY}
