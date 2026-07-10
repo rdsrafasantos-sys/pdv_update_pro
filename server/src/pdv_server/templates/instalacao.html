@@ -398,16 +398,39 @@
         <!-- Instalador -->
         <div class="card">
           <div class="section-title">Instalador do PDV Agent</div>
-          <div class="siteid-hint" style="margin:0 0 16px;">
-            Execute <code>PDVAgent_Setup.exe</code> no PDV como Administrador para instalar o agente,
-            o monitor de status e o Tailscale de uma vez só.
-          </div>
 
-          <div id="setupStatus" style="margin-bottom:14px;">
+          <div id="setupStatus" style="margin-bottom:16px;">
             <div class="text-muted" style="font-size:12.5px;">Verificando disponibilidade...</div>
           </div>
 
+          <!-- Script de instalação silenciosa -->
+          <div style="border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:14px; margin-bottom:14px;">
+            <div style="font-size:13px; font-weight:650; margin-bottom:4px;">
+              Script de instalação silenciosa
+              <span class="status-badge status-ok" style="font-size:11px; padding:2px 8px; margin-left:8px;">Recomendado</span>
+            </div>
+            <div class="text-muted" style="font-size:12px; margin-bottom:12px;">
+              Gere um <code>.ps1</code> com tudo pré-configurado. O técnico só executa o script no PDV como Administrador — sem digitar token nem auth key.
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <input id="inputHostnamePdv" type="text" placeholder="Nome do PDV (ex: loja01-pdv03) — opcional"
+                     style="flex:1; min-width:200px; background:var(--bg-elevated); border:1px solid var(--border-strong);
+                            border-radius:var(--radius-sm); padding:7px 10px; color:var(--text); font-size:12.5px;">
+              <button class="btn btn-primary btn-sm" onclick="baixarScriptInstalacao()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Gerar Script .ps1
+              </button>
+            </div>
+            <div class="text-muted" style="font-size:11px; margin-top:8px;">
+              O script baixa o Setup.exe do servidor automaticamente. Se o PDV não tiver acesso ao servidor, coloque o <code>PDVAgent_Setup.exe</code> na mesma pasta que o script.
+            </div>
+          </div>
+
+          <!-- Download direto + upload -->
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <span class="text-muted" style="font-size:12px;">Ou baixe o instalador manualmente:</span>
             <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
@@ -890,6 +913,13 @@ async function copiarAuthKey() {
   const orig = btn.textContent;
   btn.textContent = 'Copiado!';
   setTimeout(() => { btn.textContent = orig; }, 2000);
+}
+
+// ── PDV — Script de instalação silenciosa ────────────────────────────────────
+function baixarScriptInstalacao() {
+  const hostname = document.getElementById('inputHostnamePdv').value.trim();
+  const params   = hostname ? `?hostname=${encodeURIComponent(hostname)}` : '';
+  window.location.href = `/api/pdv/script-instalacao${params}`;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

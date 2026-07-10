@@ -14,6 +14,7 @@ Unicode true
 !include "MUI2.nsh"
 !include "nsDialogs.nsh"
 !include "LogicLib.nsh"
+!include "FileFunc.nsh"
 
 ;--------------------------------
 ; Configurações gerais
@@ -73,6 +74,31 @@ Page custom TailscalePageCreate TailscalePageLeave
 !insertmacro MUI_UNPAGE_INSTFILES
 
 !insertmacro MUI_LANGUAGE "PortugueseBR"
+
+;--------------------------------
+; Modo silencioso: ler parametros da linha de comando
+; Uso: PDVAgent_Setup.exe /S /TOKEN=xxx [/AUTHKEY=yyy] [/HOSTNAME=zzz]
+;--------------------------------
+Function .onInit
+  ${If} ${Silent}
+    ${GetOptions} $CMDLINE "/TOKEN=" $AgentToken
+    ${If} $AgentToken == ""
+      SetErrorLevel 1   ; TOKEN ausente
+      Quit
+    ${EndIf}
+    StrLen $R0 $AgentToken
+    ${If} $R0 < 16
+      SetErrorLevel 2   ; TOKEN muito curto
+      Quit
+    ${EndIf}
+    ${If} $AgentToken == "pdv-agent-2024"
+      SetErrorLevel 3   ; TOKEN padrao inseguro
+      Quit
+    ${EndIf}
+    ${GetOptions} $CMDLINE "/AUTHKEY=" $TailscaleAuthKey
+    ${GetOptions} $CMDLINE "/HOSTNAME=" $TailscaleHostname
+  ${EndIf}
+FunctionEnd
 
 ;--------------------------------
 ; Pagina customizada: Tailscale (opcional)
