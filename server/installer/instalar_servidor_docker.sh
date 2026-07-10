@@ -55,8 +55,18 @@ if [ ! -f .env ]; then
   read -rp "IP/host do MongoDB do integrador (ex: 192.168.1.20): " MONGO_HOST
   read -rp "Porta do MongoDB do integrador [27016]: " MONGO_PORT
   MONGO_PORT="${MONGO_PORT:-27016}"
-  read -rp "Token compartilhado com os agentes dos PDVs [pdv-agent-2024]: " TOKEN
-  TOKEN="${TOKEN:-pdv-agent-2024}"
+  TOKEN=""
+  while true; do
+    read -rsp "Token compartilhado com os agentes dos PDVs (min 16 chars, sem espacos): " TOKEN
+    echo
+    if [ ${#TOKEN} -lt 16 ]; then
+      echo "ERRO: o token precisa ter pelo menos 16 caracteres. Tente novamente."
+    elif [ "$TOKEN" = "pdv-agent-2024" ]; then
+      echo "ERRO: nao use o valor padrao inseguro. Escolha um token unico."
+    else
+      break
+    fi
+  done
 
   # Chaves de seguranca obrigatorias -- uma por instalacao, nunca
   # reaproveitar entre clientes/servidores.

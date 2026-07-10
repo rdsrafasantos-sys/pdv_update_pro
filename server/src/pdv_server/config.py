@@ -1,8 +1,22 @@
 import os
 
-# Token de seguranca — deve ser IGUAL ao PDV_AGENT_TOKEN configurado no agente.
-# Sobrescreva via variavel de ambiente PDV_SERVER_TOKEN em producao.
-TOKEN_SEGURANCA = os.environ.get("PDV_SERVER_TOKEN", "pdv-agent-2024")
+_TOKEN_PROIBIDO = "pdv-agent-2024"
+
+TOKEN_SEGURANCA = os.environ.get("PDV_SERVER_TOKEN", "")
+if not TOKEN_SEGURANCA:
+    raise RuntimeError(
+        "PDV_SERVER_TOKEN nao configurado. "
+        "Gere um com: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
+if len(TOKEN_SEGURANCA) < 16:
+    raise RuntimeError(
+        f"PDV_SERVER_TOKEN muito curto ({len(TOKEN_SEGURANCA)} chars). Minimo: 16 caracteres."
+    )
+if TOKEN_SEGURANCA == _TOKEN_PROIBIDO:
+    raise RuntimeError(
+        "PDV_SERVER_TOKEN usa o valor padrao inseguro. "
+        "Defina um token unico com: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
 
 # Porta do servidor web
 PORTA_SERVIDOR = int(os.environ.get("PDV_SERVER_PORTA", "8888"))

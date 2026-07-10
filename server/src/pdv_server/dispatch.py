@@ -1,3 +1,5 @@
+import hashlib
+import hmac as _hmac_mod
 import os
 import threading
 import time
@@ -5,6 +7,12 @@ import time
 import requests
 
 from pdv_server.discovery import endereco_alcancavel
+
+
+def _hmac_arquivo(caminho: str, token: str) -> str:
+    with open(caminho, "rb") as f:
+        dados = f.read()
+    return _hmac_mod.new(token.encode(), dados, hashlib.sha256).hexdigest()
 
 atualizacoes = {}
 lock = threading.Lock()
@@ -57,7 +65,10 @@ def enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo, caminho_status=Non
                     r = requests.post(
                         f"http://{endereco}:5000/atualizar_agente",
                         files={"arquivo": ("agente.exe", f, "application/octet-stream")},
-                        headers={"X-Agent-Token": contexto.token},
+                        headers={
+                            "X-Agent-Token": contexto.token,
+                            "X-File-Hmac": _hmac_arquivo(caminho_exe, contexto.token),
+                        },
                         timeout=60
                     )
                 ok = r.status_code == 200
@@ -68,7 +79,10 @@ def enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo, caminho_status=Non
                             requests.post(
                                 f"http://{endereco}:5000/atualizar_status_pdv",
                                 files={"arquivo": ("status_pdv.exe", f2, "application/octet-stream")},
-                                headers={"X-Agent-Token": contexto.token},
+                                headers={
+                                    "X-Agent-Token": contexto.token,
+                                    "X-File-Hmac": _hmac_arquivo(caminho_status, contexto.token),
+                                },
                                 timeout=60
                             )
                     except Exception:
@@ -120,7 +134,10 @@ def _enviar_para_pdv(contexto, loja_id, pdv, caminho_zip):
             r = requests.post(
                 f"http://{endereco}:5000/atualizar",
                 files={"arquivo": (os.path.basename(caminho_zip), f, "application/zip")},
-                headers={"X-Agent-Token": contexto.token},
+                headers={
+                    "X-Agent-Token": contexto.token,
+                    "X-File-Hmac": _hmac_arquivo(caminho_zip, contexto.token),
+                },
                 timeout=120
             )
         if r.status_code != 200:

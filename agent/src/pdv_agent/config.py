@@ -1,4 +1,5 @@
 import os
+import sys
 
 PORTA = int(os.environ.get("PDV_AGENT_PORTA", "5000"))
 
@@ -14,10 +15,24 @@ PASTA_AGENTE = r"C:\PDVAgent"
 LOG_FILE = r"C:\PDVAgent\agente_pdv.log"
 PROGRESSO_FILE = r"C:\PDVAgent\progresso.json"
 
-# Token compartilhado com o servidor — sobrescreva via variável de ambiente
-# PDV_AGENT_TOKEN em produção. O valor abaixo é apenas o default de
-# desenvolvimento e deve ser igual ao PDV_SERVER_TOKEN configurado no servidor.
-TOKEN_SEGURANCA = os.environ.get("PDV_AGENT_TOKEN", "pdv-agent-2024")
+_TOKEN_PROIBIDO = "pdv-agent-2024"
+
+TOKEN_SEGURANCA = os.environ.get("PDV_AGENT_TOKEN", "")
+if not TOKEN_SEGURANCA:
+    sys.exit(
+        "ERRO FATAL: PDV_AGENT_TOKEN nao definido. "
+        "Configure a variavel de ambiente antes de iniciar o agente."
+    )
+if len(TOKEN_SEGURANCA) < 16:
+    sys.exit(
+        f"ERRO FATAL: PDV_AGENT_TOKEN muito curto ({len(TOKEN_SEGURANCA)} chars). "
+        "Minimo: 16 caracteres."
+    )
+if TOKEN_SEGURANCA == _TOKEN_PROIBIDO:
+    sys.exit(
+        "ERRO FATAL: PDV_AGENT_TOKEN usa o valor padrao inseguro 'pdv-agent-2024'. "
+        "Defina um token unico com: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
 
 CONJUNTOS_SERVICOS = [
     ["MongoDumpRestore", "MongoFilho", "MongoStandalone"],

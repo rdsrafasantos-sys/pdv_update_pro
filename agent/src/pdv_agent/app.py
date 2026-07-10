@@ -1,3 +1,5 @@
+import hashlib
+import hmac as _hmac_mod
 import logging
 import os
 import subprocess
@@ -19,6 +21,13 @@ app = Flask(__name__)
 
 def verificar_token(req):
     return req.headers.get("X-Agent-Token", "") == TOKEN_SEGURANCA
+
+
+def _verificar_hmac(dados: bytes, hmac_recebido: str) -> bool:
+    if not hmac_recebido:
+        return False
+    hmac_calc = _hmac_mod.new(TOKEN_SEGURANCA.encode(), dados, hashlib.sha256).hexdigest()
+    return _hmac_mod.compare_digest(hmac_calc, hmac_recebido)
 
 
 @app.route("/ping")
@@ -43,9 +52,14 @@ def atualizar_status_pdv():
         return jsonify({"erro": "Nenhum arquivo enviado"}), 400
     arq = request.files["arquivo"]
     try:
+        dados = arq.read()
+        if not _verificar_hmac(dados, request.headers.get("X-File-Hmac", "")):
+            log.warning("status_pdv.exe rejeitado — HMAC invalido")
+            return jsonify({"erro": "Assinatura do arquivo invalida — atualizacao recusada"}), 403
         atual = os.path.join(PASTA_AGENTE, "status_pdv.exe")
         novo = os.path.join(PASTA_AGENTE, "status_pdv_novo.exe")
-        arq.save(novo)
+        with open(novo, "wb") as f:
+            f.write(dados)
         # Encerra instancia atual
         subprocess.run(["taskkill", "/F", "/IM", "status_pdv.exe"],
                        capture_output=True)
@@ -109,8 +123,13 @@ def atualizar_agente():
         nssm = os.path.join(pasta, "nssm.exe")
         bat = os.path.join(pasta, "atualizar_agente.bat")
 
-        arq.save(novo)
-        log.info(f"Novo agente recebido: {novo}")
+        dados = arq.read()
+        if not _verificar_hmac(dados, request.headers.get("X-File-Hmac", "")):
+            log.warning("agente.exe rejeitado — HMAC invalido")
+            return jsonify({"erro": "Assinatura do arquivo invalida — atualizacao recusada"}), 403
+        with open(novo, "wb") as f:
+            f.write(dados)
+        log.info(f"Novo agente recebido e verificado: {novo}")
 
         # Detecta servicos Mongo agora, enquanto o agente ainda esta rodando,
         # para incluir o restart deles no BAT — garante que sobem mesmo se o
@@ -204,8 +223,13 @@ def atualizar():
     if not arq.filename.endswith(".zip"):
         return jsonify({"erro": "Apenas .zip"}), 400
     try:
+        dados = arq.read()
+        if not _verificar_hmac(dados, request.headers.get("X-File-Hmac", "")):
+            log.warning("ZIP rejeitado — HMAC invalido")
+            return jsonify({"erro": "Assinatura do arquivo invalida — atualizacao recusada"}), 403
         os.makedirs(VRPDV_DIR, exist_ok=True)
-        arq.save(TEMP_ZIP)
+        with open(TEMP_ZIP, "wb") as f:
+            f.write(dados)
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
     threading.Thread(target=executar_atualizacao, daemon=True).start()
