@@ -152,7 +152,7 @@
         </div>
         <div class="field">
           <label>Token compartilhado com os agentes PDV <span class="text-muted">(deve bater com PDV_AGENT_TOKEN no agente de cada PDV)</span></label>
-          <input id="campoPasso3Token" value="pdv-agent-2024" placeholder="pdv-agent-2024" type="text">
+          <input id="campoPasso3Token" placeholder="Carregando..." type="text">
         </div>
         <div class="field">
           <label>Mongo URI <span class="text-muted">(gerado automaticamente — edite só se necessário)</span></label>
@@ -212,6 +212,34 @@
           <div style="margin-top:12px;">
             <a id="p4LinkRede" class="btn btn-primary btn-sm" href="#">Abrir painel da Rede →</a>
           </div>
+        </div>
+      </div>
+
+      <!-- ── Token de Acesso dos Agentes ── -->
+      <div class="card">
+        <div class="section-title">Token de Acesso dos Agentes</div>
+        <div class="siteid-hint" style="margin:0 0 16px;">
+          Informe este valor quando o instalador <code>PDVAgent_Setup.exe</code> perguntar pelo
+          <b>Token de Acesso ao Servidor</b>. É o mesmo para todos os PDVs desta instalação.
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;
+                    background:var(--bg-elevated); border:1px solid var(--border-strong);
+                    border-radius:var(--radius-sm); padding:10px 14px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               style="width:16px;height:16px;flex-shrink:0;color:var(--orange);">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0110 0v4"/>
+          </svg>
+          <span id="tokenValor"
+                style="flex:1; font-family:monospace; font-size:13px; letter-spacing:.04em;
+                       overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text);">
+            Carregando...
+          </span>
+          <button class="btn btn-ghost btn-sm" id="btnRevelarToken" onclick="toggleToken()">Revelar</button>
+          <button class="btn btn-ghost btn-sm" id="btnCopiarToken" onclick="copiarToken()">Copiar</button>
+        </div>
+        <div class="text-muted" style="font-size:12px; margin-top:10px;">
+          🔒 Mantenha este valor em sigilo — quem tiver acesso a ele e à rede pode comunicar com os agentes PDV.
         </div>
       </div>
 
@@ -565,8 +593,47 @@ async function criarRede() {
   }
 }
 
+// ── Token de acesso ──────────────────────────────────────────────────────────
+let _tokenAgente  = null;
+let _tokenVisivel = false;
+
+async function carregarTokenAgente() {
+  try {
+    const d = await fetch('/api/token-agente').then(r => r.json());
+    if (d.token) {
+      _tokenAgente = d.token;
+      document.getElementById('campoPasso3Token').value = d.token;
+    }
+  } catch (_) {}
+  _renderToken();
+}
+
+function _renderToken() {
+  const el  = document.getElementById('tokenValor');
+  const btn = document.getElementById('btnRevelarToken');
+  if (!_tokenAgente) { el.textContent = '— erro ao carregar —'; return; }
+  el.textContent = _tokenVisivel ? _tokenAgente : '●'.repeat(Math.min(_tokenAgente.length, 40));
+  btn.textContent = _tokenVisivel ? 'Ocultar' : 'Revelar';
+}
+
+function toggleToken() {
+  _tokenVisivel = !_tokenVisivel;
+  _renderToken();
+}
+
+async function copiarToken() {
+  if (!_tokenAgente) return;
+  try { await navigator.clipboard.writeText(_tokenAgente); } catch (_) {}
+  const btn = document.getElementById('btnCopiarToken');
+  const orig = btn.textContent;
+  btn.textContent = 'Copiado!';
+  setTimeout(() => { btn.textContent = orig; }, 2000);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 carregarHistorico();
 carregarInfoAgente();
+carregarTokenAgente();
 
 async function carregarInfoAgente() {
   const info = await fetch('/api/setup/info').then(r => r.json()).catch(() => ({ disponivel: false }));

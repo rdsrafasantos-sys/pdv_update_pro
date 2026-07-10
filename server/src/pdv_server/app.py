@@ -319,6 +319,15 @@ def api_setup_info():
     })
 
 
+@app.route("/api/token-agente", methods=["GET"])
+@login_required
+def api_token_agente():
+    """Retorna o token de acesso dos agentes PDV (PDV_SERVER_TOKEN).
+    Usado pelo painel de Instalação para exibir o valor ao técnico."""
+    from pdv_server.config import TOKEN_SEGURANCA
+    return jsonify({"token": TOKEN_SEGURANCA})
+
+
 @app.route("/api/agente/info", methods=["GET"])
 @login_required
 def api_agente_info():
