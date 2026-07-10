@@ -355,21 +355,58 @@
         </div>
 
         {% if usuario_atual.is_super_admin %}
-        <!-- Aviso de auth key (só para admin, só se não configurada) -->
-        <div id="authKeyAdminAviso" style="display:none;">
-          <div class="card" style="border-color:rgba(255,170,0,.35);">
+        <div class="card" id="authKeyAdminCard">
+
+          <!-- Carregando -->
+          <div id="authKeyAdminCarregando">
+            <span class="text-muted" style="font-size:12px;">Verificando auth key Tailscale...</span>
+          </div>
+
+          <!-- Não configurada: formulário -->
+          <div id="authKeyAdminForm" style="display:none;">
             <div style="font-weight:650; color:#ffaa00; margin-bottom:8px;">⚠️ Auth key do Tailscale não configurada</div>
-            <div class="text-muted" style="font-size:12.5px; line-height:1.8;">
+            <div class="text-muted" style="font-size:12.5px; line-height:1.6; margin-bottom:14px;">
               O <code>pdv_config.ini</code> será gerado sem auth key — o PDV não entrará na VPN automaticamente.<br>
-              Para configurar, crie uma key em <b>Tailscale Admin Console → Settings → Keys</b>
-              (reusable, tag <code>pdv-terminal</code>) e adicione ao <code>.env</code>:
+              Crie a key em <b>Tailscale Admin Console → Settings → Keys</b>
+              (reusable, tag <code>pdv-terminal</code>) e cole abaixo:
             </div>
-            <div style="margin-top:8px; font-family:monospace; font-size:11.5px; background:var(--bg-elevated);
-                        padding:8px 12px; border-radius:var(--radius-sm); color:var(--text);">
-              PDV_TAILSCALE_AUTH_KEY_PDV=tskey-auth-...<br>
-              PDV_TAILSCALE_AUTH_KEY_PDV_ID=kXXXXXXXXXX
+            <div style="display:flex; flex-direction:column; gap:8px; max-width:480px;">
+              <div>
+                <label style="font-size:11.5px; color:var(--text-faint); display:block; margin-bottom:3px;">Auth Key *</label>
+                <input type="password" id="inputAuthKey" placeholder="tskey-auth-..."
+                       style="width:100%; box-sizing:border-box; padding:6px 10px;
+                              border-radius:var(--radius-sm); border:1px solid var(--border);
+                              background:var(--bg-elevated); color:var(--text);
+                              font-family:monospace; font-size:12px;">
+              </div>
+              <div>
+                <label style="font-size:11.5px; color:var(--text-faint); display:block; margin-bottom:3px;">
+                  Key ID <span style="font-weight:400;">(opcional — para aviso de expiração)</span>
+                </label>
+                <input type="text" id="inputAuthKeyId" placeholder="kXXXXXXXXXX"
+                       style="width:100%; box-sizing:border-box; padding:6px 10px;
+                              border-radius:var(--radius-sm); border:1px solid var(--border);
+                              background:var(--bg-elevated); color:var(--text);
+                              font-family:monospace; font-size:12px;">
+              </div>
+              <div style="display:flex; align-items:center; gap:10px; margin-top:2px;">
+                <button class="btn btn-primary btn-sm" onclick="salvarAuthKeyPdv()">Salvar</button>
+                <span id="authKeySaveStatus" style="font-size:12px;"></span>
+              </div>
             </div>
           </div>
+
+          <!-- Configurada: status + botão alterar -->
+          <div id="authKeyAdminStatus" style="display:none;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+              <div>
+                <div style="font-size:13px; font-weight:650; margin-bottom:4px;">🔑 Auth key Tailscale — PDV terminals</div>
+                <div id="authKeyAdminStatusInfo" style="font-size:12.5px;"></div>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="mostrarFormAuthKey()">Alterar</button>
+            </div>
+          </div>
+
         </div>
         {% endif %}
 
@@ -739,15 +776,74 @@ async function uploadSetup(input) {
   input.value = '';
 }
 
-// ── PDV — Aviso auth key não configurada (só para admin) ─────────────────────
+// ── PDV — Auth key admin card ─────────────────────────────────────────────────
 async function verificarAuthKeyPdv() {
-  const aviso = document.getElementById('authKeyAdminAviso');
-  if (!aviso) return;
+  if (!document.getElementById('authKeyAdminCard')) return;
   try {
     const d = await fetch('/api/tailscale/auth-key-pdv').then(r => r.json());
-    if (d.erro) aviso.style.display = 'block';
+    document.getElementById('authKeyAdminCarregando').style.display = 'none';
+    if (d.erro) {
+      document.getElementById('authKeyAdminForm').style.display = 'block';
+    } else {
+      document.getElementById('authKeyAdminStatus').style.display = 'block';
+      const info = document.getElementById('authKeyAdminStatusInfo');
+      if (d.nivel_aviso === 'expirada') {
+        info.innerHTML = `<span style="color:var(--red);">❌ Auth key expirada — configure uma nova</span>`;
+        mostrarFormAuthKey();
+      } else if (d.nivel_aviso === 'critico') {
+        info.innerHTML = `<span style="color:var(--red);">🔴 Expira em ${d.dias_restantes} dias — renove agora</span>`;
+      } else if (d.nivel_aviso === 'atencao') {
+        info.innerHTML = `<span style="color:#ffaa00;">⚠️ Expira em ${d.dias_restantes} dias — renove em breve</span>`;
+      } else if (d.nivel_aviso === 'ok') {
+        info.innerHTML = `<span style="color:var(--green);">✔ Válida · ${d.dias_restantes} dias restantes</span>`;
+      } else {
+        info.innerHTML = `<span class="text-muted">Configurada · tag pdv-terminal · reutilizável</span>`;
+      }
+    }
   } catch (_) {
-    aviso.style.display = 'block';
+    document.getElementById('authKeyAdminCarregando').style.display = 'none';
+    document.getElementById('authKeyAdminForm').style.display = 'block';
+  }
+}
+
+function mostrarFormAuthKey() {
+  document.getElementById('authKeyAdminStatus').style.display = 'none';
+  document.getElementById('authKeyAdminForm').style.display = 'block';
+}
+
+async function salvarAuthKeyPdv() {
+  const key    = document.getElementById('inputAuthKey').value.trim();
+  const key_id = document.getElementById('inputAuthKeyId').value.trim();
+  const statusEl = document.getElementById('authKeySaveStatus');
+  if (!key) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = '❌ Auth key obrigatória';
+    return;
+  }
+  if (!key.startsWith('tskey-auth-')) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = '❌ Deve começar com tskey-auth-';
+    return;
+  }
+  statusEl.style.color = 'var(--text-faint)';
+  statusEl.textContent = 'Salvando...';
+  try {
+    const r = await fetch('/api/pdv/auth-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, key_id }),
+    });
+    const d = await r.json();
+    if (d.erro) { statusEl.style.color = 'var(--red)'; statusEl.textContent = '❌ ' + d.erro; return; }
+    statusEl.textContent = '';
+    document.getElementById('authKeyAdminForm').style.display = 'none';
+    const carregando = document.getElementById('authKeyAdminCarregando');
+    carregando.innerHTML = '<span class="text-muted" style="font-size:12px;">Verificando auth key Tailscale...</span>';
+    carregando.style.display = 'block';
+    verificarAuthKeyPdv();
+  } catch (_) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = '❌ Erro ao salvar';
   }
 }
 

@@ -323,12 +323,13 @@ def api_setup_info():
 @login_required
 def api_config_arquivo_pdv():
     """Gera pdv_config.ini com token e auth key para importar no instalador PDVAgent_Setup.exe."""
-    from pdv_server.config import TOKEN_SEGURANCA, TAILSCALE_AUTH_KEY_PDV
+    from pdv_server import pdv_auth_key
+    from pdv_server.config import TOKEN_SEGURANCA
 
     conteudo = (
         "[PDVAgent]\n"
         f"TOKEN={TOKEN_SEGURANCA}\n"
-        f"AUTHKEY={TAILSCALE_AUTH_KEY_PDV}\n"
+        f"AUTHKEY={pdv_auth_key.ler()['key']}\n"
         "HOSTNAME=\n"
     )
 
@@ -351,29 +352,23 @@ def api_token_agente():
 @app.route("/api/tailscale/auth-key-pdv", methods=["GET"])
 @login_required
 def api_auth_key_pdv():
-    """Retorna a auth key PDV configurada no .env e, se o ID também estiver
-    configurado e a API Tailscale disponível, informa quantos dias restam
-    para expirar (para o aviso no painel)."""
+    """Retorna status da auth key PDV (configurada ou não, dias para expirar).
+    A key pode vir do arquivo salvo via painel ou das variáveis de ambiente."""
     import datetime
-    from pdv_server import tailscale_api
-    from pdv_server.config import TAILSCALE_AUTH_KEY_PDV, TAILSCALE_AUTH_KEY_PDV_ID
+    from pdv_server import pdv_auth_key, tailscale_api
 
-    if not TAILSCALE_AUTH_KEY_PDV:
-        return jsonify({
-            "erro": "PDV_TAILSCALE_AUTH_KEY_PDV não configurado. "
-                    "Crie uma auth key com tag:pdv-terminal no admin console do Tailscale "
-                    "e adicione no .env do servidor."
-        }), 404
+    cfg = pdv_auth_key.ler()
+    if not cfg["key"]:
+        return jsonify({"erro": "Auth key não configurada."}), 404
 
     resultado = {
-        "key": TAILSCALE_AUTH_KEY_PDV,
         "dias_restantes": None,
         "nivel_aviso": None,  # None | "ok" | "atencao" | "critico" | "expirada"
     }
 
-    if TAILSCALE_AUTH_KEY_PDV_ID and tailscale_api.automacao_disponivel():
+    if cfg["key_id"] and tailscale_api.automacao_disponivel():
         try:
-            info = tailscale_api.obter_info_key(TAILSCALE_AUTH_KEY_PDV_ID)
+            info = tailscale_api.obter_info_key(cfg["key_id"])
             if info.get("invalid"):
                 resultado["nivel_aviso"] = "expirada"
                 resultado["dias_restantes"] = 0
@@ -395,9 +390,27 @@ def api_auth_key_pdv():
                     else:
                         resultado["nivel_aviso"] = "ok"
         except Exception:
-            pass  # não bloqueia exibição da key se a checagem de expiração falhar
+            pass  # não bloqueia se a checagem de expiração falhar
 
     return jsonify(resultado)
+
+
+@app.route("/api/pdv/auth-key", methods=["POST"])
+@login_required
+def api_salvar_auth_key_pdv():
+    """Salva auth key Tailscale para PDV terminals. Apenas super admins."""
+    if not current_user.is_super_admin:
+        return jsonify({"erro": "Acesso negado"}), 403
+    dados = request.get_json(silent=True) or {}
+    key = str(dados.get("key", "")).strip()
+    key_id = str(dados.get("key_id", "")).strip()
+    if not key:
+        return jsonify({"erro": "Auth key obrigatória"}), 400
+    if not key.startswith("tskey-auth-"):
+        return jsonify({"erro": "Auth key inválida — deve começar com tskey-auth-"}), 400
+    from pdv_server import pdv_auth_key
+    pdv_auth_key.salvar(key, key_id)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/agente/info", methods=["GET"])
