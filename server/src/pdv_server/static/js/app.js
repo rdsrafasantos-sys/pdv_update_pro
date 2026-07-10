@@ -115,6 +115,16 @@ function mostrarView(nome) {
 }
 window.mostrarView = mostrarView;
 
+function mostrarConfigTab(nome) {
+  document.querySelectorAll(".cfg-tab-content").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".cfg-tab-btn").forEach(el => el.classList.remove("active"));
+  const painel = document.getElementById("cfg-tab-" + nome);
+  if (painel) painel.classList.add("active");
+  const btn = document.querySelector(`.cfg-tab-btn[data-cfg-tab="${nome}"]`);
+  if (btn) btn.classList.add("active");
+}
+window.mostrarConfigTab = mostrarConfigTab;
+
 // ──────────────────────────────────────────────
 // SIDEBAR: secoes recolhiveis (clicar no titulo expande/recolhe)
 // ──────────────────────────────────────────────

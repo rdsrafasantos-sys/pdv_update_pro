@@ -369,3 +369,31 @@ input:checked + .slider:before { transform: translateX(17px); background: #1a0f0
 .fiscal-tr-data .fiscal-chevron { display: inline-block; margin-right: 6px; }
 .fiscal-tr-data-label { margin-right: 10px; }
 .fiscal-td-data { color: var(--text-dim); font-size: 13px; }
+
+
+/* ── Config tabs ─────────────────────────────────────────────────────────── */
+.cfg-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.cfg-tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 18px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  transition: color .15s, border-color .15s;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: -1px;
+}
+.cfg-tab-btn:hover { color: var(--text); }
+.cfg-tab-btn.active { color: var(--vr-orange); border-bottom-color: var(--vr-orange); }
+.cfg-tab-content { display: none; }
+.cfg-tab-content.active { display: block; }
