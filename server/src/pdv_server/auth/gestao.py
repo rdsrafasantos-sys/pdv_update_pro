@@ -637,10 +637,16 @@ def _perfil_para_dict(perfil):
         "pode_gerenciar_redes": bool(perfil.pode_gerenciar_redes),
         "pode_gerenciar_usuarios": bool(perfil.pode_gerenciar_usuarios),
         "somente_leitura": bool(perfil.somente_leitura),
-        "pode_atualizar": bool(perfil.pode_atualizar),
-        "pode_configurar": bool(perfil.pode_configurar),
         "pode_ver_fiscal": bool(perfil.pode_ver_fiscal),
-        "pode_ver_replicacoes": bool(perfil.pode_ver_replicacoes),
+        "pode_atu_agente": bool(perfil.pode_atu_agente),
+        "pode_atu_pdv_upload": bool(perfil.pode_atu_pdv_upload),
+        "pode_atu_pdv_disparar": bool(perfil.pode_atu_pdv_disparar),
+        "pode_atu_pdv_limpar": bool(perfil.pode_atu_pdv_limpar),
+        "pode_atu_integrador": bool(perfil.pode_atu_integrador),
+        "pode_replic_verificar": bool(perfil.pode_replic_verificar),
+        "pode_replic_config": bool(perfil.pode_replic_config),
+        "pode_config_banco": bool(perfil.pode_config_banco),
+        "pode_config_integrador": bool(perfil.pode_config_integrador),
         "total_usuarios": len(perfil.usuarios),
     }
 
@@ -656,8 +662,12 @@ def listar_perfis():
 
 def criar_perfil(nome, descricao="", pode_gerenciar_redes=False,
                   pode_gerenciar_usuarios=False, somente_leitura=False,
-                  pode_atualizar=False, pode_configurar=False,
-                  pode_ver_fiscal=False, pode_ver_replicacoes=False):
+                  pode_ver_fiscal=False,
+                  pode_atu_agente=False, pode_atu_pdv_upload=False,
+                  pode_atu_pdv_disparar=False, pode_atu_pdv_limpar=False,
+                  pode_atu_integrador=False,
+                  pode_replic_verificar=False, pode_replic_config=False,
+                  pode_config_banco=False, pode_config_integrador=False):
     nome = (nome or "").strip()
     if not nome:
         raise ValueError("Nome do perfil e obrigatorio.")
@@ -670,10 +680,16 @@ def criar_perfil(nome, descricao="", pode_gerenciar_redes=False,
             pode_gerenciar_redes=bool(pode_gerenciar_redes),
             pode_gerenciar_usuarios=bool(pode_gerenciar_usuarios),
             somente_leitura=bool(somente_leitura),
-            pode_atualizar=bool(pode_atualizar),
-            pode_configurar=bool(pode_configurar),
             pode_ver_fiscal=bool(pode_ver_fiscal),
-            pode_ver_replicacoes=bool(pode_ver_replicacoes),
+            pode_atu_agente=bool(pode_atu_agente),
+            pode_atu_pdv_upload=bool(pode_atu_pdv_upload),
+            pode_atu_pdv_disparar=bool(pode_atu_pdv_disparar),
+            pode_atu_pdv_limpar=bool(pode_atu_pdv_limpar),
+            pode_atu_integrador=bool(pode_atu_integrador),
+            pode_replic_verificar=bool(pode_replic_verificar),
+            pode_replic_config=bool(pode_replic_config),
+            pode_config_banco=bool(pode_config_banco),
+            pode_config_integrador=bool(pode_config_integrador),
         )
         db.add(perfil)
         db.commit()
@@ -684,8 +700,12 @@ def criar_perfil(nome, descricao="", pode_gerenciar_redes=False,
 
 def editar_perfil(perfil_id, nome=None, descricao=None, pode_gerenciar_redes=None,
                    pode_gerenciar_usuarios=None, somente_leitura=None,
-                   pode_atualizar=None, pode_configurar=None,
-                   pode_ver_fiscal=None, pode_ver_replicacoes=None):
+                   pode_ver_fiscal=None,
+                   pode_atu_agente=None, pode_atu_pdv_upload=None,
+                   pode_atu_pdv_disparar=None, pode_atu_pdv_limpar=None,
+                   pode_atu_integrador=None,
+                   pode_replic_verificar=None, pode_replic_config=None,
+                   pode_config_banco=None, pode_config_integrador=None):
     db = SessionLocal()
     try:
         perfil = db.get(Perfil, perfil_id)
@@ -701,14 +721,15 @@ def editar_perfil(perfil_id, nome=None, descricao=None, pode_gerenciar_redes=Non
             perfil.pode_gerenciar_usuarios = bool(pode_gerenciar_usuarios)
         if somente_leitura is not None:
             perfil.somente_leitura = bool(somente_leitura)
-        if pode_atualizar is not None:
-            perfil.pode_atualizar = bool(pode_atualizar)
-        if pode_configurar is not None:
-            perfil.pode_configurar = bool(pode_configurar)
         if pode_ver_fiscal is not None:
             perfil.pode_ver_fiscal = bool(pode_ver_fiscal)
-        if pode_ver_replicacoes is not None:
-            perfil.pode_ver_replicacoes = bool(pode_ver_replicacoes)
+        for flag in ("pode_atu_agente", "pode_atu_pdv_upload", "pode_atu_pdv_disparar",
+                     "pode_atu_pdv_limpar", "pode_atu_integrador",
+                     "pode_replic_verificar", "pode_replic_config",
+                     "pode_config_banco", "pode_config_integrador"):
+            valor = locals()[flag]
+            if valor is not None:
+                setattr(perfil, flag, bool(valor))
         db.commit()
         return _perfil_para_dict(perfil)
     finally:
@@ -862,26 +883,31 @@ def excluir_usuario(usuario_id):
 
 # ── Resolucao de permissao (usada por app.py/painel/routes.py) ─
 
+_TODAS_FLAGS_SECAO = (
+    "pode_ver_fiscal",
+    "pode_atu_agente", "pode_atu_pdv_upload", "pode_atu_pdv_disparar",
+    "pode_atu_pdv_limpar", "pode_atu_integrador",
+    "pode_replic_verificar", "pode_replic_config",
+    "pode_config_banco", "pode_config_integrador",
+)
+
+
 def flags_de_perfil(usuario):
     if usuario.is_super_admin:
-        return {
-            "pode_gerenciar_redes": True, "pode_gerenciar_usuarios": True, "somente_leitura": False,
-            "pode_atualizar": True, "pode_configurar": True, "pode_ver_fiscal": True, "pode_ver_replicacoes": True,
-        }
+        base = {"pode_gerenciar_redes": True, "pode_gerenciar_usuarios": True, "somente_leitura": False}
+        base.update({f: True for f in _TODAS_FLAGS_SECAO})
+        return base
     if not usuario.perfil:
-        return {
-            "pode_gerenciar_redes": False, "pode_gerenciar_usuarios": False, "somente_leitura": True,
-            "pode_atualizar": False, "pode_configurar": False, "pode_ver_fiscal": False, "pode_ver_replicacoes": False,
-        }
-    return {
+        base = {"pode_gerenciar_redes": False, "pode_gerenciar_usuarios": False, "somente_leitura": True}
+        base.update({f: False for f in _TODAS_FLAGS_SECAO})
+        return base
+    base = {
         "pode_gerenciar_redes": bool(usuario.perfil.pode_gerenciar_redes),
         "pode_gerenciar_usuarios": bool(usuario.perfil.pode_gerenciar_usuarios),
         "somente_leitura": bool(usuario.perfil.somente_leitura),
-        "pode_atualizar": bool(usuario.perfil.pode_atualizar),
-        "pode_configurar": bool(usuario.perfil.pode_configurar),
-        "pode_ver_fiscal": bool(usuario.perfil.pode_ver_fiscal),
-        "pode_ver_replicacoes": bool(usuario.perfil.pode_ver_replicacoes),
     }
+    base.update({f: bool(getattr(usuario.perfil, f, False)) for f in _TODAS_FLAGS_SECAO})
+    return base
 
 
 def carregar_permissoes(usuario_id):

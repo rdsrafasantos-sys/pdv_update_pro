@@ -257,11 +257,19 @@
     <div class="checkbox-row"><input type="checkbox" id="campoPodeRedes"><label style="margin:0;">Pode cadastrar/editar redes</label></div>
     <div class="checkbox-row"><input type="checkbox" id="campoPodeUsuarios"><label style="margin:0;">Pode gerenciar usuários e perfis</label></div>
     <div class="checkbox-row"><input type="checkbox" id="campoSomenteLeitura"><label style="margin:0;">Somente leitura (não pode disparar ações)</label></div>
-    <div style="border-top:1px solid var(--border);margin:10px 0 6px;padding-top:10px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;">Acesso às seções</div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeAtualizar"><label style="margin:0;">⚡ Atualizações (upload e disparo de updates)</label></div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeConfigurar"><label style="margin:0;">⚙️ Configurações (banco de dados e integrador)</label></div>
     <div class="checkbox-row"><input type="checkbox" id="campoPodeVerFiscal"><label style="margin:0;">📋 Pendências Fiscais</label></div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeVerReplicacoes"><label style="margin:0;">🔄 Replicações (verificação e configuração)</label></div>
+    <div style="border-top:1px solid var(--border);margin:10px 0 4px;padding-top:10px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;">⚡ Atualizações</div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuAgente"><label style="margin:0;">Aba Agente — upload + disparar agente.exe</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuPdvUpload"><label style="margin:0;">Aba PDV — subir arquivo ZIP</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuPdvDisparar"><label style="margin:0;">Aba PDV — disparar atualização nos PDVs</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuPdvLimpar"><label style="margin:0;">Aba PDV — deletar / limpar arquivos ZIP</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuIntegrador"><label style="margin:0;">Aba Integrador — disparar atualização SSH</label></div>
+    <div style="border-top:1px solid var(--border);margin:10px 0 4px;padding-top:10px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;">🔄 Replicações</div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeReplicVerificar"><label style="margin:0;">Disparar verificação manual</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeReplicConfig"><label style="margin:0;">Configurar verificação automática</label></div>
+    <div style="border-top:1px solid var(--border);margin:10px 0 4px;padding-top:10px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;">⚙️ Configurações</div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeConfigBanco"><label style="margin:0;">Aba Banco de Dados (ERP)</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeConfigIntegrador"><label style="margin:0;">Aba Integrador + SSH</label></div>
     <div class="erro-msg" id="erroPerfil"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="fecharModalPerfil()">Cancelar</button>
@@ -424,14 +432,17 @@ function renderPerfis(perfis) {
     <div class="card">
       <div style="font-weight:650;">${p.nome}</div>
       <div style="font-size:11.5px; color:var(--text-faint); margin:4px 0 12px;">${p.total_usuarios} usuário(s)</div>
-      <div style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--text-dim); margin-bottom:12px;">
+      <div style="display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--text-dim); margin-bottom:12px;">
         <div>${p.pode_gerenciar_redes ? '✔' : '✕'} Gerenciar redes</div>
         <div>${p.pode_gerenciar_usuarios ? '✔' : '✕'} Gerenciar usuários</div>
         <div>${p.somente_leitura ? '✔ Somente leitura' : '✔ Pode disparar ações'}</div>
-        <div style="border-top:1px solid var(--border);padding-top:4px;margin-top:2px;">${p.pode_atualizar ? '✔' : '✕'} Atualizações</div>
-        <div>${p.pode_configurar ? '✔' : '✕'} Configurações</div>
-        <div>${p.pode_ver_fiscal ? '✔' : '✕'} Fiscal</div>
-        <div>${p.pode_ver_replicacoes ? '✔' : '✕'} Replicações</div>
+        <div>${p.pode_ver_fiscal ? '✔' : '✕'} 📋 Fiscal</div>
+        <div style="border-top:1px solid var(--border);padding-top:4px;margin-top:2px;font-size:11px;opacity:.7;">⚡ Atualizações</div>
+        <div style="padding-left:8px;">${p.pode_atu_agente ? '✔' : '✕'} Agente &nbsp;${p.pode_atu_pdv_upload ? '✔' : '✕'} ZIP &nbsp;${p.pode_atu_pdv_disparar ? '✔' : '✕'} Disparar &nbsp;${p.pode_atu_pdv_limpar ? '✔' : '✕'} Limpar &nbsp;${p.pode_atu_integrador ? '✔' : '✕'} Integ.</div>
+        <div style="font-size:11px;opacity:.7;">🔄 Replicações</div>
+        <div style="padding-left:8px;">${p.pode_replic_verificar ? '✔' : '✕'} Verificar &nbsp;${p.pode_replic_config ? '✔' : '✕'} Config</div>
+        <div style="font-size:11px;opacity:.7;">⚙️ Configurações</div>
+        <div style="padding-left:8px;">${p.pode_config_banco ? '✔' : '✕'} Banco &nbsp;${p.pode_config_integrador ? '✔' : '✕'} Integrador</div>
       </div>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-ghost btn-sm" onclick="editarPerfil(${p.id})">Editar</button>
@@ -641,10 +652,16 @@ function abrirModalNovoPerfil() {
   document.getElementById('campoPodeRedes').checked = false;
   document.getElementById('campoPodeUsuarios').checked = false;
   document.getElementById('campoSomenteLeitura').checked = false;
-  document.getElementById('campoPodeAtualizar').checked = false;
-  document.getElementById('campoPodeConfigurar').checked = false;
   document.getElementById('campoPodeVerFiscal').checked = false;
-  document.getElementById('campoPodeVerReplicacoes').checked = false;
+  document.getElementById('campoPodeAtuAgente').checked = false;
+  document.getElementById('campoPodeAtuPdvUpload').checked = false;
+  document.getElementById('campoPodeAtuPdvDisparar').checked = false;
+  document.getElementById('campoPodeAtuPdvLimpar').checked = false;
+  document.getElementById('campoPodeAtuIntegrador').checked = false;
+  document.getElementById('campoPodeReplicVerificar').checked = false;
+  document.getElementById('campoPodeReplicConfig').checked = false;
+  document.getElementById('campoPodeConfigBanco').checked = false;
+  document.getElementById('campoPodeConfigIntegrador').checked = false;
   document.getElementById('erroPerfil').style.display = 'none';
   document.getElementById('modalPerfil').classList.add('aberto');
 }
@@ -659,10 +676,16 @@ function editarPerfil(id) {
   document.getElementById('campoPodeRedes').checked = p.pode_gerenciar_redes;
   document.getElementById('campoPodeUsuarios').checked = p.pode_gerenciar_usuarios;
   document.getElementById('campoSomenteLeitura').checked = p.somente_leitura;
-  document.getElementById('campoPodeAtualizar').checked = p.pode_atualizar;
-  document.getElementById('campoPodeConfigurar').checked = p.pode_configurar;
   document.getElementById('campoPodeVerFiscal').checked = p.pode_ver_fiscal;
-  document.getElementById('campoPodeVerReplicacoes').checked = p.pode_ver_replicacoes;
+  document.getElementById('campoPodeAtuAgente').checked = p.pode_atu_agente;
+  document.getElementById('campoPodeAtuPdvUpload').checked = p.pode_atu_pdv_upload;
+  document.getElementById('campoPodeAtuPdvDisparar').checked = p.pode_atu_pdv_disparar;
+  document.getElementById('campoPodeAtuPdvLimpar').checked = p.pode_atu_pdv_limpar;
+  document.getElementById('campoPodeAtuIntegrador').checked = p.pode_atu_integrador;
+  document.getElementById('campoPodeReplicVerificar').checked = p.pode_replic_verificar;
+  document.getElementById('campoPodeReplicConfig').checked = p.pode_replic_config;
+  document.getElementById('campoPodeConfigBanco').checked = p.pode_config_banco;
+  document.getElementById('campoPodeConfigIntegrador').checked = p.pode_config_integrador;
   document.getElementById('erroPerfil').style.display = 'none';
   document.getElementById('modalPerfil').classList.add('aberto');
 }
@@ -679,10 +702,16 @@ async function salvarPerfil() {
     pode_gerenciar_redes:    document.getElementById('campoPodeRedes').checked,
     pode_gerenciar_usuarios: document.getElementById('campoPodeUsuarios').checked,
     somente_leitura:         document.getElementById('campoSomenteLeitura').checked,
-    pode_atualizar:          document.getElementById('campoPodeAtualizar').checked,
-    pode_configurar:         document.getElementById('campoPodeConfigurar').checked,
     pode_ver_fiscal:         document.getElementById('campoPodeVerFiscal').checked,
-    pode_ver_replicacoes:    document.getElementById('campoPodeVerReplicacoes').checked,
+    pode_atu_agente:         document.getElementById('campoPodeAtuAgente').checked,
+    pode_atu_pdv_upload:     document.getElementById('campoPodeAtuPdvUpload').checked,
+    pode_atu_pdv_disparar:   document.getElementById('campoPodeAtuPdvDisparar').checked,
+    pode_atu_pdv_limpar:     document.getElementById('campoPodeAtuPdvLimpar').checked,
+    pode_atu_integrador:     document.getElementById('campoPodeAtuIntegrador').checked,
+    pode_replic_verificar:   document.getElementById('campoPodeReplicVerificar').checked,
+    pode_replic_config:      document.getElementById('campoPodeReplicConfig').checked,
+    pode_config_banco:       document.getElementById('campoPodeConfigBanco').checked,
+    pode_config_integrador:  document.getElementById('campoPodeConfigIntegrador').checked,
   };
   const url = id ? `/api/perfis/${id}` : '/api/perfis';
   const r = await fetch(url, { method: id ? 'PUT' : 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo) });

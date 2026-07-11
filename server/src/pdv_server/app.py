@@ -208,7 +208,7 @@ def api_ping_loja(contexto, loja_id):
 
 @app.route("/api/<int:rede_id>/pdv/<loja_id>/<pdv_id>/reiniciar_mongo", methods=["POST"])
 @com_rede
-@exigir_permissao("pode_atualizar")
+@exigir_permissao("pode_atu_pdv_disparar")
 def api_reiniciar_mongo(contexto, loja_id, pdv_id):
     pdv = encontrar_pdv(contexto, loja_id, pdv_id)
     if not pdv:
@@ -219,7 +219,7 @@ def api_reiniciar_mongo(contexto, loja_id, pdv_id):
 
 @app.route("/api/<int:rede_id>/upload", methods=["POST"])
 @com_rede
-@exigir_permissao("pode_atualizar")
+@exigir_permissao("pode_atu_pdv_upload")
 @limiter.limit("10 per minute")
 def api_upload(contexto):
     if "arquivo" not in request.files:
@@ -263,7 +263,7 @@ def api_arquivos(contexto):
 
 @app.route("/api/<int:rede_id>/arquivos/<nome>", methods=["DELETE"])
 @com_rede
-@exigir_permissao("pode_atualizar")
+@exigir_permissao("pode_atu_pdv_limpar")
 def api_deletar_arquivo(contexto, nome):
     caminho = os.path.join(contexto.upload_dir, secure_filename(nome))
     if os.path.exists(caminho):
@@ -274,7 +274,7 @@ def api_deletar_arquivo(contexto, nome):
 
 @app.route("/api/<int:rede_id>/arquivos/limpar", methods=["DELETE"])
 @com_rede
-@exigir_permissao("pode_atualizar")
+@exigir_permissao("pode_atu_pdv_limpar")
 def api_limpar_arquivos(contexto):
     removidos = 0
     for f in os.listdir(contexto.upload_dir):
@@ -482,7 +482,7 @@ def api_agente_info():
 
 @app.route("/api/<int:rede_id>/upload_agente", methods=["POST"])
 @com_rede
-@exigir_permissao("pode_atualizar")
+@exigir_permissao("pode_atu_agente")
 @limiter.limit("10 per minute")
 def api_upload_agente(contexto):
     """Recebe agente.exe ou status_pdv.exe e salva no servidor."""
@@ -523,7 +523,7 @@ def api_versao_agente(contexto):
 
 @app.route("/api/<int:rede_id>/atualizar_agente", methods=["POST"])
 @com_rede
-@exigir_permissao("pode_atualizar")
+@exigir_permissao("pode_atu_agente")
 def api_atualizar_agente(contexto):
     """Envia novo agente.exe para PDVs selecionados."""
     dados = request.json
@@ -559,7 +559,7 @@ def api_atualizar_agente(contexto):
 
 @app.route("/api/<int:rede_id>/atualizar", methods=["POST"])
 @com_rede
-@exigir_permissao("pode_atualizar")
+@exigir_permissao("pode_atu_pdv_disparar")
 def api_atualizar(contexto):
     dados = request.json
     loja_id = dados.get("loja_id")
@@ -640,7 +640,7 @@ def api_status_stream(contexto, loja_id):
 # ──────────────────────────────────────────────
 @app.route("/api/<int:rede_id>/replicacao/verificar", methods=["POST"])
 @com_rede
-@exigir_permissao("pode_ver_replicacoes")
+@exigir_permissao("pode_replic_verificar")
 def api_replicacao_verificar(contexto):
     dados = request.json or {}
     loja_id = dados.get("loja_id")
@@ -677,7 +677,7 @@ def api_replicacao_config_get(contexto):
 
 @app.route("/api/<int:rede_id>/replicacao/config", methods=["POST"])
 @com_rede
-@exigir_permissao("pode_ver_replicacoes")
+@exigir_permissao("pode_replic_config")
 def api_replicacao_config_set(contexto):
     dados = request.json or {}
     alteracoes = {k: dados[k] for k in ("habilitado", "intervalo_minutos", "pdvs") if k in dados}
@@ -712,7 +712,7 @@ def api_erp_db_config_get(contexto):
 
 @app.route("/api/<int:rede_id>/erp_db/config", methods=["POST"])
 @com_rede
-@exigir_permissao("pode_configurar")
+@exigir_permissao("pode_config_banco")
 def api_erp_db_config_set(contexto):
     dados = request.json or {}
     cfg = erp_db.salvar_config(contexto, dados)
@@ -749,7 +749,7 @@ def api_integrador_config_get(contexto):
 
 @app.route("/api/<int:rede_id>/integrador/config", methods=["POST"])
 @com_rede
-@exigir_permissao("pode_configurar")
+@exigir_permissao("pode_config_integrador")
 def api_integrador_config_set(contexto):
     dados = request.json or {}
     cfg = integrador.salvar_config(contexto, dados)
@@ -768,6 +768,7 @@ def api_integrador_status(contexto):
 # ──────────────────────────────────────────────
 @app.route("/api/<int:rede_id>/integrador/versao_atual", methods=["GET"])
 @com_rede
+@exigir_permissao("pode_atu_integrador")
 def api_integrador_versao_atual(contexto):
     cfg = integrador.carregar_config(contexto)
     if not integrador_update.config_ssh_completa(cfg):
@@ -777,6 +778,7 @@ def api_integrador_versao_atual(contexto):
 
 @app.route("/api/<int:rede_id>/integrador/atualizar_stream", methods=["GET"])
 @com_rede
+@exigir_permissao("pode_atu_integrador")
 def api_integrador_atualizar_stream(contexto):
     nova_versao = request.args.get("versao", "").strip()
     if not nova_versao:

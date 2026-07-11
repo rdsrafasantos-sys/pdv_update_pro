@@ -265,10 +265,16 @@ def api_criar_perfil():
             pode_gerenciar_redes=dados.get("pode_gerenciar_redes", False),
             pode_gerenciar_usuarios=dados.get("pode_gerenciar_usuarios", False),
             somente_leitura=dados.get("somente_leitura", False),
-            pode_atualizar=dados.get("pode_atualizar", False),
-            pode_configurar=dados.get("pode_configurar", False),
             pode_ver_fiscal=dados.get("pode_ver_fiscal", False),
-            pode_ver_replicacoes=dados.get("pode_ver_replicacoes", False),
+            pode_atu_agente=dados.get("pode_atu_agente", False),
+            pode_atu_pdv_upload=dados.get("pode_atu_pdv_upload", False),
+            pode_atu_pdv_disparar=dados.get("pode_atu_pdv_disparar", False),
+            pode_atu_pdv_limpar=dados.get("pode_atu_pdv_limpar", False),
+            pode_atu_integrador=dados.get("pode_atu_integrador", False),
+            pode_replic_verificar=dados.get("pode_replic_verificar", False),
+            pode_replic_config=dados.get("pode_replic_config", False),
+            pode_config_banco=dados.get("pode_config_banco", False),
+            pode_config_integrador=dados.get("pode_config_integrador", False),
         )
         registrar_auditoria(current_user.email, "criar_perfil", detalhes=dados.get("nome", ""), ip=_ip())
         return jsonify(resultado)
@@ -286,10 +292,16 @@ def api_editar_perfil(perfil_id):
             pode_gerenciar_redes=dados.get("pode_gerenciar_redes"),
             pode_gerenciar_usuarios=dados.get("pode_gerenciar_usuarios"),
             somente_leitura=dados.get("somente_leitura"),
-            pode_atualizar=dados.get("pode_atualizar"),
-            pode_configurar=dados.get("pode_configurar"),
             pode_ver_fiscal=dados.get("pode_ver_fiscal"),
-            pode_ver_replicacoes=dados.get("pode_ver_replicacoes"),
+            pode_atu_agente=dados.get("pode_atu_agente"),
+            pode_atu_pdv_upload=dados.get("pode_atu_pdv_upload"),
+            pode_atu_pdv_disparar=dados.get("pode_atu_pdv_disparar"),
+            pode_atu_pdv_limpar=dados.get("pode_atu_pdv_limpar"),
+            pode_atu_integrador=dados.get("pode_atu_integrador"),
+            pode_replic_verificar=dados.get("pode_replic_verificar"),
+            pode_replic_config=dados.get("pode_replic_config"),
+            pode_config_banco=dados.get("pode_config_banco"),
+            pode_config_integrador=dados.get("pode_config_integrador"),
         )
         registrar_auditoria(current_user.email, "editar_perfil", detalhes=f"id={perfil_id}", ip=_ip())
         return jsonify(resultado)

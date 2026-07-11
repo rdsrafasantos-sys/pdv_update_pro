@@ -405,6 +405,7 @@ async function carregarArquivos() {
     el.innerHTML = '<div class="empty">Nenhum arquivo enviado ainda.</div>';
     return;
   }
+  const podeLimpar = window.PERMS?.pode_atu_pdv_limpar;
   el.innerHTML = arquivos.map(a => `
     <div class="file-item ${a.nome === arquivoSelecionado ? 'selected' : ''}" onclick="selecionarArquivo('${a.nome}')">
       <div>
@@ -412,7 +413,7 @@ async function carregarArquivos() {
         <div class="file-meta text-muted">${a.tamanho_mb} MB — ${a.data}</div>
       </div>
       <div class="file-actions">
-        <button class="btn-del" onclick="event.stopPropagation(); deletarArquivo('${a.nome}')">🗑️</button>
+        ${podeLimpar ? `<button class="btn-del" onclick="event.stopPropagation(); deletarArquivo('${a.nome}')">🗑️</button>` : ''}
       </div>
     </div>
   `).join("");

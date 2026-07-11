@@ -74,10 +74,19 @@ class Perfil(Base):
     pode_gerenciar_redes = Column(Boolean, default=False)
     pode_gerenciar_usuarios = Column(Boolean, default=False)
     somente_leitura = Column(Boolean, default=False)
-    pode_atualizar = Column(Boolean, default=False)
-    pode_configurar = Column(Boolean, default=False)
     pode_ver_fiscal = Column(Boolean, default=False)
-    pode_ver_replicacoes = Column(Boolean, default=False)
+    # Atualizações — granular por aba / ação
+    pode_atu_agente = Column(Boolean, default=False)
+    pode_atu_pdv_upload = Column(Boolean, default=False)
+    pode_atu_pdv_disparar = Column(Boolean, default=False)
+    pode_atu_pdv_limpar = Column(Boolean, default=False)
+    pode_atu_integrador = Column(Boolean, default=False)
+    # Replicações
+    pode_replic_verificar = Column(Boolean, default=False)
+    pode_replic_config = Column(Boolean, default=False)
+    # Configurações
+    pode_config_banco = Column(Boolean, default=False)
+    pode_config_integrador = Column(Boolean, default=False)
 
     criado_em = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -191,10 +200,16 @@ def _migrar_colunas_novas():
             "pode_gerenciar_redes": "BOOLEAN DEFAULT 0",
             "pode_gerenciar_usuarios": "BOOLEAN DEFAULT 0",
             "somente_leitura": "BOOLEAN DEFAULT 0",
-            "pode_atualizar": "BOOLEAN DEFAULT 0",
-            "pode_configurar": "BOOLEAN DEFAULT 0",
             "pode_ver_fiscal": "BOOLEAN DEFAULT 0",
-            "pode_ver_replicacoes": "BOOLEAN DEFAULT 0",
+            "pode_atu_agente": "BOOLEAN DEFAULT 0",
+            "pode_atu_pdv_upload": "BOOLEAN DEFAULT 0",
+            "pode_atu_pdv_disparar": "BOOLEAN DEFAULT 0",
+            "pode_atu_pdv_limpar": "BOOLEAN DEFAULT 0",
+            "pode_atu_integrador": "BOOLEAN DEFAULT 0",
+            "pode_replic_verificar": "BOOLEAN DEFAULT 0",
+            "pode_replic_config": "BOOLEAN DEFAULT 0",
+            "pode_config_banco": "BOOLEAN DEFAULT 0",
+            "pode_config_integrador": "BOOLEAN DEFAULT 0",
         },
         "redes": {
             "cnpj": "VARCHAR(14)",
