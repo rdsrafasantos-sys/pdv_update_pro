@@ -202,7 +202,7 @@ input:checked + .slider:before { transform: translateX(17px); background: #1a0f0
 
 /* DASHBOARD */
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; align-items: stretch; }
-.kpi-card { border-radius: 10px; padding: 18px; background: var(--surface); border: 1px solid var(--border); transition: border-color .25s, background .25s; display: flex; flex-direction: column; }
+.kpi-card { border-radius: 10px; padding: 18px; background: var(--surface); border: 1px solid var(--border); transition: border-color .25s, background .25s; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 
 /* Lista de lojas dentro do KPI card */
 .kpi-lojas-lista { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
@@ -213,7 +213,7 @@ input:checked + .slider:before { transform: translateX(17px); background: #1a0f0
 
 /* Breakdown de PDVs */
 .kpi-pdvs-detalhe { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
-.kpi-pdv-linha { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.kpi-pdv-linha { display: flex; align-items: center; gap: 6px; font-size: 11px; flex-wrap: wrap; }
 .kpi-pdv-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .kpi-pdv-dot--online { background: var(--green); box-shadow: 0 0 0 2px var(--green-dim); }
 .kpi-pdv-dot--offline { background: var(--text-faint); }
