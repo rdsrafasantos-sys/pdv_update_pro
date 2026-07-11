@@ -257,6 +257,11 @@
     <div class="checkbox-row"><input type="checkbox" id="campoPodeRedes"><label style="margin:0;">Pode cadastrar/editar redes</label></div>
     <div class="checkbox-row"><input type="checkbox" id="campoPodeUsuarios"><label style="margin:0;">Pode gerenciar usuários e perfis</label></div>
     <div class="checkbox-row"><input type="checkbox" id="campoSomenteLeitura"><label style="margin:0;">Somente leitura (não pode disparar ações)</label></div>
+    <div style="border-top:1px solid var(--border);margin:10px 0 6px;padding-top:10px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;">Acesso às seções</div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeAtualizar"><label style="margin:0;">⚡ Atualizações (upload e disparo de updates)</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeConfigurar"><label style="margin:0;">⚙️ Configurações (banco de dados e integrador)</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeVerFiscal"><label style="margin:0;">📋 Pendências Fiscais</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeVerReplicacoes"><label style="margin:0;">🔄 Replicações (verificação e configuração)</label></div>
     <div class="erro-msg" id="erroPerfil"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="fecharModalPerfil()">Cancelar</button>
@@ -423,6 +428,10 @@ function renderPerfis(perfis) {
         <div>${p.pode_gerenciar_redes ? '✔' : '✕'} Gerenciar redes</div>
         <div>${p.pode_gerenciar_usuarios ? '✔' : '✕'} Gerenciar usuários</div>
         <div>${p.somente_leitura ? '✔ Somente leitura' : '✔ Pode disparar ações'}</div>
+        <div style="border-top:1px solid var(--border);padding-top:4px;margin-top:2px;">${p.pode_atualizar ? '✔' : '✕'} Atualizações</div>
+        <div>${p.pode_configurar ? '✔' : '✕'} Configurações</div>
+        <div>${p.pode_ver_fiscal ? '✔' : '✕'} Fiscal</div>
+        <div>${p.pode_ver_replicacoes ? '✔' : '✕'} Replicações</div>
       </div>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-ghost btn-sm" onclick="editarPerfil(${p.id})">Editar</button>
@@ -632,6 +641,10 @@ function abrirModalNovoPerfil() {
   document.getElementById('campoPodeRedes').checked = false;
   document.getElementById('campoPodeUsuarios').checked = false;
   document.getElementById('campoSomenteLeitura').checked = false;
+  document.getElementById('campoPodeAtualizar').checked = false;
+  document.getElementById('campoPodeConfigurar').checked = false;
+  document.getElementById('campoPodeVerFiscal').checked = false;
+  document.getElementById('campoPodeVerReplicacoes').checked = false;
   document.getElementById('erroPerfil').style.display = 'none';
   document.getElementById('modalPerfil').classList.add('aberto');
 }
@@ -646,6 +659,10 @@ function editarPerfil(id) {
   document.getElementById('campoPodeRedes').checked = p.pode_gerenciar_redes;
   document.getElementById('campoPodeUsuarios').checked = p.pode_gerenciar_usuarios;
   document.getElementById('campoSomenteLeitura').checked = p.somente_leitura;
+  document.getElementById('campoPodeAtualizar').checked = p.pode_atualizar;
+  document.getElementById('campoPodeConfigurar').checked = p.pode_configurar;
+  document.getElementById('campoPodeVerFiscal').checked = p.pode_ver_fiscal;
+  document.getElementById('campoPodeVerReplicacoes').checked = p.pode_ver_replicacoes;
   document.getElementById('erroPerfil').style.display = 'none';
   document.getElementById('modalPerfil').classList.add('aberto');
 }
@@ -657,11 +674,15 @@ function fecharModalPerfil() {
 async function salvarPerfil() {
   const id = document.getElementById('perfilId').value;
   const corpo = {
-    nome:                  document.getElementById('campoNomePerfil').value,
-    descricao:             document.getElementById('campoDescPerfil').value,
-    pode_gerenciar_redes:  document.getElementById('campoPodeRedes').checked,
+    nome:                    document.getElementById('campoNomePerfil').value,
+    descricao:               document.getElementById('campoDescPerfil').value,
+    pode_gerenciar_redes:    document.getElementById('campoPodeRedes').checked,
     pode_gerenciar_usuarios: document.getElementById('campoPodeUsuarios').checked,
-    somente_leitura:       document.getElementById('campoSomenteLeitura').checked,
+    somente_leitura:         document.getElementById('campoSomenteLeitura').checked,
+    pode_atualizar:          document.getElementById('campoPodeAtualizar').checked,
+    pode_configurar:         document.getElementById('campoPodeConfigurar').checked,
+    pode_ver_fiscal:         document.getElementById('campoPodeVerFiscal').checked,
+    pode_ver_replicacoes:    document.getElementById('campoPodeVerReplicacoes').checked,
   };
   const url = id ? `/api/perfis/${id}` : '/api/perfis';
   const r = await fetch(url, { method: id ? 'PUT' : 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo) });

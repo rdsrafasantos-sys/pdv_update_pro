@@ -68,33 +68,41 @@
         </div>
       </div>
 
+      {% if usuario_atual.pode_atualizar %}
       <div class="menu-group">
         <div class="menu-section" onclick="toggleMenuGroup(this)">Atualizações<span class="menu-chevron">▾</span></div>
         <div class="menu-items">
           <div class="menu-item" data-view="atualizacoes" onclick="mostrarView('atualizacoes')">⚡ Atualizações</div>
         </div>
       </div>
+      {% endif %}
 
+      {% if usuario_atual.pode_ver_replicacoes %}
       <div class="menu-group">
         <div class="menu-section" onclick="toggleMenuGroup(this)">Replicações<span class="menu-chevron">▾</span></div>
         <div class="menu-items">
           <div class="menu-item" data-view="replicacao" onclick="mostrarView('replicacao')">🔄 Check</div>
         </div>
       </div>
+      {% endif %}
 
+      {% if usuario_atual.pode_ver_fiscal %}
       <div class="menu-group">
         <div class="menu-section" onclick="toggleMenuGroup(this)">Pendências Fiscais<span class="menu-chevron">▾</span></div>
         <div class="menu-items">
           <div class="menu-item" data-view="fiscal" onclick="mostrarView('fiscal')">📋 NFC-e &amp; Consistência</div>
         </div>
       </div>
+      {% endif %}
 
+      {% if usuario_atual.pode_configurar %}
       <div class="menu-group">
         <div class="menu-section" onclick="toggleMenuGroup(this)">Configurações<span class="menu-chevron">▾</span></div>
         <div class="menu-items">
           <div class="menu-item" data-view="config" onclick="mostrarView('config')">⚙️ Configurações</div>
         </div>
       </div>
+      {% endif %}
     </div>
 
     <div class="content">
@@ -129,6 +137,7 @@
               <div id="kpiUltimaVerifRow"></div>
               <div id="kpiSysinfo"></div>
             </div>
+            {% if usuario_atual.pode_ver_fiscal %}
             <div class="kpi-card kpi-card--clickable" id="kpiCardFiscal" ondblclick="mostrarView('fiscal')" title="Duplo clique para ver detalhes">
               <div class="kpi-label">📋 Pendências Fiscais</div>
               <div id="kpiFiscalConsistencia">
@@ -147,6 +156,7 @@
               </div>
               <div class="kpi-fiscal-hint">Duplo clique para detalhes</div>
             </div>
+            {% endif %}
           </div>
 
           <div class="card">
@@ -171,9 +181,13 @@
           <div class="card">
             <div class="section-title">⚡ Atalhos rápidos</div>
             <div class="quick-actions">
+              {% if usuario_atual.pode_atualizar %}
               <button class="btn-quick" onclick="mostrarView('atualizacoes');mostrarAtualizacoesTab('pdv')">📦 Ir para Atualização de PDV</button>
               <button class="btn-quick" onclick="mostrarView('atualizacoes');mostrarAtualizacoesTab('agente')">🤖 Ir para Atualização de Agente</button>
+              {% endif %}
+              {% if usuario_atual.pode_ver_replicacoes %}
               <button class="btn-quick" onclick="mostrarView('replicacao')">🔍 Ir para Verificação de Replicação</button>
+              {% endif %}
               <button class="btn-quick" onclick="redescobrir()">🔄 Redescobrir PDVs</button>
             </div>
           </div>

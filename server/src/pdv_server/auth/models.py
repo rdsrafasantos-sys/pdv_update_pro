@@ -74,6 +74,10 @@ class Perfil(Base):
     pode_gerenciar_redes = Column(Boolean, default=False)
     pode_gerenciar_usuarios = Column(Boolean, default=False)
     somente_leitura = Column(Boolean, default=False)
+    pode_atualizar = Column(Boolean, default=False)
+    pode_configurar = Column(Boolean, default=False)
+    pode_ver_fiscal = Column(Boolean, default=False)
+    pode_ver_replicacoes = Column(Boolean, default=False)
 
     criado_em = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -187,6 +191,10 @@ def _migrar_colunas_novas():
             "pode_gerenciar_redes": "BOOLEAN DEFAULT 0",
             "pode_gerenciar_usuarios": "BOOLEAN DEFAULT 0",
             "somente_leitura": "BOOLEAN DEFAULT 0",
+            "pode_atualizar": "BOOLEAN DEFAULT 0",
+            "pode_configurar": "BOOLEAN DEFAULT 0",
+            "pode_ver_fiscal": "BOOLEAN DEFAULT 0",
+            "pode_ver_replicacoes": "BOOLEAN DEFAULT 0",
         },
         "redes": {
             "cnpj": "VARCHAR(14)",

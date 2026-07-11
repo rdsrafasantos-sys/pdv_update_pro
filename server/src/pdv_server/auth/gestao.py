@@ -637,6 +637,10 @@ def _perfil_para_dict(perfil):
         "pode_gerenciar_redes": bool(perfil.pode_gerenciar_redes),
         "pode_gerenciar_usuarios": bool(perfil.pode_gerenciar_usuarios),
         "somente_leitura": bool(perfil.somente_leitura),
+        "pode_atualizar": bool(perfil.pode_atualizar),
+        "pode_configurar": bool(perfil.pode_configurar),
+        "pode_ver_fiscal": bool(perfil.pode_ver_fiscal),
+        "pode_ver_replicacoes": bool(perfil.pode_ver_replicacoes),
         "total_usuarios": len(perfil.usuarios),
     }
 
@@ -651,7 +655,9 @@ def listar_perfis():
 
 
 def criar_perfil(nome, descricao="", pode_gerenciar_redes=False,
-                  pode_gerenciar_usuarios=False, somente_leitura=False):
+                  pode_gerenciar_usuarios=False, somente_leitura=False,
+                  pode_atualizar=False, pode_configurar=False,
+                  pode_ver_fiscal=False, pode_ver_replicacoes=False):
     nome = (nome or "").strip()
     if not nome:
         raise ValueError("Nome do perfil e obrigatorio.")
@@ -664,6 +670,10 @@ def criar_perfil(nome, descricao="", pode_gerenciar_redes=False,
             pode_gerenciar_redes=bool(pode_gerenciar_redes),
             pode_gerenciar_usuarios=bool(pode_gerenciar_usuarios),
             somente_leitura=bool(somente_leitura),
+            pode_atualizar=bool(pode_atualizar),
+            pode_configurar=bool(pode_configurar),
+            pode_ver_fiscal=bool(pode_ver_fiscal),
+            pode_ver_replicacoes=bool(pode_ver_replicacoes),
         )
         db.add(perfil)
         db.commit()
@@ -673,7 +683,9 @@ def criar_perfil(nome, descricao="", pode_gerenciar_redes=False,
 
 
 def editar_perfil(perfil_id, nome=None, descricao=None, pode_gerenciar_redes=None,
-                   pode_gerenciar_usuarios=None, somente_leitura=None):
+                   pode_gerenciar_usuarios=None, somente_leitura=None,
+                   pode_atualizar=None, pode_configurar=None,
+                   pode_ver_fiscal=None, pode_ver_replicacoes=None):
     db = SessionLocal()
     try:
         perfil = db.get(Perfil, perfil_id)
@@ -689,6 +701,14 @@ def editar_perfil(perfil_id, nome=None, descricao=None, pode_gerenciar_redes=Non
             perfil.pode_gerenciar_usuarios = bool(pode_gerenciar_usuarios)
         if somente_leitura is not None:
             perfil.somente_leitura = bool(somente_leitura)
+        if pode_atualizar is not None:
+            perfil.pode_atualizar = bool(pode_atualizar)
+        if pode_configurar is not None:
+            perfil.pode_configurar = bool(pode_configurar)
+        if pode_ver_fiscal is not None:
+            perfil.pode_ver_fiscal = bool(pode_ver_fiscal)
+        if pode_ver_replicacoes is not None:
+            perfil.pode_ver_replicacoes = bool(pode_ver_replicacoes)
         db.commit()
         return _perfil_para_dict(perfil)
     finally:
@@ -844,13 +864,23 @@ def excluir_usuario(usuario_id):
 
 def flags_de_perfil(usuario):
     if usuario.is_super_admin:
-        return {"pode_gerenciar_redes": True, "pode_gerenciar_usuarios": True, "somente_leitura": False}
+        return {
+            "pode_gerenciar_redes": True, "pode_gerenciar_usuarios": True, "somente_leitura": False,
+            "pode_atualizar": True, "pode_configurar": True, "pode_ver_fiscal": True, "pode_ver_replicacoes": True,
+        }
     if not usuario.perfil:
-        return {"pode_gerenciar_redes": False, "pode_gerenciar_usuarios": False, "somente_leitura": True}
+        return {
+            "pode_gerenciar_redes": False, "pode_gerenciar_usuarios": False, "somente_leitura": True,
+            "pode_atualizar": False, "pode_configurar": False, "pode_ver_fiscal": False, "pode_ver_replicacoes": False,
+        }
     return {
         "pode_gerenciar_redes": bool(usuario.perfil.pode_gerenciar_redes),
         "pode_gerenciar_usuarios": bool(usuario.perfil.pode_gerenciar_usuarios),
         "somente_leitura": bool(usuario.perfil.somente_leitura),
+        "pode_atualizar": bool(usuario.perfil.pode_atualizar),
+        "pode_configurar": bool(usuario.perfil.pode_configurar),
+        "pode_ver_fiscal": bool(usuario.perfil.pode_ver_fiscal),
+        "pode_ver_replicacoes": bool(usuario.perfil.pode_ver_replicacoes),
     }
 
 

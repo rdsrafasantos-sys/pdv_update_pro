@@ -265,6 +265,10 @@ def api_criar_perfil():
             pode_gerenciar_redes=dados.get("pode_gerenciar_redes", False),
             pode_gerenciar_usuarios=dados.get("pode_gerenciar_usuarios", False),
             somente_leitura=dados.get("somente_leitura", False),
+            pode_atualizar=dados.get("pode_atualizar", False),
+            pode_configurar=dados.get("pode_configurar", False),
+            pode_ver_fiscal=dados.get("pode_ver_fiscal", False),
+            pode_ver_replicacoes=dados.get("pode_ver_replicacoes", False),
         )
         registrar_auditoria(current_user.email, "criar_perfil", detalhes=dados.get("nome", ""), ip=_ip())
         return jsonify(resultado)
@@ -282,6 +286,10 @@ def api_editar_perfil(perfil_id):
             pode_gerenciar_redes=dados.get("pode_gerenciar_redes"),
             pode_gerenciar_usuarios=dados.get("pode_gerenciar_usuarios"),
             somente_leitura=dados.get("somente_leitura"),
+            pode_atualizar=dados.get("pode_atualizar"),
+            pode_configurar=dados.get("pode_configurar"),
+            pode_ver_fiscal=dados.get("pode_ver_fiscal"),
+            pode_ver_replicacoes=dados.get("pode_ver_replicacoes"),
         )
         registrar_auditoria(current_user.email, "editar_perfil", detalhes=f"id={perfil_id}", ip=_ip())
         return jsonify(resultado)
