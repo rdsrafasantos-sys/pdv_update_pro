@@ -1287,10 +1287,9 @@ function _dashFase2(lojasList, historico) {
         }).join("");
         elPdvsDetalhe.innerHTML = `${linhasLoja}
           <div class="kpi-pdv-linha" style="margin-top:4px;padding-top:6px;border-top:1px solid var(--border);">
-            <span class="kpi-pdv-dot kpi-pdv-dot--online"></span><span class="kpi-pdv-count">${totalOnline}</span><span class="kpi-pdv-label">online</span>
-            <span style="margin-left:8px;"></span>
-            <span class="kpi-pdv-dot kpi-pdv-dot--offline"></span><span class="kpi-pdv-count">${off}</span><span class="kpi-pdv-label">offline</span>
-            <span style="margin-left:8px;color:var(--text-faint);font-size:10px;">${totalAtivos} total</span>
+            <span class="kpi-pdv-grupo"><span class="kpi-pdv-dot kpi-pdv-dot--online"></span><span class="kpi-pdv-count">${totalOnline}</span><span class="kpi-pdv-label">online</span></span>
+            <span class="kpi-pdv-grupo"><span class="kpi-pdv-dot kpi-pdv-dot--offline"></span><span class="kpi-pdv-count">${off}</span><span class="kpi-pdv-label">offline</span></span>
+            <span class="kpi-pdv-total">${totalAtivos} total</span>
           </div>`;
       }
     }

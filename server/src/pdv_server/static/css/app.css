@@ -213,7 +213,9 @@ input:checked + .slider:before { transform: translateX(17px); background: #1a0f0
 
 /* Breakdown de PDVs */
 .kpi-pdvs-detalhe { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
-.kpi-pdv-linha { display: flex; align-items: center; gap: 6px; font-size: 11px; flex-wrap: wrap; }
+.kpi-pdv-linha { display: flex; align-items: center; gap: 8px; font-size: 11px; flex-wrap: wrap; }
+.kpi-pdv-grupo { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.kpi-pdv-total { margin-left: auto; color: var(--text-faint); font-size: 10px; white-space: nowrap; }
 .kpi-pdv-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .kpi-pdv-dot--online { background: var(--green); box-shadow: 0 0 0 2px var(--green-dim); }
 .kpi-pdv-dot--offline { background: var(--text-faint); }
