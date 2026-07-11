@@ -71,9 +71,7 @@
       <div class="menu-group">
         <div class="menu-section" onclick="toggleMenuGroup(this)">Atualizações<span class="menu-chevron">▾</span></div>
         <div class="menu-items">
-          <div class="menu-item" data-view="agente" onclick="mostrarView('agente')">🤖 Agentes</div>
-          <div class="menu-item" data-view="pdv" onclick="mostrarView('pdv')">📦 PDVs</div>
-          <div class="menu-item" data-view="integrador-update" onclick="mostrarView('integrador-update')">🔗 Integrador</div>
+          <div class="menu-item" data-view="atualizacoes" onclick="mostrarView('atualizacoes')">⚡ Atualizações</div>
         </div>
       </div>
 
@@ -173,67 +171,123 @@
           <div class="card">
             <div class="section-title">⚡ Atalhos rápidos</div>
             <div class="quick-actions">
-              <button class="btn-quick" onclick="mostrarView('pdv')">📦 Ir para Atualização de PDV</button>
-              <button class="btn-quick" onclick="mostrarView('agente')">🤖 Ir para Atualização de Agente</button>
+              <button class="btn-quick" onclick="mostrarView('atualizacoes');mostrarAtualizacoesTab('pdv')">📦 Ir para Atualização de PDV</button>
+              <button class="btn-quick" onclick="mostrarView('atualizacoes');mostrarAtualizacoesTab('agente')">🤖 Ir para Atualização de Agente</button>
               <button class="btn-quick" onclick="mostrarView('replicacao')">🔍 Ir para Verificação de Replicação</button>
               <button class="btn-quick" onclick="redescobrir()">🔄 Redescobrir PDVs</button>
             </div>
           </div>
         </div>
 
-        <!-- ═══════════════ ATUALIZAÇÃO DE AGENTE ═══════════════ -->
-        <div class="view" id="view-agente" style="display:none;">
-          <div class="card">
-            <div class="section-title">🤖 Atualização do Agente PDV</div>
-            <div class="agente-info">
-              <div id="agenteInfoTexto" class="text-muted">Carregando...</div>
-              <span class="agente-badge indisponivel" id="agenteBadge">—</span>
-            </div>
-            <input type="file" id="agenteInput" accept=".exe" style="display:none" onchange="uploadAgente(this)">
-            <button class="btn-atualizar-agente" id="btnUploadAgente" onclick="document.getElementById('agenteInput').click()">Enviar novo agente.exe</button>
-            <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
-              <div id="statusPdvInfoTexto" class="text-muted" style="font-size:12px;">status_pdv.exe: envie junto para atualizar o painel de acompanhamento</div>
-              <input type="file" id="statusPdvInput" accept=".exe" style="display:none" onchange="uploadStatusPdv(this)">
-              <button class="btn-atualizar-agente" id="btnUploadStatusPdv" style="margin-top:6px;font-size:12px;padding:6px 14px;" onclick="document.getElementById('statusPdvInput').click()">Enviar novo status_pdv.exe</button>
-            </div>
+        <!-- ═══════════════ ATUALIZAÇÕES ═══════════════ -->
+        <div class="view" id="view-atualizacoes" style="display:none;">
+
+          <div class="cfg-tab-bar">
+            <button class="cfg-tab-btn active" data-atu-tab="agente" onclick="mostrarAtualizacoesTab('agente')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              Agente
+            </button>
+            <button class="cfg-tab-btn" data-atu-tab="pdv" onclick="mostrarAtualizacoesTab('pdv')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+              PDV
+            </button>
+            <button class="cfg-tab-btn" data-atu-tab="integrador" onclick="mostrarAtualizacoesTab('integrador')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+              Integrador
+            </button>
           </div>
 
-          {{ seletor_pdv("agente", "🏪 Lojas & PDVs") }}
-
-          <div class="actions-row">
-            <div></div>
-            <button class="btn-update" id="btnAtualizarAgente" disabled onclick="iniciarAtualizacaoAgente()">🚀 Atualizar Agente nos PDVs Selecionados</button>
-          </div>
-        </div>
-
-        <!-- ═══════════════ ATUALIZAÇÃO DE PDV ═══════════════ -->
-        <div class="view" id="view-pdv" style="display:none;">
-          <div class="card">
-            <div class="section-title">📦 Arquivo de atualização</div>
-            <div class="upload-area" id="uploadArea">
-              <strong>Clique ou arraste um arquivo .zip aqui</strong>
-              <p class="text-muted">A atualização será enviada para os PDVs selecionados abaixo.</p>
-              <input type="file" id="uploadInput" accept=".zip" style="display:none">
+          <!-- Aba: Agente -->
+          <div class="cfg-tab-content active" id="atu-tab-agente">
+            <div class="card">
+              <div class="section-title">🤖 Atualização do Agente PDV</div>
+              <div class="agente-info">
+                <div id="agenteInfoTexto" class="text-muted">Carregando...</div>
+                <span class="agente-badge indisponivel" id="agenteBadge">—</span>
+              </div>
+              <input type="file" id="agenteInput" accept=".exe" style="display:none" onchange="uploadAgente(this)">
+              <button class="btn-atualizar-agente" id="btnUploadAgente" onclick="document.getElementById('agenteInput').click()">Enviar novo agente.exe</button>
+              <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+                <div id="statusPdvInfoTexto" class="text-muted" style="font-size:12px;">status_pdv.exe: envie junto para atualizar o painel de acompanhamento</div>
+                <input type="file" id="statusPdvInput" accept=".exe" style="display:none" onchange="uploadStatusPdv(this)">
+                <button class="btn-atualizar-agente" id="btnUploadStatusPdv" style="margin-top:6px;font-size:12px;padding:6px 14px;" onclick="document.getElementById('statusPdvInput').click()">Enviar novo status_pdv.exe</button>
+              </div>
             </div>
-            <div class="upload-progress" id="uploadProgress">
-              <div class="text-muted" style="font-size:12px;">Enviando...</div>
-              <div class="bar-wrap-upload"><div class="bar" style="width:100%"></div></div>
-            </div>
-            <div class="file-list" id="fileList"></div>
-            <div class="actions-row" style="margin-top:10px;">
-              <button class="btn-clear" onclick="limparTodos()">🗑️ Limpar todos</button>
+            {{ seletor_pdv("agente", "🏪 Lojas & PDVs") }}
+            <div class="actions-row">
               <div></div>
+              <button class="btn-update" id="btnAtualizarAgente" disabled onclick="iniciarAtualizacaoAgente()">🚀 Atualizar Agente nos PDVs Selecionados</button>
             </div>
           </div>
 
-          {{ seletor_pdv("pdv", "🏪 Lojas & PDVs", multi=False) }}
-
-          <div id="pdvVersaoAviso"></div>
-
-          <div class="actions-row">
-            <div></div>
-            <button class="btn-update" id="btnAtualizarPdv" disabled onclick="iniciarAtualizacao()">🚀 Atualizar PDV Selecionado</button>
+          <!-- Aba: PDV -->
+          <div class="cfg-tab-content" id="atu-tab-pdv">
+            <div class="card">
+              <div class="section-title">📦 Arquivo de atualização</div>
+              <div class="upload-area" id="uploadArea">
+                <strong>Clique ou arraste um arquivo .zip aqui</strong>
+                <p class="text-muted">A atualização será enviada para os PDVs selecionados abaixo.</p>
+                <input type="file" id="uploadInput" accept=".zip" style="display:none">
+              </div>
+              <div class="upload-progress" id="uploadProgress">
+                <div class="text-muted" style="font-size:12px;">Enviando...</div>
+                <div class="bar-wrap-upload"><div class="bar" style="width:100%"></div></div>
+              </div>
+              <div class="file-list" id="fileList"></div>
+              <div class="actions-row" style="margin-top:10px;">
+                <button class="btn-clear" onclick="limparTodos()">🗑️ Limpar todos</button>
+                <div></div>
+              </div>
+            </div>
+            {{ seletor_pdv("pdv", "🏪 Lojas & PDVs", multi=False) }}
+            <div id="pdvVersaoAviso"></div>
+            <div class="actions-row">
+              <div></div>
+              <button class="btn-update" id="btnAtualizarPdv" disabled onclick="iniciarAtualizacao()">🚀 Atualizar PDV Selecionado</button>
+            </div>
           </div>
+
+          <!-- Aba: Integrador -->
+          <div class="cfg-tab-content" id="atu-tab-integrador">
+            <div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+              <div style="flex:1;min-width:200px;">
+                <div class="section-title" style="margin-bottom:4px;">🔗 Atualização do Integrador VR</div>
+                <div style="font-size:12px;color:var(--text-dim);">Versão atual detectada via SSH no host do integrador</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span class="kpi-label" style="font-size:11px;">VERSÃO ATUAL</span>
+                <span id="intUpdVersaoAtual" class="intupd-versao-badge">—</span>
+                <button class="btn-verify" onclick="intUpdVerificarVersao()" style="white-space:nowrap;">🔄 Verificar</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="section-title">⬆ Nova versão</div>
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+                <label class="form-field" style="flex:1;min-width:180px;max-width:260px;">
+                  Versão alvo
+                  <input type="text" id="intUpdNovaVersao" placeholder="ex: v2.3.0" style="font-family:monospace;">
+                </label>
+                <button class="btn-update" id="btnIntUpd" onclick="intUpdIniciar()" style="margin-top:18px;white-space:nowrap;" disabled>
+                  🚀 Atualizar Integrador
+                </button>
+              </div>
+              <div id="intUpdAviso" style="font-size:12px;color:var(--amber);display:none;margin-bottom:8px;">
+                ⚠ Configure o acesso SSH do integrador em Configurações antes de atualizar.
+              </div>
+            </div>
+            <div class="card" id="intUpdCardProgresso" style="display:none;">
+              <div class="section-title">📋 Progresso</div>
+              <div id="intUpdPassos"></div>
+            </div>
+            <div class="card" id="intUpdCardLog" style="display:none;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <div class="section-title" style="margin:0;">🖥 Log do container</div>
+                <button class="btn-verify" onclick="document.getElementById('intUpdLog').innerHTML=''" style="font-size:11px;padding:3px 10px;">Limpar</button>
+              </div>
+              <div id="intUpdLog" class="intupd-log"></div>
+            </div>
+          </div>
+
         </div>
 
         <!-- ═══════════════ VERIFICAÇÃO DE REPLICAÇÃO ═══════════════ -->
@@ -306,56 +360,6 @@
               <div class="section-title">🧾 NFC-e pendentes de transmissão</div>
               <div id="fiscalNfceTabela"><div class="empty">Carregando...</div></div>
             </div>
-          </div>
-
-        </div>
-
-        <!-- ═══════════════ ATUALIZAÇÃO DO INTEGRADOR ═══════════════ -->
-        <div class="view" id="view-integrador-update" style="display:none;">
-
-          <!-- Cabeçalho com versão atual -->
-          <div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-            <div style="flex:1;min-width:200px;">
-              <div class="section-title" style="margin-bottom:4px;">🔗 Atualização do Integrador VR</div>
-              <div style="font-size:12px;color:var(--text-dim);">Versão atual detectada via SSH no host do integrador</div>
-            </div>
-            <div style="display:flex;align-items:center;gap:10px;">
-              <span class="kpi-label" style="font-size:11px;">VERSÃO ATUAL</span>
-              <span id="intUpdVersaoAtual" class="intupd-versao-badge">—</span>
-              <button class="btn-verify" onclick="intUpdVerificarVersao()" style="white-space:nowrap;">🔄 Verificar</button>
-            </div>
-          </div>
-
-          <!-- Painel de atualização -->
-          <div class="card">
-            <div class="section-title">⬆ Nova versão</div>
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-              <label class="form-field" style="flex:1;min-width:180px;max-width:260px;">
-                Versão alvo
-                <input type="text" id="intUpdNovaVersao" placeholder="ex: v2.3.0" style="font-family:monospace;">
-              </label>
-              <button class="btn-update" id="btnIntUpd" onclick="intUpdIniciar()" style="margin-top:18px;white-space:nowrap;" disabled>
-                🚀 Atualizar Integrador
-              </button>
-            </div>
-            <div id="intUpdAviso" style="font-size:12px;color:var(--amber);display:none;margin-bottom:8px;">
-              ⚠ Configure o acesso SSH do integrador em Configurações antes de atualizar.
-            </div>
-          </div>
-
-          <!-- Progresso passo a passo -->
-          <div class="card" id="intUpdCardProgresso" style="display:none;">
-            <div class="section-title">📋 Progresso</div>
-            <div id="intUpdPassos"></div>
-          </div>
-
-          <!-- Log ao vivo -->
-          <div class="card" id="intUpdCardLog" style="display:none;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-              <div class="section-title" style="margin:0;">🖥 Log do container</div>
-              <button class="btn-verify" onclick="document.getElementById('intUpdLog').innerHTML=''" style="font-size:11px;padding:3px 10px;">Limpar</button>
-            </div>
-            <div id="intUpdLog" class="intupd-log"></div>
           </div>
 
         </div>

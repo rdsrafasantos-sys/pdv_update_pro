@@ -101,7 +101,7 @@ function _dashOcultarLoading() {
 // NAVEGACAO (sidebar + views)
 // ──────────────────────────────────────────────
 function mostrarView(nome) {
-  for (const v of ["dashboard", "agente", "pdv", "replicacao", "config", "fiscal", "integrador-update"]) {
+  for (const v of ["dashboard", "atualizacoes", "replicacao", "config", "fiscal"]) {
     const el = document.getElementById(`view-${v}`);
     if (el) el.style.display = v === nome ? "flex" : "none";
   }
@@ -110,9 +110,19 @@ function mostrarView(nome) {
   });
   if (nome === "dashboard") { carregarDashboard(); _iniciarPolingSysinfo(); }
   else if (nome === "fiscal") { carregarPendenciasFiscais(); }
-  else if (nome === "integrador-update") { intUpdCarregar(); }
+  else if (nome === "atualizacoes") { intUpdCarregar(); }
   else { _pararPolingSysinfo(); _pararPolingSysinfoLojas(); }
 }
+
+function mostrarAtualizacoesTab(nome) {
+  document.querySelectorAll(".cfg-tab-content[id^='atu-tab-']").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".cfg-tab-btn[data-atu-tab]").forEach(el => el.classList.remove("active"));
+  const painel = document.getElementById("atu-tab-" + nome);
+  if (painel) painel.classList.add("active");
+  const btn = document.querySelector(`.cfg-tab-btn[data-atu-tab="${nome}"]`);
+  if (btn) btn.classList.add("active");
+}
+window.mostrarAtualizacoesTab = mostrarAtualizacoesTab;
 window.mostrarView = mostrarView;
 
 function mostrarConfigTab(nome) {
