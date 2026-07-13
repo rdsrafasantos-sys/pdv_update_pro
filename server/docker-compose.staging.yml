@@ -8,7 +8,7 @@ services:
       - 1.1.1.1
       - 100.100.100.100
     environment:
-      - PDV_SERVER_PORTA=8889
+      - PDV_SERVER_PORTA=8888
       - PDV_AMBIENTE=staging
       - "PDV_SERVER_TOKEN=${PDV_SERVER_TOKEN:?PDV_SERVER_TOKEN nao configurado - defina no .env}"
       - PDV_SERVER_MONGO_URI=${PDV_SERVER_MONGO_URI:-mongodb://localhost:27016}
