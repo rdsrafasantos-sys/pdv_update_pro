@@ -61,11 +61,11 @@ def obter_contexto(rede_id, permitir_inativa=False):
         raise RedeNaoEncontrada(f"Rede {rede_id} nao encontrada.")
 
     if not dados["ativa"] and not permitir_inativa:
-        raise RedeInativa(f"Rede '{dados['nome']}' esta desativada.")
+        raise RedeInativa(f"Rede '{dados['nome_fantasia']}' esta desativada.")
 
     return RedeContexto(
         rede_id=dados["id"],
-        nome=dados["nome"],
+        nome=dados["nome_fantasia"],
         mongo_uri=dados["mongo_uri"],
         token=dados["token"],
         tailscale_site_id=dados.get("tailscale_site_id") or "",

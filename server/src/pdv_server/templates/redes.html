@@ -116,11 +116,15 @@
     <div class="modal-title" id="modalTitulo">Nova rede</div>
     <input type="hidden" id="redeId">
     <div class="field">
-      <label>Nome da rede</label>
-      <input id="campoNome" placeholder="Ex: Compre Mais">
+      <label>Nome Fantasia</label>
+      <input id="campoNomeFantasia" placeholder="Ex: Compre Mais">
     </div>
     <div class="field">
-      <label>CNPJ <span class="text-muted">(identifica a empresa de forma única — o nome pode se repetir)</span></label>
+      <label>Razão Social <span class="text-muted">(opcional — razão social completa cadastrada no CNPJ)</span></label>
+      <input id="campoRazaoSocial" placeholder="Ex: Compre Mais Distribuidora Ltda">
+    </div>
+    <div class="field">
+      <label>CNPJ <span class="text-muted">(identifica a empresa de forma única)</span></label>
       <input id="campoCnpj" placeholder="00.000.000/0000-00">
     </div>
     <div class="field">
@@ -177,9 +181,10 @@ async function carregarTudo() {
     <div class="rede-card">
       <div class="rede-card-head">
         <div style="display:flex; gap:12px; align-items:center;">
-          <div class="rede-icon">${r.nome.slice(0,2).toUpperCase()}</div>
+          <div class="rede-icon">${r.nome_fantasia.slice(0,2).toUpperCase()}</div>
           <div>
-            <div class="rede-name">${r.nome}</div>
+            <div class="rede-name">${r.nome_fantasia}</div>
+            ${r.razao_social ? `<div class="rede-unidade" style="font-size:11px;">${r.razao_social}</div>` : ''}
             <div class="rede-unidade">${r.unidade_nome || '—'}</div>
           </div>
         </div>
@@ -204,7 +209,8 @@ async function carregarTudo() {
 function abrirModalNovaRede() {
   document.getElementById('modalTitulo').textContent = 'Nova rede';
   document.getElementById('redeId').value = '';
-  document.getElementById('campoNome').value = '';
+  document.getElementById('campoNomeFantasia').value = '';
+  document.getElementById('campoRazaoSocial').value = '';
   document.getElementById('campoCnpj').value = '';
   document.getElementById('campoMongoUri').value = '';
   document.getElementById('campoToken').value = '';
@@ -217,9 +223,10 @@ async function editarRede(id) {
   const r = await fetch(`/api/redes/${id}`);
   const dados = await r.json();
   if (dados.erro) { alert(dados.erro); return; }
-  document.getElementById('modalTitulo').textContent = `Editar — ${dados.nome}`;
+  document.getElementById('modalTitulo').textContent = `Editar — ${dados.nome_fantasia}`;
   document.getElementById('redeId').value = dados.id;
-  document.getElementById('campoNome').value = dados.nome;
+  document.getElementById('campoNomeFantasia').value = dados.nome_fantasia;
+  document.getElementById('campoRazaoSocial').value = dados.razao_social || '';
   document.getElementById('campoCnpj').value = dados.cnpj || '';
   document.getElementById('campoUnidade').value = dados.unidade_id;
   document.getElementById('campoMongoUri').value = dados.mongo_uri;
@@ -236,7 +243,8 @@ function fecharModal() {
 async function salvarRede() {
   const id = document.getElementById('redeId').value;
   const corpo = {
-    nome: document.getElementById('campoNome').value,
+    nome_fantasia: document.getElementById('campoNomeFantasia').value,
+    razao_social: document.getElementById('campoRazaoSocial').value,
     cnpj: document.getElementById('campoCnpj').value,
     unidade_id: parseInt(document.getElementById('campoUnidade').value, 10),
     mongo_uri: document.getElementById('campoMongoUri').value,

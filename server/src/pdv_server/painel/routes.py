@@ -116,14 +116,15 @@ def api_criar_rede():
         return jsonify({"erro": "Sem acesso a essa unidade"}), 403
     try:
         resultado = criar_rede(
-            nome=dados.get("nome"),
+            nome_fantasia=dados.get("nome_fantasia"),
+            razao_social=dados.get("razao_social", ""),
             unidade_id=unidade_id,
             mongo_uri=dados.get("mongo_uri"),
             token=dados.get("token"),
             tailscale_site_id=dados.get("tailscale_site_id", ""),
             cnpj=dados.get("cnpj", ""),
         )
-        registrar_auditoria(current_user.email, "criar_rede", detalhes=dados.get("nome", ""), ip=_ip())
+        registrar_auditoria(current_user.email, "criar_rede", detalhes=dados.get("nome_fantasia", ""), ip=_ip())
         return jsonify(resultado)
     except ValueError as e:
         return jsonify({"erro": str(e)}), 400
@@ -138,7 +139,8 @@ def api_editar_rede(rede_id):
     try:
         resultado = editar_rede(
             rede_id,
-            nome=dados.get("nome"),
+            nome_fantasia=dados.get("nome_fantasia"),
+            razao_social=dados.get("razao_social"),
             unidade_id=dados.get("unidade_id"),
             mongo_uri=dados.get("mongo_uri"),
             token=dados.get("token"),

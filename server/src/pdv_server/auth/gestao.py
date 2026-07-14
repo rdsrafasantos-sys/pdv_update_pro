@@ -212,7 +212,8 @@ def excluir_unidade(unidade_id):
 def _rede_para_dict(rede, com_segredos=False):
     dados = {
         "id": rede.id,
-        "nome": rede.nome,
+        "nome_fantasia": rede.nome_fantasia,
+        "razao_social": rede.razao_social,
         "cnpj": rede.cnpj,
         "unidade_id": rede.unidade_id,
         "unidade_nome": rede.unidade.nome if rede.unidade else None,
@@ -233,7 +234,7 @@ def listar_redes(unidade_id=None):
         query = db.query(Rede)
         if unidade_id:
             query = query.filter_by(unidade_id=unidade_id)
-        redes = query.order_by(Rede.nome).all()
+        redes = query.order_by(Rede.nome_fantasia).all()
         return [_rede_para_dict(r) for r in redes]
     finally:
         db.close()
@@ -258,28 +259,30 @@ def _checar_cnpj_disponivel(db, cnpj, ignorar_rede_id=None):
         query = query.filter(Rede.id != ignorar_rede_id)
     existente = query.first()
     if existente:
-        raise ValueError(f"Ja existe uma rede com este CNPJ: '{existente.nome}'.")
+        raise ValueError(f"Ja existe uma rede com este CNPJ: '{existente.nome_fantasia}'.")
 
 
-def criar_rede(nome, unidade_id, mongo_uri, token, tailscale_site_id="", cnpj=""):
-    nome = (nome or "").strip()
+def criar_rede(nome_fantasia, unidade_id, mongo_uri, token, tailscale_site_id="", cnpj="", razao_social=""):
+    nome_fantasia = (nome_fantasia or "").strip()
     mongo_uri = (mongo_uri or "").strip()
     token = (token or "").strip()
-    if not nome or not unidade_id or not mongo_uri or not token:
-        raise ValueError("Nome, unidade, Mongo URI e token sao obrigatorios.")
+    if not nome_fantasia or not unidade_id or not mongo_uri or not token:
+        raise ValueError("Nome fantasia, unidade, Mongo URI e token sao obrigatorios.")
     cnpj_normalizado = validar_cnpj(cnpj) if cnpj else None
 
     db = SessionLocal()
     try:
         if not db.get(Unidade, unidade_id):
             raise ValueError("Unidade nao encontrada.")
-        if db.query(Rede).filter_by(nome=nome).first():
-            raise ValueError(f"Ja existe uma rede chamada '{nome}'.")
+        if db.query(Rede).filter_by(nome_fantasia=nome_fantasia).first():
+            raise ValueError(f"Ja existe uma rede chamada '{nome_fantasia}'.")
         if cnpj_normalizado:
             _checar_cnpj_disponivel(db, cnpj_normalizado)
 
         rede = Rede(
-            nome=nome, unidade_id=unidade_id, cnpj=cnpj_normalizado,
+            nome_fantasia=nome_fantasia,
+            razao_social=(razao_social or "").strip() or None,
+            unidade_id=unidade_id, cnpj=cnpj_normalizado,
             mongo_uri_cifrado=cifrar(mongo_uri),
             token_cifrado=cifrar(token),
             tailscale_site_id_cifrado=cifrar(tailscale_site_id) if tailscale_site_id else None,
@@ -292,15 +295,17 @@ def criar_rede(nome, unidade_id, mongo_uri, token, tailscale_site_id="", cnpj=""
         db.close()
 
 
-def editar_rede(rede_id, nome, unidade_id, mongo_uri, token, tailscale_site_id="", cnpj=None):
+def editar_rede(rede_id, nome_fantasia, unidade_id, mongo_uri, token, tailscale_site_id="", cnpj=None, razao_social=None):
     db = SessionLocal()
     try:
         rede = db.get(Rede, rede_id)
         if not rede:
             raise ValueError("Rede nao encontrada.")
 
-        if nome:
-            rede.nome = nome.strip()
+        if nome_fantasia:
+            rede.nome_fantasia = nome_fantasia.strip()
+        if razao_social is not None:
+            rede.razao_social = razao_social.strip() or None
         if unidade_id:
             if not db.get(Unidade, unidade_id):
                 raise ValueError("Unidade nao encontrada.")
@@ -559,7 +564,7 @@ def criar_rede_da_instalacao(instalacao_id, token, unidade_id, mongo_uri=None):
 
     # Fase 2: criacao da Rede (usa SessionLocal propria internamente, sem conflito)
     rede = criar_rede(
-        nome=cliente_nome or f"Rede {site_id}",
+        nome_fantasia=cliente_nome or f"Rede {site_id}",
         unidade_id=unidade_id,
         mongo_uri=mongo_uri_final,
         token=token,

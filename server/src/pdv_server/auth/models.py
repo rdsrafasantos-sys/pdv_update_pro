@@ -39,14 +39,13 @@ class Unidade(Base):
 
 class Rede(Base):
     __tablename__ = "redes"
-    __table_args__ = (UniqueConstraint("nome", name="uq_rede_nome"),)
+    __table_args__ = (UniqueConstraint("nome_fantasia", name="uq_rede_nome_fantasia"),)
 
     id = Column(Integer, primary_key=True)
-    nome = Column(String(120), nullable=False)
-    # CNPJ identifica a empresa de forma unica (nome pode se repetir entre
-    # clientes diferentes). Unicidade validada em gestao.py, nao aqui --
-    # nullable porque redes criadas antes desta coluna nao tem o valor
-    # preenchido ainda.
+    nome_fantasia = Column(String(120), nullable=False)
+    razao_social = Column(String(200), nullable=True)
+    # CNPJ identifica a empresa de forma unica. Unicidade validada em gestao.py,
+    # nao aqui -- nullable porque redes criadas antes desta coluna nao tem o valor.
     cnpj = Column(String(14), nullable=True)
     unidade_id = Column(Integer, ForeignKey("unidades.id"), nullable=False)
 
@@ -213,6 +212,7 @@ def _migrar_colunas_novas():
         },
         "redes": {
             "cnpj": "VARCHAR(14)",
+            "razao_social": "VARCHAR(200)",
         },
         "instalacao_site_ids": {
             "rede_id": "INTEGER",
@@ -221,7 +221,11 @@ def _migrar_colunas_novas():
     with engine.connect() as conn:
         for tabela, colunas in colunas_novas.items():
             existentes = {row[1] for row in conn.execute(sa.text(f"PRAGMA table_info({tabela})"))}
-            for nome, tipo in colunas.items():
-                if nome not in existentes:
-                    conn.execute(sa.text(f"ALTER TABLE {tabela} ADD COLUMN {nome} {tipo}"))
+            for col, tipo in colunas.items():
+                if col not in existentes:
+                    conn.execute(sa.text(f"ALTER TABLE {tabela} ADD COLUMN {col} {tipo}"))
+        # Renomeia nome -> nome_fantasia nas instalacoes existentes (SQLite 3.25+)
+        redes_cols = {row[1] for row in conn.execute(sa.text("PRAGMA table_info(redes)"))}
+        if "nome" in redes_cols and "nome_fantasia" not in redes_cols:
+            conn.execute(sa.text("ALTER TABLE redes RENAME COLUMN nome TO nome_fantasia"))
         conn.commit()
