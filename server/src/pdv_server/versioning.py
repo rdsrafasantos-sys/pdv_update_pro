@@ -11,7 +11,7 @@ def extrair_versao(nome_arquivo):
 
 
 def versao_para_tupla(versao):
-    return tuple(int(p) for p in versao.split("."))
+    return tuple(int(p) for p in str(versao).lstrip("vV").split("."))
 
 
 def comparar_versoes(v1, v2):
