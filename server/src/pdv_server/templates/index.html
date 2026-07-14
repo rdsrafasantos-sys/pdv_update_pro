@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PDV Updater — Painel v{{ server_version }}{% if ambiente == "staging" %} [STAGING]{% endif %}</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ server_version }}">
 </head>
 <body>
 {% macro seletor_pdv(key, titulo, multi=True) %}
@@ -607,6 +607,6 @@ window.PERMS = {
   pode_ver_fiscal:       {{ usuario_atual.pode_ver_fiscal|tojson }},
 };
 </script>
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}?v={{ server_version }}"></script>
 </body>
 </html>
