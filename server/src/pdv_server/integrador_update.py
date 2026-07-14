@@ -175,3 +175,41 @@ def atualizar_stream(cfg: dict, nova_versao: str):
 def config_ssh_completa(cfg: dict) -> bool:
     """Retorna True se os campos SSH obrigatórios estão presentes."""
     return bool(cfg.get("ssh_ip") and cfg.get("ssh_usuario"))
+
+
+def container_status(cfg: dict) -> dict:
+    """Retorna o status do container vrintegradormaster via SSH."""
+    try:
+        client = _ssh(cfg)
+        out, _, _ = _exec(client, "docker inspect --format '{{.State.Status}}' vrintegradormaster 2>&1")
+        client.close()
+        status_raw = out.strip().lower()
+        return {"ok": True, "rodando": status_raw == "running", "status": status_raw or "desconhecido"}
+    except Exception as e:
+        return {"ok": False, "rodando": False, "status": "erro", "erro": str(e)}
+
+
+def logs_container(cfg: dict, linhas: int = 100) -> dict:
+    """Retorna os últimos N logs do container vrintegradormaster."""
+    try:
+        client = _ssh(cfg)
+        cmd = f"cd ~ && {COMPOSE_CMD} logs --tail={int(linhas)} --no-log-prefix vrintegradormaster 2>&1"
+        out, err, _ = _exec(client, cmd)
+        client.close()
+        return {"ok": True, "linhas": (out + err).splitlines()}
+    except Exception as e:
+        return {"ok": False, "linhas": [], "erro": str(e)}
+
+
+def start_stop_container(cfg: dict, acao: str) -> dict:
+    """Executa start ou stop no container vrintegradormaster via SSH."""
+    if acao not in ("start", "stop"):
+        return {"ok": False, "erro": f"Ação inválida: {acao}"}
+    try:
+        client = _ssh(cfg)
+        out, err, code = _exec(client, f"cd ~ && {COMPOSE_CMD} {acao} vrintegradormaster 2>&1")
+        client.close()
+        saida = (out + err).strip()
+        return {"ok": code == 0, "saida": saida, "erro": None if code == 0 else saida}
+    except Exception as e:
+        return {"ok": False, "saida": "", "erro": str(e)}

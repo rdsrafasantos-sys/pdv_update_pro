@@ -419,12 +419,38 @@ async function carregarArquivos() {
   `).join("");
 }
 
+let _pdvCompatResult = null;
+let _pdvCompatVersaoChecked = null;
+
 function selecionarArquivo(nome) {
   arquivoSelecionado = arquivoSelecionado === nome ? null : nome;
   carregarArquivos();
+  const arquivo = arquivosPorNome[arquivoSelecionado];
+  const versao = arquivo?.versao || null;
+  if (versao !== _pdvCompatVersaoChecked) {
+    _pdvCompatResult = null;
+    _pdvCompatVersaoChecked = versao;
+  }
   atualizarBotaoPdv();
+  if (versao) _verificarCompatIntegrador(versao);
 }
 window.selecionarArquivo = selecionarArquivo;
+
+async function _verificarCompatIntegrador(versao_pdvpro) {
+  try {
+    const d = await fetch(API(`/compat/verificar?versao_pdvpro=${encodeURIComponent(versao_pdvpro)}`))
+      .then(r => r.json()).catch(() => null);
+    if (_pdvCompatVersaoChecked === versao_pdvpro) {
+      _pdvCompatResult = d;
+      atualizarBotaoPdv();
+    }
+  } catch (_) {
+    if (_pdvCompatVersaoChecked === versao_pdvpro) {
+      _pdvCompatResult = { ok: true, bloqueado: false };
+      atualizarBotaoPdv();
+    }
+  }
+}
 
 async function deletarArquivo(nome) {
   await fetch(API(`/arquivos/${encodeURIComponent(nome)}`), { method: "DELETE" });
@@ -472,20 +498,37 @@ function atualizarBotaoPdv() {
   const pdv = pdvSelecionadoAtual();
   const arquivo = arquivosPorNome[arquivoSelecionado];
   let bloqueadoPorVersao = false;
-
-  if (aviso) aviso.innerHTML = "";
+  let html = "";
 
   if (pdv && arquivo) {
     if (!arquivo.versao) {
-      if (aviso) aviso.innerHTML = `<div class="card aviso-versao aviso-indefinido">⚠️ Não foi possível identificar a versão do arquivo <strong>${arquivo.nome}</strong> pelo nome. Renomeie incluindo a versão (ex: VRPdvPro_7.1.0.zip).</div>`;
+      html += `<div class="card aviso-versao aviso-indefinido">⚠️ Não foi possível identificar a versão do arquivo <strong>${arquivo.nome}</strong> pelo nome. Renomeie incluindo a versão (ex: VRPdvPro_7.1.0.zip).</div>`;
     } else if (pdv.versao && ehDowngrade(arquivo.versao, pdv.versao)) {
       bloqueadoPorVersao = true;
-      if (aviso) aviso.innerHTML = `<div class="card aviso-versao aviso-bloqueado">⛔ Downgrade bloqueado: o pacote é a versão <strong>${arquivo.versao}</strong>, mas o PDV ${pdv.id} já está na <strong>${pdv.versao}</strong>. Atualizar para uma versão anterior pode corromper o banco.</div>`;
+      html += `<div class="card aviso-versao aviso-bloqueado">⛔ Downgrade bloqueado: o pacote é a versão <strong>${arquivo.versao}</strong>, mas o PDV ${pdv.id} já está na <strong>${pdv.versao}</strong>. Atualizar para uma versão anterior pode corromper o banco.</div>`;
     } else if (pdv.versao) {
-      if (aviso) aviso.innerHTML = `<div class="card aviso-versao aviso-ok">✅ ${pdv.id}: ${pdv.versao} → ${arquivo.versao}</div>`;
+      html += `<div class="card aviso-versao aviso-ok">✅ ${pdv.id}: ${pdv.versao} → ${arquivo.versao}</div>`;
     }
   }
 
+  // Resultado da verificação de compatibilidade com integrador
+  if (arquivo?.versao) {
+    if (_pdvCompatVersaoChecked === arquivo.versao && _pdvCompatResult) {
+      const c = _pdvCompatResult;
+      if (c.bloqueado) {
+        bloqueadoPorVersao = true;
+        html += `<div class="card aviso-versao aviso-bloqueado">⛔ Integrador incompatível: ${c.aviso}</div>`;
+      } else if (!c.ok && c.aviso) {
+        html += `<div class="card aviso-versao aviso-indefinido">⚠️ ${c.aviso}</div>`;
+      } else if (c.ok && c.versao_min) {
+        html += `<div class="card aviso-versao aviso-ok">✅ Integrador compatível — atual: ${c.versao_atual || "?"}, mínimo: ${c.versao_min}</div>`;
+      }
+    } else if (_pdvCompatVersaoChecked === arquivo.versao && !_pdvCompatResult) {
+      html += `<div class="card aviso-versao aviso-indefinido" style="opacity:.7">⏳ Verificando compatibilidade com o integrador...</div>`;
+    }
+  }
+
+  if (aviso) aviso.innerHTML = html;
   btn.disabled = !arquivoSelecionado || seletores.pdv.selecionados.size === 0 || bloqueadoPorVersao;
 }
 
@@ -496,7 +539,10 @@ async function iniciarAtualizacao() {
 
   const r = await fetch(API("/atualizar"), {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ loja_id, pdv_ids, arquivo: arquivoSelecionado }),
+    body: JSON.stringify({
+      loja_id, pdv_ids, arquivo: arquivoSelecionado,
+      versao_integrador: _pdvCompatResult?.versao_atual ?? null,
+    }),
   });
   const dados = await r.json();
   if (dados.erro) { alert(dados.erro); return; }
@@ -1611,7 +1657,10 @@ async function intUpdCarregar() {
   if (aviso) aviso.style.display = temSsh ? "none" : "block";
   if (btn) btn.disabled = !temSsh;
 
-  if (temSsh) intUpdVerificarVersao();
+  if (temSsh) {
+    intUpdVerificarVersao();
+    intContainerCarregar();
+  }
 }
 window.intUpdCarregar = intUpdCarregar;
 
@@ -1710,6 +1759,94 @@ function intUpdIniciar() {
   };
 }
 window.intUpdIniciar = intUpdIniciar;
+
+// ──────────────────────────────────────────────
+// GERENCIAMENTO DO CONTAINER DO INTEGRADOR
+// ──────────────────────────────────────────────
+let _intContainerRodando = null;
+
+function _escHtml(str) {
+  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+async function intContainerCarregar() {
+  const badge = document.getElementById("intContainerStatus");
+  const btn = document.getElementById("btnIntContainerAcao");
+  if (badge) { badge.textContent = "..."; badge.className = "intupd-versao-badge"; }
+  if (btn) btn.disabled = true;
+
+  const d = await fetch(API("/integrador/container_status")).then(r => r.json()).catch(() => null);
+  if (!badge) return;
+
+  if (!d || !d.ok) {
+    badge.textContent = d?.erro || "Erro SSH";
+    badge.className = "intupd-versao-badge intupd-versao-badge--erro";
+    return;
+  }
+  _intContainerRodando = d.rodando;
+  _intAtualizarBotaoContainer(d.rodando, d.status);
+}
+window.intContainerCarregar = intContainerCarregar;
+
+function _intAtualizarBotaoContainer(rodando, status) {
+  const badge = document.getElementById("intContainerStatus");
+  const btn = document.getElementById("btnIntContainerAcao");
+  if (badge) {
+    badge.textContent = status;
+    badge.className = "intupd-versao-badge " + (rodando ? "intupd-versao-badge--ok" : "intupd-versao-badge--erro");
+  }
+  if (btn) {
+    btn.textContent = rodando ? "⏹ Stop" : "▶ Start";
+    btn.disabled = false;
+    btn.style.background = rodando ? "var(--red,#ef4444)" : "var(--green,#22c55e)";
+    btn.style.borderColor = rodando ? "var(--red,#ef4444)" : "var(--green,#22c55e)";
+  }
+}
+
+async function intContainerStartStop() {
+  const btn = document.getElementById("btnIntContainerAcao");
+  if (!btn || btn.disabled) return;
+  const acao = _intContainerRodando ? "stop" : "start";
+  btn.disabled = true;
+  btn.textContent = acao === "stop" ? "Parando..." : "Iniciando...";
+
+  await fetch(API("/integrador/container_acao"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ acao })
+  }).catch(() => null);
+
+  await intContainerCarregar();
+}
+window.intContainerStartStop = intContainerStartStop;
+
+async function intContainerVerLogs() {
+  const wrap = document.getElementById("intContainerLogWrap");
+  const logEl = document.getElementById("intContainerLog");
+  const btnLogs = document.getElementById("btnIntContainerLogs");
+  if (!wrap) return;
+
+  if (wrap.style.display !== "none") {
+    wrap.style.display = "none";
+    if (btnLogs) btnLogs.textContent = "📋 Ver logs";
+    return;
+  }
+
+  wrap.style.display = "block";
+  if (btnLogs) btnLogs.textContent = "🔼 Fechar logs";
+  if (logEl) logEl.innerHTML = '<div class="intupd-log-linha" style="opacity:.6">Carregando logs...</div>';
+
+  const d = await fetch(API("/integrador/logs?linhas=100")).then(r => r.json()).catch(() => null);
+  if (!logEl) return;
+
+  if (!d || !d.ok) {
+    logEl.innerHTML = `<div class="intupd-log-linha intupd-passo--erro">Erro: ${_escHtml(d?.erro || "falha ao buscar logs")}</div>`;
+    return;
+  }
+  logEl.innerHTML = d.linhas.map(l => `<div class="intupd-log-linha">${_escHtml(l)}</div>`).join("");
+  logEl.scrollTop = logEl.scrollHeight;
+}
+window.intContainerVerLogs = intContainerVerLogs;
 
 // ──────────────────────────────────────────────
 // TEMA

@@ -23,7 +23,7 @@ from pdv_server.discovery import (
     encontrar_pdv, endereco_alcancavel, get_lojas, invalidar_cache,
     resolver_endereco, _tentar_requisicao,
 )
-from pdv_server import VERSION, erp_db, integrador, integrador_update, replication
+from pdv_server import VERSION, erp_db, integrador, integrador_update, pdv_compat, replication
 from pdv_server.versioning import eh_downgrade, extrair_versao
 from pdv_server.auth.audit import registrar_auditoria
 
@@ -600,6 +600,14 @@ def api_atualizar(contexto):
                     f"permitido (risco de corromper o banco)."
         }), 409
 
+    # Verificação de compatibilidade integrador × PDVPro
+    # versao_integrador vem do frontend (pre-flight check via SSH já feito lá)
+    versao_int = dados.get("versao_integrador") or None
+    tabela_compat = pdv_compat.buscar_tabela(contexto.integrador_dir)
+    compat = pdv_compat.verificar(versao_zip, versao_int, tabela_compat)
+    if compat.get("bloqueado"):
+        return jsonify({"erro": compat["aviso"]}), 409
+
     iniciar_envio_zip(contexto, loja_id, pdv, caminho_zip)
     registrar_auditoria(
         current_user.email, "atualizar_pdv",
@@ -796,6 +804,66 @@ def api_integrador_atualizar_stream(contexto):
     return app.response_class(gerar(), mimetype="text/event-stream",
                               headers={"Cache-Control": "no-cache",
                                        "X-Accel-Buffering": "no"})
+
+
+@app.route("/api/<int:rede_id>/compat/verificar", methods=["GET"])
+@com_rede
+@exigir_permissao("pode_atu_pdv_disparar")
+def api_compat_verificar(contexto):
+    versao_pdvpro = request.args.get("versao_pdvpro", "").strip()
+    if not versao_pdvpro:
+        return jsonify({"erro": "versao_pdvpro obrigatório"}), 400
+    tabela = pdv_compat.buscar_tabela(contexto.integrador_dir)
+    cfg_int = integrador.carregar_config(contexto)
+    versao_int = None
+    if integrador_update.config_ssh_completa(cfg_int):
+        res = integrador_update.versao_atual(cfg_int)
+        versao_int = res.get("versao")
+    return jsonify(pdv_compat.verificar(versao_pdvpro, versao_int, tabela))
+
+
+@app.route("/api/<int:rede_id>/compat/tabela", methods=["GET"])
+@com_rede
+def api_compat_tabela(contexto):
+    forcar = request.args.get("forcar", "false").lower() == "true"
+    tabela = pdv_compat.buscar_tabela(contexto.integrador_dir, forcar=forcar)
+    return jsonify({"tabela": tabela})
+
+
+@app.route("/api/<int:rede_id>/integrador/container_status", methods=["GET"])
+@com_rede
+@exigir_permissao("pode_atu_integrador")
+def api_integrador_container_status(contexto):
+    cfg = integrador.carregar_config(contexto)
+    if not integrador_update.config_ssh_completa(cfg):
+        return jsonify({"ok": False, "rodando": False, "status": "ssh_nao_configurado",
+                        "erro": "SSH não configurado"})
+    return jsonify(integrador_update.container_status(cfg))
+
+
+@app.route("/api/<int:rede_id>/integrador/logs", methods=["GET"])
+@com_rede
+@exigir_permissao("pode_atu_integrador")
+def api_integrador_logs(contexto):
+    cfg = integrador.carregar_config(contexto)
+    if not integrador_update.config_ssh_completa(cfg):
+        return jsonify({"ok": False, "linhas": [], "erro": "SSH não configurado"})
+    linhas = min(int(request.args.get("linhas", 100)), 500)
+    return jsonify(integrador_update.logs_container(cfg, linhas))
+
+
+@app.route("/api/<int:rede_id>/integrador/container_acao", methods=["POST"])
+@com_rede
+@exigir_permissao("pode_atu_integrador")
+def api_integrador_container_acao(contexto):
+    acao = (request.json or {}).get("acao", "")
+    cfg = integrador.carregar_config(contexto)
+    if not integrador_update.config_ssh_completa(cfg):
+        return jsonify({"ok": False, "erro": "SSH não configurado"}), 400
+    resultado = integrador_update.start_stop_container(cfg, acao)
+    registrar_auditoria(current_user.email, f"integrador_{acao}",
+                        detalhes=f"rede={contexto.rede_id}", ip=_ip())
+    return jsonify(resultado)
 
 
 @app.route("/api/<int:rede_id>/sysinfo_loja/<loja_id>", methods=["GET"])
