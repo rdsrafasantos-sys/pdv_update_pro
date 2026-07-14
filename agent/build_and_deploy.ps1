@@ -12,10 +12,10 @@
       4. Upload para staging e/ou prod via API
 
 .PARAMETER Staging
-    Faz upload para o servidor de staging (192.168.1.126:8889). Padrao: $true
+    Faz upload para o servidor de staging (painel-central.tail377baf.ts.net:8888). Padrao: $true
 
 .PARAMETER Prod
-    Faz upload para producao (pdvproupdater.com.br). Padrao: $false
+    Faz upload para producao (vrsoft.pdvproupdater.com.br). Padrao: $false
     Requer confirmacao explicita.
 
 .PARAMETER Token
@@ -107,14 +107,14 @@ function Upload-Setup {
 
 # ── 4. Deploy ──────────────────────────────────────────────────
 if ($Staging) {
-    Upload-Setup -BaseUrl "http://192.168.1.126:8889" -Label "Staging"
+    Upload-Setup -BaseUrl "http://painel-central.tail377baf.ts.net:8888" -Label "Staging"
 }
 
 if ($Prod) {
-    Write-Host "`n[ATENCAO] Voce esta prestes a enviar o setup para PRODUCAO (pdvproupdater.com.br)." -ForegroundColor Yellow
+    Write-Host "`n[ATENCAO] Voce esta prestes a enviar o setup para PRODUCAO (vrsoft.pdvproupdater.com.br)." -ForegroundColor Yellow
     $conf = Read-Host "Confirme digitando 'prod'"
     if ($conf -ne "prod") { Write-Host "Cancelado." -ForegroundColor Yellow; exit 0 }
-    Upload-Setup -BaseUrl "https://pdvproupdater.com.br" -Label "Prod"
+    Upload-Setup -BaseUrl "https://vrsoft.pdvproupdater.com.br" -Label "Prod"
 }
 
 Write-Host "`nConcluido!" -ForegroundColor Green

@@ -32,6 +32,79 @@
   .saude-erro { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); }
   .saude-atencao { background: var(--amber-dim); color: var(--amber); border: 1px solid var(--amber); }
   .saude-neutro { background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border-strong); }
+
+  /* ── Filtros ── */
+  .filter-bar {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 13px 15px;
+    display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;
+  }
+  .filter-search { position: relative; }
+  .filter-search svg {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    width: 14px; height: 14px; color: var(--text-faint); pointer-events: none;
+  }
+  .filter-search input {
+    width: 100%; background: var(--bg-elevated);
+    border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+    padding: 8px 10px 8px 32px; font-size: 13px; color: var(--text); outline: none;
+    transition: border-color .15s; font-family: inherit;
+  }
+  .filter-search input:focus { border-color: var(--accent); }
+  .filter-search input::placeholder { color: var(--text-faint); }
+  .filter-controls { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+  .seg-group {
+    display: flex; border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm); overflow: hidden;
+  }
+  .seg-btn {
+    padding: 5px 13px; border: none; background: transparent;
+    color: var(--text-dim); font-size: 12px; font-weight: 500; cursor: pointer;
+    transition: background .1s, color .1s; font-family: inherit;
+    border-right: 1px solid var(--border-strong);
+  }
+  .seg-btn:last-child { border-right: none; }
+  .seg-btn.active { background: var(--accent); color: #fff; }
+  .seg-btn:not(.active):hover { background: var(--border); }
+  .filter-sep { width: 1px; height: 18px; background: var(--border-strong); }
+  .filter-select {
+    background: var(--bg-elevated); border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm); padding: 5px 24px 5px 9px;
+    font-size: 12px; color: var(--text-dim); cursor: pointer;
+    appearance: none; outline: none; font-family: inherit;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2364748B' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center;
+    transition: border-color .15s;
+  }
+  .filter-select:focus { border-color: var(--accent); }
+  .filter-select.ativo { border-color: var(--accent); color: var(--accent); }
+  .btn-limpar {
+    background: none; border: none; color: var(--text-faint);
+    font-size: 12px; cursor: pointer; padding: 5px 8px;
+    border-radius: 5px; visibility: hidden; font-family: inherit;
+    transition: color .15s, background .15s;
+  }
+  .btn-limpar:hover { color: var(--red); background: var(--red-dim); }
+  .btn-limpar.visivel { visibility: visible; }
+  .chips-row { display: flex; flex-wrap: wrap; gap: 6px; min-height: 4px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    color: var(--accent); border-radius: 99px;
+    padding: 3px 8px 3px 10px; font-size: 11.5px; font-weight: 500;
+  }
+  .chip-x {
+    background: none; border: none; color: inherit; cursor: pointer;
+    font-size: 14px; line-height: 1; opacity: .65; padding: 0;
+    transition: opacity .1s;
+  }
+  .chip-x:hover { opacity: 1; }
+  .results-line {
+    display: flex; align-items: center;
+    margin: 10px 0 13px; font-size: 12px;
+  }
+  .results-count { font-weight: 600; color: var(--text-dim); }
 </style>
 </head>
 <body class="app-bg" data-theme="dark">
@@ -102,6 +175,46 @@
         {% endif %}
       </div>
 
+      <!-- Barra de filtros -->
+      <div class="filter-bar">
+        <div class="filter-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="search" id="buscaInput" placeholder="Buscar por nome fantasia, razão social ou CNPJ…">
+        </div>
+        <div class="filter-controls">
+          <div class="seg-group">
+            <button class="seg-btn active" data-val="todos" onclick="setStatus(this)">Todas</button>
+            <button class="seg-btn" data-val="ativas" onclick="setStatus(this)">Ativas</button>
+            <button class="seg-btn" data-val="inativas" onclick="setStatus(this)">Inativas</button>
+          </div>
+          <div class="filter-sep"></div>
+          <select class="filter-select" id="filtroUnidade" onchange="filtrar()">
+            <option value="">Todas as unidades</option>
+          </select>
+          <select class="filter-select" id="filtroErp" onchange="filtrar()">
+            <option value="">ERP — qualquer</option>
+            <option value="ok">ERP online</option>
+            <option value="offline">ERP offline</option>
+          </select>
+          <select class="filter-select" id="filtroInteg" onchange="filtrar()">
+            <option value="">Integrador — qualquer</option>
+            <option value="ok">Integrador OK</option>
+            <option value="atencao">Integrador atenção</option>
+            <option value="offline">Integrador offline</option>
+          </select>
+          <div class="filter-sep"></div>
+          <select class="filter-select" id="filtroOrdem" onchange="filtrar()">
+            <option value="nome_az">Nome A → Z</option>
+            <option value="nome_za">Nome Z → A</option>
+            <option value="recentes">Mais recentes</option>
+            <option value="unidade">Por unidade</option>
+          </select>
+          <button class="btn-limpar" id="btnLimpar" onclick="limparFiltros()">✕ Limpar</button>
+        </div>
+      </div>
+      <div class="chips-row" id="chipsRow"></div>
+      <div class="results-line"><span class="results-count" id="resultCount"></span></div>
+
       <div id="redesContainer" class="grid grid-3">
         <div class="card skeleton" style="height:140px;"></div>
         <div class="card skeleton" style="height:140px;"></div>
@@ -153,39 +266,126 @@
 
 <script>window.PODE_GERENCIAR_REDES = {{ "true" if usuario_atual.pode_gerenciar_redes else "false" }};</script>
 <script>
+let todasRedes   = [];
 let unidadesCache = [];
+// undefined = não iniciado | null = verificando | object = concluído
+let saudeCache   = {};
+let statusAtual  = 'todos';
 
+// ── Carregamento inicial ─────────────────────────────────────
 async function carregarTudo() {
   const [redes, unidades] = await Promise.all([
     fetch('/api/redes').then(r => r.json()),
     fetch('/api/unidades').then(r => r.json()),
   ]);
+  todasRedes    = redes;
   unidadesCache = unidades;
+  saudeCache    = {};
 
-  const totalRedes = redes.length;
   const totalAtivas = redes.filter(r => r.ativa).length;
   document.getElementById('resumo').textContent =
-    `${totalRedes} rede(s) cadastrada(s) · ${totalAtivas} ativa(s) · ${unidades.length} unidade(s)`;
+    `${redes.length} rede(s) cadastrada(s) · ${totalAtivas} ativa(s) · ${unidades.length} unidade(s)`;
 
   const sel = document.getElementById('campoUnidade');
   sel.innerHTML = unidades.map(u => `<option value="${u.id}">${u.nome}</option>`).join('')
     || '<option value="">Cadastre uma unidade primeiro</option>';
 
+  const nomes = [...new Set(redes.map(r => r.unidade_nome).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'pt'));
+  const fUnd = document.getElementById('filtroUnidade');
+  fUnd.innerHTML = '<option value="">Todas as unidades</option>'
+    + nomes.map(n => `<option value="${n}">${n}</option>`).join('');
+
+  filtrar();
+}
+
+// ── Filtros ──────────────────────────────────────────────────
+function setStatus(btn) {
+  document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  statusAtual = btn.dataset.val;
+  filtrar();
+}
+
+function filtrar() {
+  const busca     = (document.getElementById('buscaInput').value || '').toLowerCase().trim();
+  const unidade   = document.getElementById('filtroUnidade').value;
+  const filtroErp = document.getElementById('filtroErp').value;
+  const filtroInt = document.getElementById('filtroInteg').value;
+  const ordem     = document.getElementById('filtroOrdem').value;
+
+  let lista = todasRedes.filter(r => {
+    if (statusAtual === 'ativas'   && !r.ativa) return false;
+    if (statusAtual === 'inativas' &&  r.ativa) return false;
+    if (unidade && r.unidade_nome !== unidade)   return false;
+    if (busca) {
+      const hay = [r.nome_fantasia, r.razao_social || '', r.cnpj || ''].join(' ').toLowerCase();
+      if (!hay.includes(busca)) return false;
+    }
+    if (filtroErp || filtroInt) {
+      const s = saudeCache[r.id];
+      if (s !== undefined && s !== null) {
+        if (filtroErp === 'ok'      && !s.erp_ok)               return false;
+        if (filtroErp === 'offline' &&  s.erp_ok)               return false;
+        if (filtroInt === 'ok'      && s.integ !== 'ok')         return false;
+        if (filtroInt === 'atencao' && s.integ !== 'atencao')    return false;
+        if (filtroInt === 'offline' && s.integ !== 'offline')    return false;
+      }
+    }
+    return true;
+  });
+
+  lista = [...lista].sort((a, b) => {
+    if (ordem === 'nome_az')  return a.nome_fantasia.localeCompare(b.nome_fantasia, 'pt');
+    if (ordem === 'nome_za')  return b.nome_fantasia.localeCompare(a.nome_fantasia, 'pt');
+    if (ordem === 'recentes') return (b.criado_em || '').localeCompare(a.criado_em || '');
+    if (ordem === 'unidade')  return (a.unidade_nome || '').localeCompare(b.unidade_nome || '', 'pt')
+                                     || a.nome_fantasia.localeCompare(b.nome_fantasia, 'pt');
+    return 0;
+  });
+
+  renderizarCards(lista);
+
+  lista.filter(r => r.ativa).forEach(r => {
+    if (saudeCache[r.id] === undefined) {
+      verificarSaudeRede(r.id);
+    } else if (saudeCache[r.id] !== null) {
+      renderSaude(r.id, saudeCache[r.id]);
+    }
+  });
+
+  renderChips(busca, unidade, filtroErp, filtroInt);
+
+  const n = lista.length;
+  document.getElementById('resultCount').textContent =
+    `${n} rede${n !== 1 ? 's' : ''} encontrada${n !== 1 ? 's' : ''}`;
+
+  const temFiltro = busca || unidade || filtroErp || filtroInt || statusAtual !== 'todos';
+  document.getElementById('btnLimpar').classList.toggle('visivel', temFiltro);
+  document.getElementById('filtroUnidade').classList.toggle('ativo', !!unidade);
+  document.getElementById('filtroErp').classList.toggle('ativo',     !!filtroErp);
+  document.getElementById('filtroInteg').classList.toggle('ativo',   !!filtroInt);
+}
+
+// ── Renderização dos cards ───────────────────────────────────
+function renderizarCards(lista) {
   const cont = document.getElementById('redesContainer');
-  if (redes.length === 0) {
-    cont.innerHTML = '<div class="card" style="grid-column: 1/-1;"><div class="text-muted">Nenhuma rede cadastrada ainda. Clique em "Nova rede" para começar.</div></div>';
+  if (todasRedes.length === 0) {
+    cont.innerHTML = '<div class="card" style="grid-column:1/-1"><div class="text-muted">Nenhuma rede cadastrada ainda. Clique em "Nova rede" para começar.</div></div>';
     return;
   }
-
-  cont.innerHTML = redes.map(r => `
-    <div class="rede-card">
+  if (lista.length === 0) {
+    cont.innerHTML = '<div class="card" style="grid-column:1/-1;text-align:center;padding:40px 24px"><div class="text-muted">Nenhuma rede encontrada com os filtros aplicados.</div></div>';
+    return;
+  }
+  cont.innerHTML = lista.map(r => `
+    <div class="rede-card" id="card-${r.id}">
       <div class="rede-card-head">
         <div style="display:flex; gap:12px; align-items:center;">
-          <div class="rede-icon">${r.nome_fantasia.slice(0,2).toUpperCase()}</div>
+          <div class="rede-icon">${_esc(r.nome_fantasia.slice(0,2).toUpperCase())}</div>
           <div>
-            <div class="rede-name">${r.nome_fantasia}</div>
-            ${r.razao_social ? `<div class="rede-unidade" style="font-size:11px;">${r.razao_social}</div>` : ''}
-            <div class="rede-unidade">${r.unidade_nome || '—'}</div>
+            <div class="rede-name">${_esc(r.nome_fantasia)}</div>
+            ${r.razao_social ? `<div class="rede-unidade" style="font-size:11px;">${_esc(r.razao_social)}</div>` : ''}
+            <div class="rede-unidade">${_esc(r.unidade_nome || '—')}</div>
           </div>
         </div>
         <span class="badge ${r.ativa ? 'badge-green' : 'badge-gray'}">
@@ -202,10 +402,64 @@ async function carregarTudo() {
       ${r.ativa ? `<div class="rede-saude" id="saude-${r.id}"><span class="saude-badge saude-verificando">Verificando saúde...</span></div>` : ''}
     </div>
   `).join('');
-
-  redes.filter(r => r.ativa).forEach(r => verificarSaudeRede(r.id));
 }
 
+function renderSaude(redeId, s) {
+  const el = document.getElementById(`saude-${redeId}`);
+  if (!el) return;
+  const erpBadge = s.erp_ok
+    ? `<span class="saude-badge saude-ok" title="${_esc(s.erp_title)}">🛢️ ERP OK</span>`
+    : `<span class="saude-badge saude-erro" title="${_esc(s.erp_title)}">🛢️ ERP offline</span>`;
+  const intBadge = s.integ === 'ok'
+    ? `<span class="saude-badge saude-ok" title="Integrador online e replicando">🔗 Integrador OK</span>`
+    : s.integ === 'nao_configurado'
+    ? `<span class="saude-badge saude-neutro" title="Integrador não configurado">🔗 Não configurado</span>`
+    : s.integ === 'atencao'
+    ? `<span class="saude-badge saude-atencao" title="${_esc(s.integ_title)}">🔗 Integrador atenção</span>`
+    : `<span class="saude-badge saude-erro" title="${_esc(s.integ_title)}">🔗 Integrador offline</span>`;
+  el.innerHTML = erpBadge + intBadge;
+}
+
+// ── Chips de filtros ativos ──────────────────────────────────
+function renderChips(busca, unidade, filtroErp, filtroInt) {
+  const chips = [];
+  if (statusAtual !== 'todos') chips.push(['status', statusAtual === 'ativas' ? 'Ativas' : 'Inativas']);
+  if (unidade)                  chips.push(['unidade', `Unidade: ${unidade}`]);
+  if (filtroErp === 'ok')       chips.push(['erp',   'ERP online']);
+  if (filtroErp === 'offline')  chips.push(['erp',   'ERP offline']);
+  if (filtroInt === 'ok')       chips.push(['integ', 'Integrador OK']);
+  if (filtroInt === 'atencao')  chips.push(['integ', 'Integrador atenção']);
+  if (filtroInt === 'offline')  chips.push(['integ', 'Integrador offline']);
+  document.getElementById('chipsRow').innerHTML = chips.map(([tipo, label]) =>
+    `<span class="chip">${_esc(label)}<button class="chip-x" onclick="clearChip('${tipo}')">×</button></span>`
+  ).join('');
+}
+
+function clearChip(tipo) {
+  if (tipo === 'status') {
+    statusAtual = 'todos';
+    document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-val="todos"]').classList.add('active');
+  }
+  if (tipo === 'unidade') document.getElementById('filtroUnidade').value = '';
+  if (tipo === 'erp')     document.getElementById('filtroErp').value = '';
+  if (tipo === 'integ')   document.getElementById('filtroInteg').value = '';
+  filtrar();
+}
+
+function limparFiltros() {
+  document.getElementById('buscaInput').value = '';
+  document.getElementById('filtroUnidade').value = '';
+  document.getElementById('filtroErp').value = '';
+  document.getElementById('filtroInteg').value = '';
+  document.getElementById('filtroOrdem').value = 'nome_az';
+  statusAtual = 'todos';
+  document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-val="todos"]').classList.add('active');
+  filtrar();
+}
+
+// ── Modal ────────────────────────────────────────────────────
 function abrirModalNovaRede() {
   document.getElementById('modalTitulo').textContent = 'Nova rede';
   document.getElementById('redeId').value = '';
@@ -226,12 +480,12 @@ async function editarRede(id) {
   document.getElementById('modalTitulo').textContent = `Editar — ${dados.nome_fantasia}`;
   document.getElementById('redeId').value = dados.id;
   document.getElementById('campoNomeFantasia').value = dados.nome_fantasia;
-  document.getElementById('campoRazaoSocial').value = dados.razao_social || '';
-  document.getElementById('campoCnpj').value = dados.cnpj || '';
-  document.getElementById('campoUnidade').value = dados.unidade_id;
-  document.getElementById('campoMongoUri').value = dados.mongo_uri;
-  document.getElementById('campoToken').value = dados.token;
-  document.getElementById('campoSiteId').value = dados.tailscale_site_id || '';
+  document.getElementById('campoRazaoSocial').value  = dados.razao_social || '';
+  document.getElementById('campoCnpj').value         = dados.cnpj || '';
+  document.getElementById('campoUnidade').value      = dados.unidade_id;
+  document.getElementById('campoMongoUri').value     = dados.mongo_uri;
+  document.getElementById('campoToken').value        = dados.token;
+  document.getElementById('campoSiteId').value       = dados.tailscale_site_id || '';
   document.getElementById('modalErro').style.display = 'none';
   document.getElementById('modalRede').classList.add('aberto');
 }
@@ -243,21 +497,21 @@ function fecharModal() {
 async function salvarRede() {
   const id = document.getElementById('redeId').value;
   const corpo = {
-    nome_fantasia: document.getElementById('campoNomeFantasia').value,
-    razao_social: document.getElementById('campoRazaoSocial').value,
-    cnpj: document.getElementById('campoCnpj').value,
-    unidade_id: parseInt(document.getElementById('campoUnidade').value, 10),
-    mongo_uri: document.getElementById('campoMongoUri').value,
-    token: document.getElementById('campoToken').value,
+    nome_fantasia:     document.getElementById('campoNomeFantasia').value,
+    razao_social:      document.getElementById('campoRazaoSocial').value,
+    cnpj:              document.getElementById('campoCnpj').value,
+    unidade_id:        parseInt(document.getElementById('campoUnidade').value, 10),
+    mongo_uri:         document.getElementById('campoMongoUri').value,
+    token:             document.getElementById('campoToken').value,
     tailscale_site_id: document.getElementById('campoSiteId').value,
   };
   const url = id ? `/api/redes/${id}` : '/api/redes';
-  const r = await fetch(url, {
+  const resp = await fetch(url, {
     method: id ? 'PUT' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(corpo),
   });
-  const dados = await r.json();
+  const dados = await resp.json();
   if (dados.erro) {
     const erroEl = document.getElementById('modalErro');
     erroEl.textContent = dados.erro;
@@ -276,37 +530,44 @@ async function alternarRede(id, ativa) {
   carregarTudo();
 }
 
+// ── Verificação de saúde ─────────────────────────────────────
 async function verificarSaudeRede(redeId) {
-  const el = document.getElementById(`saude-${redeId}`);
-  if (!el) return;
+  if (saudeCache[redeId] !== undefined) return;
+  saudeCache[redeId] = null; // marcado como verificando
 
-  function comTimeout(promise, ms) {
-    return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]);
+  function comTimeout(p, ms) {
+    return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
   }
 
   const [erp, integ] = await Promise.all([
     comTimeout(fetch(`/api/${redeId}/erp_db/status`).then(r => r.json()), 12000)
-      .catch(() => ({ online: false, erro: "Sem resposta (timeout)" })),
+      .catch(() => ({ online: false, erro: 'Sem resposta (timeout)' })),
     comTimeout(fetch(`/api/${redeId}/integrador/status`).then(r => r.json()), 12000)
-      .catch(() => ({ status: "erro", erro: "Sem resposta (timeout)" })),
+      .catch(() => ({ status: 'erro', erro: 'Sem resposta (timeout)' })),
   ]);
 
-  const erpBadge = erp.online
-    ? `<span class="saude-badge saude-ok" title="Banco de dados ERP acessível">🛢️ ERP OK</span>`
-    : `<span class="saude-badge saude-erro" title="${erp.erro || 'Falha de conexão'}">🛢️ ERP offline</span>`;
+  const integStatus = ['ok', 'atencao', 'nao_configurado'].includes(integ.status) ? integ.status : 'offline';
+  saudeCache[redeId] = {
+    erp_ok:     erp.online,
+    erp_title:  erp.online ? 'ERP acessível' : (erp.erro || 'Falha de conexão'),
+    integ:      integStatus,
+    integ_title: integ.erro || '',
+  };
 
-  const iStatus = integ.status;
-  const intBadge = iStatus === "ok"
-    ? `<span class="saude-badge saude-ok" title="Integrador online e replicando">🔗 Integrador OK</span>`
-    : iStatus === "nao_configurado"
-    ? `<span class="saude-badge saude-neutro" title="Integrador não configurado">🔗 Não configurado</span>`
-    : iStatus === "atencao"
-    ? `<span class="saude-badge saude-atencao" title="${integ.erro || ''}">🔗 Integrador atenção</span>`
-    : `<span class="saude-badge saude-erro" title="${integ.erro || 'Integrador inacessível'}">🔗 Integrador offline</span>`;
+  renderSaude(redeId, saudeCache[redeId]);
 
-  el.innerHTML = erpBadge + intBadge;
+  // Se há filtro de saúde ativo, re-filtra para esconder cards que não passam
+  if (document.getElementById('filtroErp').value || document.getElementById('filtroInteg').value) {
+    filtrar();
+  }
 }
 
+// ── Utilidades ───────────────────────────────────────────────
+function _esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.getElementById('buscaInput').addEventListener('input', filtrar);
 carregarTudo();
 </script>
 </body>
