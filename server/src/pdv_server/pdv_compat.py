@@ -49,35 +49,37 @@ def _salvar_cache(integrador_dir: str, tabela: dict):
 def _parsear_tabela(html: str) -> dict:
     """Extrai {versao_pdvpro: versao_min_integrador} do HTML.
 
-    A exigência aparece como:
-      "Obrigatório utilizar o VRIntegradorMaster vX.X.X ou superior"
-    no próprio heading de versão ou logo abaixo dele.
+    GitBook renderiza versões como <p><strong>vX.X.X</strong> ... requisito ...</p>
+    — sem usar <h2>/<h3>. Dividimos por tags de bloco e rastreamos a última
+    versão PDVPro vista antes de cada requisito de integrador.
     """
     tabela = {}
-    partes = re.split(
-        r"(<h[1-6][^>]*>.*?</h[1-6]>)", html, flags=re.DOTALL | re.IGNORECASE
-    )
     versao_atual = None
 
-    for parte in partes:
-        texto = re.sub(r"<[^>]+>", " ", parte).strip()
-        if re.match(r"<h[1-6]", parte, re.IGNORECASE):
-            m = re.search(r"\bv?(\d+\.\d+\.\d+)\b", texto)
-            versao_atual = m.group(1) if m else versao_atual
-            if versao_atual:
-                m_int = re.search(
-                    r"VRIntegradorMaster\s+v?(\d+\.\d+\.\d+)\s+ou\s+superior",
-                    texto, re.IGNORECASE,
-                )
-                if m_int:
-                    tabela[versao_atual] = m_int.group(1)
-        elif versao_atual and versao_atual not in tabela:
-            m_int = re.search(
-                r"VRIntegradorMaster\s+v?(\d+\.\d+\.\d+)\s+ou\s+superior",
-                texto, re.IGNORECASE,
-            )
-            if m_int:
-                tabela[versao_atual] = m_int.group(1)
+    # Divide por qualquer tag de bloco para processar cada elemento separadamente
+    blocos = re.split(
+        r"</?(?:p|div|li|ul|ol|section|article|h[1-6])[^>]*>",
+        html,
+        flags=re.IGNORECASE,
+    )
+
+    for bloco in blocos:
+        texto = re.sub(r"<[^>]+>", " ", bloco).strip()
+        if not texto:
+            continue
+
+        # Atualiza versão PDVPro se este bloco contém um número de versão
+        m_pdv = re.search(r"\bv(\d+\.\d+\.\d+)\b", texto)
+        if m_pdv:
+            versao_atual = m_pdv.group(1)
+
+        # Associa requisito do integrador à versão atual
+        m_int = re.search(
+            r"VRIntegradorMaster\s+v?(\d+\.\d+\.\d+)\s+ou\s+superior",
+            texto, re.IGNORECASE,
+        )
+        if m_int and versao_atual:
+            tabela[versao_atual] = m_int.group(1)
 
     return tabela
 
@@ -161,12 +163,12 @@ def verificar(
     if not versao_integrador:
         return {
             "ok": False,
-            "bloqueado": False,
+            "bloqueado": True,
             "versao_min": versao_min,
             "versao_atual": None,
             "aviso": (
                 f"PDVPro {versao_pdvpro} requer VRIntegradorMaster ≥ {versao_min}. "
-                "Não foi possível detectar a versão atual do integrador — "
+                "Não foi possível detectar a versão atual do integrador via SSH — "
                 "verifique manualmente antes de atualizar."
             ),
         }

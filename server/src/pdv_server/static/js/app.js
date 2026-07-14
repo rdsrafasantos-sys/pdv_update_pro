@@ -524,6 +524,7 @@ function atualizarBotaoPdv() {
         html += `<div class="card aviso-versao aviso-ok">✅ Integrador compatível — atual: ${c.versao_atual || "?"}, mínimo: ${c.versao_min}</div>`;
       }
     } else if (_pdvCompatVersaoChecked === arquivo.versao && !_pdvCompatResult) {
+      bloqueadoPorVersao = true;
       html += `<div class="card aviso-versao aviso-indefinido" style="opacity:.7">⏳ Verificando compatibilidade com o integrador...</div>`;
     }
   }
