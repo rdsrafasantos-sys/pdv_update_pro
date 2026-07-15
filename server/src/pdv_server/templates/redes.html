@@ -376,7 +376,7 @@ function renderizarCards(lista) {
     return;
   }
   cont.innerHTML = lista.map(r => `
-    <div class="rede-card" id="card-${r.id}">
+    <div class="rede-card" id="card-${r.id}" ondblclick="location.href='/r/${r.id}/'" style="cursor:pointer;">
       <div class="rede-card-head">
         <div style="display:flex; gap:12px; align-items:center;">
           <div class="rede-icon">${_esc(r.nome_fantasia.slice(0,2).toUpperCase())}</div>
