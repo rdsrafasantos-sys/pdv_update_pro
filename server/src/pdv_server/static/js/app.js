@@ -150,6 +150,16 @@ function mostrarFiscalTab(nome) {
 }
 window.mostrarFiscalTab = mostrarFiscalTab;
 
+function mostrarChecagemTab(nome) {
+  document.querySelectorAll(".cfg-tab-content[id^='checagem-tab-']").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".cfg-tab-btn[data-checagem-tab]").forEach(el => el.classList.remove("active"));
+  const painel = document.getElementById("checagem-tab-" + nome);
+  if (painel) painel.classList.add("active");
+  const btn = document.querySelector(`.cfg-tab-btn[data-checagem-tab="${nome}"]`);
+  if (btn) btn.classList.add("active");
+}
+window.mostrarChecagemTab = mostrarChecagemTab;
+
 // ──────────────────────────────────────────────
 // SIDEBAR: secoes recolhiveis (clicar no titulo expande/recolhe)
 // ──────────────────────────────────────────────
@@ -724,6 +734,54 @@ async function reiniciarMongoPdv(pdvId) {
   }
 }
 window.reiniciarMongoPdv = reiniciarMongoPdv;
+
+function _formatarTamanho(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
+async function listarLogsSelecionados() {
+  const loja_id = seletores.replicacao.lojaAtiva;
+  const pdv_ids = Array.from(seletores.replicacao.selecionados);
+  const cont = document.getElementById("logsResultados");
+  if (!loja_id || pdv_ids.length === 0 || !cont) return;
+
+  cont.innerHTML = pdv_ids.map(id => `
+    <div class="card" style="margin-top:8px;">
+      <div class="section-title">PDV ${id}</div>
+      <div id="logsResultado-${id}"><div class="text-muted">Buscando logs...</div></div>
+    </div>
+  `).join("");
+
+  for (const pdvId of pdv_ids) {
+    const el = document.getElementById(`logsResultado-${pdvId}`);
+    try {
+      const r = await fetch(API(`/pdv/${loja_id}/${pdvId}/logs`));
+      const dados = await r.json();
+      if (!dados.ok) {
+        el.innerHTML = `<span style="color:#dc2626;">⛔ ${dados.erro || "Falha ao buscar logs"}</span>`;
+        continue;
+      }
+      if (!dados.arquivos || dados.arquivos.length === 0) {
+        el.innerHTML = '<div class="empty">Nenhum arquivo de log encontrado em C:\\VRPdv\\logs.</div>';
+        continue;
+      }
+      el.innerHTML = dados.arquivos.map(a => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
+          <div>
+            <div>${a.nome}</div>
+            <div class="text-muted" style="font-size:11px;">${a.modificado} — ${_formatarTamanho(a.tamanho)}</div>
+          </div>
+          <a class="btn-verify" href="${API(`/pdv/${loja_id}/${pdvId}/logs/${encodeURIComponent(a.nome)}`)}" download>⬇️ Baixar</a>
+        </div>
+      `).join("");
+    } catch (e) {
+      el.innerHTML = `<span style="color:#dc2626;">⛔ Falha ao contatar o servidor: ${e}</span>`;
+    }
+  }
+}
+window.listarLogsSelecionados = listarLogsSelecionados;
 
 async function carregarConfigReplicacaoAuto() {
   const r = await fetch(API("/replicacao/config"));

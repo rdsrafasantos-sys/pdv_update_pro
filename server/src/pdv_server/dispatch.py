@@ -119,6 +119,36 @@ def reiniciar_mongo_pdv(contexto, pdv):
         return {"ok": False, "erro": str(e)}
 
 
+def listar_logs_pdv(contexto, pdv):
+    ip = pdv["ip"]
+    endereco = endereco_alcancavel(ip, contexto.tailscale_site_id)
+    try:
+        r = requests.get(
+            f"http://{endereco}:5000/logs",
+            headers={"X-Agent-Token": contexto.token},
+            timeout=15
+        )
+        dados = r.json()
+        dados["ok"] = r.status_code == 200
+        return dados
+    except requests.exceptions.ConnectionError:
+        return {"ok": False, "erro": f"PDV {pdv['ip']} não acessível."}
+    except Exception as e:
+        return {"ok": False, "erro": str(e)}
+
+
+def baixar_log_pdv(contexto, pdv, nome_arquivo):
+    """Retorna a resposta streaming do agente para ser repassada ao navegador."""
+    ip = pdv["ip"]
+    endereco = endereco_alcancavel(ip, contexto.tailscale_site_id)
+    return requests.get(
+        f"http://{endereco}:5000/logs/{nome_arquivo}",
+        headers={"X-Agent-Token": contexto.token},
+        timeout=30,
+        stream=True,
+    )
+
+
 def _enviar_para_pdv(contexto, loja_id, pdv, caminho_zip):
     pdv_id = pdv["id"]
     ip = pdv["ip"]

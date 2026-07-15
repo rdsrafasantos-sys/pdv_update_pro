@@ -16,8 +16,8 @@ from pdv_server.config import INTEGRADOR_DATA_DIR, MASTER_KEY, SECRET_KEY
 from pdv_server.contexto import RedeInativa, RedeNaoEncontrada, obter_contexto
 from pdv_server.painel.routes import painel_bp
 from pdv_server.dispatch import (
-    enviar_agente_para_pdvs, get_atualizacoes_loja, iniciar_envio_zip,
-    reiniciar_mongo_pdv,
+    baixar_log_pdv, enviar_agente_para_pdvs, get_atualizacoes_loja,
+    iniciar_envio_zip, listar_logs_pdv, reiniciar_mongo_pdv,
 )
 from pdv_server.discovery import (
     encontrar_pdv, endereco_alcancavel, get_lojas, invalidar_cache,
@@ -216,6 +216,35 @@ def api_reiniciar_mongo(contexto, loja_id, pdv_id):
         return jsonify({"erro": "PDV não encontrado"}), 404
     resultado = reiniciar_mongo_pdv(contexto, pdv)
     return jsonify(resultado)
+
+
+@app.route("/api/<int:rede_id>/pdv/<loja_id>/<pdv_id>/logs", methods=["GET"])
+@com_rede
+@exigir_permissao("pode_replic_verificar")
+def api_listar_logs_pdv(contexto, loja_id, pdv_id):
+    pdv = encontrar_pdv(contexto, loja_id, pdv_id)
+    if not pdv:
+        return jsonify({"erro": "PDV não encontrado"}), 404
+    resultado = listar_logs_pdv(contexto, pdv)
+    return jsonify(resultado)
+
+
+@app.route("/api/<int:rede_id>/pdv/<loja_id>/<pdv_id>/logs/<path:nome>", methods=["GET"])
+@com_rede
+@exigir_permissao("pode_replic_verificar")
+def api_baixar_log_pdv(contexto, loja_id, pdv_id, nome):
+    pdv = encontrar_pdv(contexto, loja_id, pdv_id)
+    if not pdv:
+        return jsonify({"erro": "PDV não encontrado"}), 404
+    nome_seguro = os.path.basename(nome)
+    r = baixar_log_pdv(contexto, pdv, nome_seguro)
+    if r.status_code != 200:
+        return jsonify({"erro": "Falha ao baixar o log do PDV"}), 502
+    return Response(
+        r.iter_content(chunk_size=8192),
+        headers={"Content-Disposition": f'attachment; filename="{nome_seguro}"'},
+        content_type=r.headers.get("Content-Type", "application/octet-stream"),
+    )
 
 
 @app.route("/api/<int:rede_id>/upload", methods=["POST"])

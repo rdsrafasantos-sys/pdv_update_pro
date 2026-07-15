@@ -10,6 +10,8 @@ from flask import Flask, jsonify, request
 
 from pdv_agent import VERSION
 from pdv_agent.config import PASTA_AGENTE, TOKEN_SEGURANCA, VRPDV_DIR, TEMP_ZIP
+
+LOGS_DIR = os.path.join(VRPDV_DIR, "logs")
 from pdv_agent.lmdb_reader import get_info_pdv
 from pdv_agent.service_control import detectar_servicos, reiniciar_servico
 from pdv_agent.update_flow import estado, executar_atualizacao, lock
@@ -208,6 +210,43 @@ def reiniciar_mongo():
         "mensagem": "Servico(s) Mongo reiniciado(s) com sucesso",
         "status": resultado
     }), 200
+
+
+@app.route("/logs")
+def listar_logs():
+    """Lista os arquivos de log em C:\\VRPdv\\logs, mais recentes primeiro."""
+    if not verificar_token(request):
+        return jsonify({"erro": "Token invalido"}), 403
+    try:
+        if not os.path.isdir(LOGS_DIR):
+            return jsonify({"arquivos": []})
+        arquivos = []
+        for nome in os.listdir(LOGS_DIR):
+            caminho = os.path.join(LOGS_DIR, nome)
+            if os.path.isfile(caminho):
+                st = os.stat(caminho)
+                arquivos.append({
+                    "nome": nome,
+                    "tamanho": st.st_size,
+                    "modificado": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime)),
+                })
+        arquivos.sort(key=lambda a: a["modificado"], reverse=True)
+        return jsonify({"arquivos": arquivos})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/logs/<path:nome>")
+def baixar_log(nome):
+    """Retorna o conteudo de um arquivo especifico de C:\\VRPdv\\logs."""
+    if not verificar_token(request):
+        return jsonify({"erro": "Token invalido"}), 403
+    nome_seguro = os.path.basename(nome)
+    caminho = os.path.join(LOGS_DIR, nome_seguro)
+    if not os.path.isfile(caminho):
+        return jsonify({"erro": "Arquivo nao encontrado"}), 404
+    from flask import send_file
+    return send_file(caminho, as_attachment=True, download_name=nome_seguro)
 
 
 @app.route("/atualizar", methods=["POST"])

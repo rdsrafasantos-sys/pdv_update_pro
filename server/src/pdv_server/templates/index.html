@@ -82,9 +82,9 @@
 
       {% if _pode_replic_view %}
       <div class="menu-group">
-        <div class="menu-section" onclick="toggleMenuGroup(this)">Replicações<span class="menu-chevron">▾</span></div>
+        <div class="menu-section" onclick="toggleMenuGroup(this)">Checagem<span class="menu-chevron">▾</span></div>
         <div class="menu-items">
-          <div class="menu-item" data-view="replicacao" onclick="mostrarView('replicacao')">🔄 Check</div>
+          <div class="menu-item" data-view="replicacao" onclick="mostrarView('replicacao')">🔄 Verificações</div>
         </div>
       </div>
       {% endif %}
@@ -346,41 +346,64 @@
 
         </div>
 
-        <!-- ═══════════════ VERIFICAÇÃO DE REPLICAÇÃO ═══════════════ -->
+        <!-- ═══════════════ CHECAGEM (Replicação & Logs) ═══════════════ -->
         <div class="view" id="view-replicacao" style="display:none;">
           {{ seletor_pdv("replicacao", "🏪 Lojas & PDVs") }}
 
-          {% if usuario_atual.pode_replic_verificar %}
-          <div class="actions-row">
-            <div></div>
-            <button class="btn-verify" onclick="abrirSeletorTabelas()">🔍 Verificar Replicação</button>
-          </div>
-          {% endif %}
-
-          <div id="repResultados"></div>
-
-          {% if usuario_atual.pode_replic_config %}
-          <div class="card">
-            <div class="section-title">⏱ Verificação automática</div>
-            <div class="actions-row">
-              <label class="toggle-wrap">
-                <span class="toggle">
-                  <input type="checkbox" id="repAutoHabilitado" onchange="salvarConfigReplicacaoAuto()">
-                  <span class="slider"></span>
-                </span>
-                Habilitada
-              </label>
-              <div style="display:flex;align-items:center;gap:6px;">
-                <span class="text-muted" style="font-size:12px;">Intervalo (min)</span>
-                <input type="number" id="repAutoIntervalo" min="5" value="60" style="width:70px;" onchange="salvarConfigReplicacaoAuto()">
-              </div>
+          <!-- Tab bar -->
+          <div class="cfg-tab-bar">
+            <div style="display:flex;">
+              <button class="cfg-tab-btn active" data-checagem-tab="replicacao" onclick="mostrarChecagemTab('replicacao')">🔄 Replicações</button>
+              <button class="cfg-tab-btn" data-checagem-tab="logs" onclick="mostrarChecagemTab('logs')">📄 Logs</button>
             </div>
           </div>
-          {% endif %}
 
-          <div class="card">
-            <div class="section-title">📜 Histórico</div>
-            <div id="repHistorico"><div class="empty">Carregando...</div></div>
+          <!-- Aba: Replicações -->
+          <div class="cfg-tab-content active" id="checagem-tab-replicacao">
+            {% if usuario_atual.pode_replic_verificar %}
+            <div class="actions-row">
+              <div></div>
+              <button class="btn-verify" onclick="abrirSeletorTabelas()">🔍 Verificar Replicação</button>
+            </div>
+            {% endif %}
+
+            <div id="repResultados"></div>
+
+            {% if usuario_atual.pode_replic_config %}
+            <div class="card">
+              <div class="section-title">⏱ Verificação automática</div>
+              <div class="actions-row">
+                <label class="toggle-wrap">
+                  <span class="toggle">
+                    <input type="checkbox" id="repAutoHabilitado" onchange="salvarConfigReplicacaoAuto()">
+                    <span class="slider"></span>
+                  </span>
+                  Habilitada
+                </label>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span class="text-muted" style="font-size:12px;">Intervalo (min)</span>
+                  <input type="number" id="repAutoIntervalo" min="5" value="60" style="width:70px;" onchange="salvarConfigReplicacaoAuto()">
+                </div>
+              </div>
+            </div>
+            {% endif %}
+
+            <div class="card">
+              <div class="section-title">📜 Histórico</div>
+              <div id="repHistorico"><div class="empty">Carregando...</div></div>
+            </div>
+          </div>
+
+          <!-- Aba: Logs -->
+          <div class="cfg-tab-content" id="checagem-tab-logs">
+            {% if usuario_atual.pode_replic_verificar %}
+            <div class="actions-row">
+              <div></div>
+              <button class="btn-verify" onclick="listarLogsSelecionados()">📄 Listar Logs</button>
+            </div>
+            {% endif %}
+
+            <div id="logsResultados"></div>
           </div>
         </div>
 
