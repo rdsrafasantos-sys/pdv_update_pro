@@ -398,7 +398,12 @@
           <div class="cfg-tab-content" id="checagem-tab-logs">
             {% if usuario_atual.pode_replic_verificar %}
             <div class="actions-row">
-              <div></div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="text-muted" style="font-size:12px;">De</span>
+                <input type="date" id="logsDataDe" style="padding:6px 8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font-size:12.5px;">
+                <span class="text-muted" style="font-size:12px;">Até</span>
+                <input type="date" id="logsDataAte" style="padding:6px 8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font-size:12.5px;">
+              </div>
               <button class="btn-verify" onclick="listarLogsSelecionados()">📄 Listar Logs</button>
             </div>
             {% endif %}

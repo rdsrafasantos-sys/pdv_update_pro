@@ -214,9 +214,15 @@ def reiniciar_mongo():
 
 @app.route("/logs")
 def listar_logs():
-    """Lista os arquivos de log em C:\\VRPdv\\logs, mais recentes primeiro."""
+    """Lista os arquivos de log em C:\\VRPdv\\logs, mais recentes primeiro.
+
+    Aceita filtro opcional por data de modificacao via query string:
+    ?desde=YYYY-MM-DD&ate=YYYY-MM-DD (ambos inclusivos, comparando so a data).
+    """
     if not verificar_token(request):
         return jsonify({"erro": "Token invalido"}), 403
+    desde = request.args.get("desde") or None
+    ate = request.args.get("ate") or None
     try:
         if not os.path.isdir(LOGS_DIR):
             return jsonify({"arquivos": []})
@@ -225,10 +231,15 @@ def listar_logs():
             caminho = os.path.join(LOGS_DIR, nome)
             if os.path.isfile(caminho):
                 st = os.stat(caminho)
+                data_mod = time.strftime("%Y-%m-%d", time.localtime(st.st_mtime))
+                if desde and data_mod < desde:
+                    continue
+                if ate and data_mod > ate:
+                    continue
                 arquivos.append({
                     "nome": nome,
                     "tamanho": st.st_size,
-                    "modificado": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime)),
+                    "modificado": f"{data_mod} {time.strftime('%H:%M:%S', time.localtime(st.st_mtime))}",
                 })
         arquivos.sort(key=lambda a: a["modificado"], reverse=True)
         return jsonify({"arquivos": arquivos})

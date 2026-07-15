@@ -119,13 +119,19 @@ def reiniciar_mongo_pdv(contexto, pdv):
         return {"ok": False, "erro": str(e)}
 
 
-def listar_logs_pdv(contexto, pdv):
+def listar_logs_pdv(contexto, pdv, desde=None, ate=None):
     ip = pdv["ip"]
     endereco = endereco_alcancavel(ip, contexto.tailscale_site_id)
+    params = {}
+    if desde:
+        params["desde"] = desde
+    if ate:
+        params["ate"] = ate
     try:
         r = requests.get(
             f"http://{endereco}:5000/logs",
             headers={"X-Agent-Token": contexto.token},
+            params=params,
             timeout=15
         )
         dados = r.json()

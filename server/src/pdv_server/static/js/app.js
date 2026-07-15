@@ -747,6 +747,13 @@ async function listarLogsSelecionados() {
   const cont = document.getElementById("logsResultados");
   if (!loja_id || pdv_ids.length === 0 || !cont) return;
 
+  const desde = document.getElementById("logsDataDe").value;
+  const ate = document.getElementById("logsDataAte").value;
+  const query = new URLSearchParams();
+  if (desde) query.set("desde", desde);
+  if (ate) query.set("ate", ate);
+  const qs = query.toString() ? `?${query.toString()}` : "";
+
   cont.innerHTML = pdv_ids.map(id => `
     <div class="card" style="margin-top:8px;">
       <div class="section-title">PDV ${id}</div>
@@ -757,14 +764,16 @@ async function listarLogsSelecionados() {
   for (const pdvId of pdv_ids) {
     const el = document.getElementById(`logsResultado-${pdvId}`);
     try {
-      const r = await fetch(API(`/pdv/${loja_id}/${pdvId}/logs`));
+      const r = await fetch(API(`/pdv/${loja_id}/${pdvId}/logs${qs}`));
       const dados = await r.json();
       if (!dados.ok) {
         el.innerHTML = `<span style="color:#dc2626;">⛔ ${dados.erro || "Falha ao buscar logs"}</span>`;
         continue;
       }
       if (!dados.arquivos || dados.arquivos.length === 0) {
-        el.innerHTML = '<div class="empty">Nenhum arquivo de log encontrado em C:\\VRPdv\\logs.</div>';
+        el.innerHTML = (desde || ate)
+          ? '<div class="empty">Nenhum log encontrado no período selecionado.</div>'
+          : '<div class="empty">Nenhum arquivo de log encontrado em C:\\VRPdv\\logs.</div>';
         continue;
       }
       let html = "";

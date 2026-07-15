@@ -225,7 +225,11 @@ def api_listar_logs_pdv(contexto, loja_id, pdv_id):
     pdv = encontrar_pdv(contexto, loja_id, pdv_id)
     if not pdv:
         return jsonify({"erro": "PDV não encontrado"}), 404
-    resultado = listar_logs_pdv(contexto, pdv)
+    resultado = listar_logs_pdv(
+        contexto, pdv,
+        desde=request.args.get("desde") or None,
+        ate=request.args.get("ate") or None,
+    )
     return jsonify(resultado)
 
 
