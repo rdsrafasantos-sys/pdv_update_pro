@@ -159,9 +159,15 @@ code, .mono { font-family: var(--font-mono); }
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 12.5px; border: 1px solid var(--border-strong);
 }
-.sidebar-foot-text { line-height: 1.25; overflow: hidden; }
+.sidebar-foot-text { line-height: 1.25; overflow: hidden; flex: 1; min-width: 0; }
 .sidebar-foot-text .name { font-size: 12.8px; font-weight: 600; }
 .sidebar-foot-text .role { font-size: 11px; color: var(--text-faint); }
+.sidebar-logout {
+  background: none; border: none; cursor: pointer; color: var(--text-faint);
+  padding: 5px; border-radius: var(--radius-sm); display: flex; align-items: center;
+  flex-shrink: 0; transition: color .15s, background .15s;
+}
+.sidebar-logout:hover { color: var(--red); background: var(--red-dim); }
 
 .collapse-btn {
   width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border-strong);
