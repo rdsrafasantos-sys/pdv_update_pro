@@ -621,14 +621,51 @@ function atualizarBlocoReplicacao(pdvId, dados) {
   el.innerHTML = linhas + status;
 }
 
-async function verificarReplicacaoSelecionados() {
+let _tabelasDisponiveis = [];
+
+async function abrirSeletorTabelas() {
   const loja_id = seletores.replicacao.lojaAtiva;
   const pdv_ids = Array.from(seletores.replicacao.selecionados);
   if (!loja_id || pdv_ids.length === 0) return;
 
+  if (_tabelasDisponiveis.length === 0) {
+    const r = await fetch(API("/replicacao/tabelas"));
+    _tabelasDisponiveis = await r.json();
+  }
+
+  const lista = document.getElementById("listaTabelas");
+  lista.innerHTML = _tabelasDisponiveis.map(t => `
+    <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;padding:4px 6px;border-radius:6px;" class="check-list-item">
+      <input type="checkbox" class="tab-check" value="${t}" checked style="accent-color:var(--accent);width:14px;height:14px;">
+      ${t}
+    </label>
+  `).join("");
+
+  document.getElementById("tabMarcaTodas").checked = true;
+  document.getElementById("modalTabelas").style.display = "flex";
+}
+
+function fecharSeletorTabelas() {
+  document.getElementById("modalTabelas").style.display = "none";
+}
+
+function toggleTodasTabelas(marcado) {
+  document.querySelectorAll(".tab-check").forEach(cb => { cb.checked = marcado; });
+}
+
+async function confirmarVerificacaoTabelas() {
+  const tabelas = Array.from(document.querySelectorAll(".tab-check:checked")).map(cb => cb.value);
+  if (tabelas.length === 0) { alert("Selecione ao menos uma tabela."); return; }
+
+  fecharSeletorTabelas();
+
+  const loja_id = seletores.replicacao.lojaAtiva;
+  const pdv_ids = Array.from(seletores.replicacao.selecionados);
+  const tabelasFiltro = tabelas.length === _tabelasDisponiveis.length ? null : tabelas;
+
   const r = await fetch(API("/replicacao/verificar"), {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ loja_id, pdv_ids }),
+    body: JSON.stringify({ loja_id, pdv_ids, tabelas: tabelasFiltro }),
   });
   const dados = await r.json();
   if (dados.erro) { alert(dados.erro); return; }
@@ -646,7 +683,12 @@ async function verificarReplicacaoSelecionados() {
   if (pollReplicacaoTimer) clearInterval(pollReplicacaoTimer);
   pollReplicacaoTimer = setInterval(() => pollReplicacao(pdv_ids), 1500);
 }
+
+async function verificarReplicacaoSelecionados() {
+  await abrirSeletorTabelas();
+}
 window.verificarReplicacaoSelecionados = verificarReplicacaoSelecionados;
+window.abrirSeletorTabelas = abrirSeletorTabelas;
 
 async function pollReplicacao(pdvIds) {
   const loja_id = seletores.replicacao.lojaAtiva;

@@ -153,7 +153,12 @@ def _comparar_colecao_com_retry(col_integradora, col_pdv, tentativas=2):
     return {"erro": f"Falha ao ler colecao (provavel replicacao em andamento): {ultimo_erro}"}
 
 
-def comparar_pdv(contexto, pdv_ip, callback=None):
+def listar_colecoes():
+    """Retorna a lista de coleções verificáveis."""
+    return list(COLECOES)
+
+
+def comparar_pdv(contexto, pdv_ip, callback=None, colecoes_filtro=None):
     """Compara as colecoes da integradora desta rede com as do PDV em
     pdv_ip. Conecta direto no MongoDB do PDV (porta PDV_LOCAL_MONGO_PORTA)
     -- exige rota de rede livre do Service Manager até essa porta.
@@ -161,6 +166,8 @@ def comparar_pdv(contexto, pdv_ip, callback=None):
     Se "callback" for informado, e chamado como callback(nome, resultado)
     logo apos cada colecao terminar, para a UI poder exibir o resultado
     parcial em sequencia em vez de esperar todas as colecoes.
+
+    colecoes_filtro: lista de nomes para verificar; None = todas.
     """
     from pymongo import MongoClient
     from pymongo.errors import PyMongoError
@@ -186,9 +193,10 @@ def comparar_pdv(contexto, pdv_ip, callback=None):
         db_integradora = cliente_integradora[REPLICACAO_DB]
         db_pdv = cliente_pdv[REPLICACAO_DB]
 
+        alvo = [c for c in COLECOES if c in colecoes_filtro] if colecoes_filtro else COLECOES
         colecoes_resultado = {}
         tem_divergencia_geral = False
-        for nome in COLECOES:
+        for nome in alvo:
             r = _comparar_colecao_com_retry(db_integradora[nome], db_pdv[nome])
             colecoes_resultado[nome] = r
             if r.get("tem_divergencia"):
@@ -221,7 +229,7 @@ def _concluir_verificacao(rede_id, loja_id, pdv_id, resultado):
         })
 
 
-def _comparar_pdv_com_progresso(contexto, loja_id, pdv_id, pdv_ip):
+def _comparar_pdv_com_progresso(contexto, loja_id, pdv_id, pdv_ip, colecoes_filtro=None):
     """Roda comparar_pdv atualizando o estado a cada colecao concluida, para
     a UI exibir os resultados em sequencia em vez de tudo de uma vez no final."""
     inicio = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -240,12 +248,12 @@ def _comparar_pdv_com_progresso(contexto, loja_id, pdv_id, pdv_ip):
             "erro": "",
         })
 
-    resultado = comparar_pdv(contexto, pdv_ip, callback=ao_concluir_colecao)
+    resultado = comparar_pdv(contexto, pdv_ip, callback=ao_concluir_colecao, colecoes_filtro=colecoes_filtro)
     _concluir_verificacao(rede_id, loja_id, pdv_id, resultado)
     return resultado
 
 
-def iniciar_verificacao_lote(contexto, loja_id, pdvs, tipo="manual"):
+def iniciar_verificacao_lote(contexto, loja_id, pdvs, tipo="manual", colecoes_filtro=None):
     """Dispara a comparacao para varios PDVs selecionados na UI, em sequencia
     numa unica thread (assim como a verificacao automatica), registrando um
     unico item consolidado no historico quando todos terminarem."""
@@ -260,7 +268,7 @@ def iniciar_verificacao_lote(contexto, loja_id, pdvs, tipo="manual"):
         detalhes = {}
         divergencia_geral = False
         for pdv in pdvs:
-            resultado = _comparar_pdv_com_progresso(contexto, loja_id, pdv["id"], pdv["ip"])
+            resultado = _comparar_pdv_com_progresso(contexto, loja_id, pdv["id"], pdv["ip"], colecoes_filtro=colecoes_filtro)
             ok = resultado.get("ok", False)
             tem_div = resultado.get("tem_divergencia") if ok else None
             detalhes[pdv["id"]] = {

@@ -647,6 +647,12 @@ def api_status_stream(contexto, loja_id):
 # ──────────────────────────────────────────────
 # VERIFICACAO DE REPLICACAO
 # ──────────────────────────────────────────────
+@app.route("/api/<int:rede_id>/replicacao/tabelas", methods=["GET"])
+@com_rede
+def api_replicacao_tabelas(contexto):
+    return jsonify(replication.listar_colecoes())
+
+
 @app.route("/api/<int:rede_id>/replicacao/verificar", methods=["POST"])
 @com_rede
 @exigir_permissao("pode_replic_verificar")
@@ -654,6 +660,7 @@ def api_replicacao_verificar(contexto):
     dados = request.json or {}
     loja_id = dados.get("loja_id")
     pdv_ids = dados.get("pdv_ids", [])
+    tabelas = dados.get("tabelas") or None  # None = todas
 
     loja = next((l for l in get_lojas(contexto) if l["id"] == loja_id), None)
     if not loja:
@@ -664,7 +671,10 @@ def api_replicacao_verificar(contexto):
     if not pdvs_alvo:
         return jsonify({"erro": "Nenhum PDV selecionado"}), 400
 
-    replication.iniciar_verificacao_lote(contexto, loja_id, pdvs_alvo, tipo="manual")
+    colecoes_validas = replication.listar_colecoes()
+    colecoes_filtro = [t for t in tabelas if t in colecoes_validas] if tabelas else None
+
+    replication.iniciar_verificacao_lote(contexto, loja_id, pdvs_alvo, tipo="manual", colecoes_filtro=colecoes_filtro)
 
     return jsonify({
         "mensagem": f"Verificacao de replicacao iniciada para {len(pdvs_alvo)} PDV(s)",
