@@ -593,21 +593,21 @@ window.PERMS = {
 <script src="{{ url_for('static', filename='js/app.js') }}?v={{ server_version }}"></script>
 
 <!-- ── Modal seleção de tabelas de replicação ── -->
-<div id="modalTabelas" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);align-items:center;justify-content:center;z-index:200;">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;width:420px;box-shadow:var(--shadow-soft);">
-    <div style="font-size:15px;font-weight:700;margin-bottom:4px;">Selecionar tabelas</div>
-    <div style="font-size:12px;color:var(--text-faint);margin-bottom:16px;">Escolha quais tabelas verificar nesta execução.</div>
+<div id="modalTabelas" class="tabelas-overlay">
+  <div class="tabelas-card">
+    <div class="tabelas-titulo">Selecionar tabelas</div>
+    <div class="tabelas-sub">Escolha quais tabelas verificar nesta execução.</div>
 
-    <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:650;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:10px;cursor:pointer;">
-      <input type="checkbox" id="tabMarcaTodas" onchange="toggleTodasTabelas(this.checked)" style="accent-color:var(--accent);width:15px;height:15px;">
+    <label class="tabelas-marcar-todas">
+      <input type="checkbox" id="tabMarcaTodas" onchange="toggleTodasTabelas(this.checked)">
       Marcar todas
     </label>
 
-    <div id="listaTabelas" style="display:flex;flex-direction:column;gap:6px;margin-bottom:18px;"></div>
+    <div id="listaTabelas" class="tabelas-lista"></div>
 
-    <div style="display:flex;justify-content:flex-end;gap:10px;">
-      <button class="btn btn-ghost" onclick="fecharSeletorTabelas()">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarVerificacaoTabelas()">🔍 Verificar</button>
+    <div class="tabelas-acoes">
+      <button class="btn-verify" onclick="fecharSeletorTabelas()">Cancelar</button>
+      <button class="btn-update" onclick="confirmarVerificacaoTabelas()">🔍 Verificar</button>
     </div>
   </div>
 </div>

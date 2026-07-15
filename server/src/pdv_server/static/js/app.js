@@ -635,18 +635,18 @@ async function abrirSeletorTabelas() {
 
   const lista = document.getElementById("listaTabelas");
   lista.innerHTML = _tabelasDisponiveis.map(t => `
-    <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;padding:4px 6px;border-radius:6px;" class="check-list-item">
-      <input type="checkbox" class="tab-check" value="${t}" checked style="accent-color:var(--accent);width:14px;height:14px;">
+    <label class="tabelas-item">
+      <input type="checkbox" class="tab-check" value="${t}" checked>
       ${t}
     </label>
   `).join("");
 
   document.getElementById("tabMarcaTodas").checked = true;
-  document.getElementById("modalTabelas").style.display = "flex";
+  document.getElementById("modalTabelas").classList.add("aberto");
 }
 
 function fecharSeletorTabelas() {
-  document.getElementById("modalTabelas").style.display = "none";
+  document.getElementById("modalTabelas").classList.remove("aberto");
 }
 
 function toggleTodasTabelas(marcado) {
