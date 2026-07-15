@@ -113,3 +113,10 @@ TAILSCALE_TAILNET = os.environ.get("PDV_TAILSCALE_TAILNET", "-")
 # consegue chamar de volta este painel -- IP ou hostname MagicDNS deste
 # servidor na tailnet, com porta. Ex: http://100.112.37.21:8888
 PAINEL_CALLBACK_URL = os.environ.get("PDV_PAINEL_CALLBACK_URL", "")
+
+# ──────────────────────────────────────────────
+# EMAIL — envio via Resend (reset de senha, notificacoes)
+# ──────────────────────────────────────────────
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+EMAIL_REMETENTE = os.environ.get("EMAIL_REMETENTE", "noreply@pdvproupdater.com.br")
+PAINEL_URL_PUBLICA = os.environ.get("PDV_PAINEL_URL_PUBLICA", "https://vrsoft.pdvproupdater.com.br")

@@ -14,12 +14,14 @@ from flask_login import (
 
 from pdv_server.auth.audit import registrar_auditoria
 from pdv_server.auth.crypto import cifrar, decifrar
+from pdv_server.auth.email_utils import enviar_email_reset
 from pdv_server.auth.gestao import flags_de_perfil
-from pdv_server.auth.models import SessionLocal, Usuario
+from pdv_server.auth.models import ResetSenha, SessionLocal, Usuario
 from pdv_server.auth.security import (
-    gerar_qr_svg, gerar_totp_secret, totp_uri, verificar_senha,
+    gerar_hash_senha, gerar_qr_svg, gerar_totp_secret, totp_uri, verificar_senha,
     verificar_totp,
 )
+from pdv_server.config import PAINEL_URL_PUBLICA
 
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"
@@ -296,3 +298,74 @@ def logout():
     registrar_auditoria(current_user.email, "logout", ip=_ip_cliente())
     logout_user()
     return redirect(url_for("auth.login"))
+
+
+@auth_bp.route("/recuperar-senha", methods=["GET", "POST"])
+@limiter.limit("5 per hour", methods=["POST"])
+def recuperar_senha():
+    if current_user.is_authenticated:
+        return redirect(url_for("painel.redes"))
+
+    if request.method == "GET":
+        return render_template("recuperar_senha.html")
+
+    email = (request.form.get("email") or "").strip().lower()
+    # Sempre exibe a mesma mensagem para não revelar se o e-mail existe
+    msg_generica = "Se este e-mail estiver cadastrado, você receberá um link em instantes."
+
+    db = SessionLocal()
+    try:
+        usuario = db.query(Usuario).filter_by(email=email, ativo=True).first()
+        if usuario:
+            # Invalida tokens anteriores deste usuário
+            db.query(ResetSenha).filter_by(usuario_id=usuario.id, usado=False).update({"usado": True})
+            token = secrets.token_hex(32)
+            expira_em = datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+            db.add(ResetSenha(usuario_id=usuario.id, token=token, expira_em=expira_em))
+            db.commit()
+            enviar_email_reset(usuario.email, usuario.nome, token, PAINEL_URL_PUBLICA)
+            registrar_auditoria(usuario.email, "reset_senha_solicitado", ip=_ip_cliente())
+    finally:
+        db.close()
+
+    flash(msg_generica, "ok")
+    return redirect(url_for("auth.recuperar_senha"))
+
+
+@auth_bp.route("/redefinir-senha/<token>", methods=["GET", "POST"])
+def redefinir_senha(token):
+    if current_user.is_authenticated:
+        return redirect(url_for("painel.redes"))
+
+    db = SessionLocal()
+    try:
+        agora = datetime.datetime.utcnow()
+        reset = db.query(ResetSenha).filter_by(token=token, usado=False).first()
+
+        if not reset or reset.expira_em < agora:
+            flash("Link inválido ou expirado. Solicite um novo.", "erro")
+            return redirect(url_for("auth.recuperar_senha"))
+
+        if request.method == "GET":
+            return render_template("redefinir_senha.html", token=token)
+
+        nova_senha = request.form.get("senha") or ""
+        confirmar = request.form.get("confirmar") or ""
+
+        if len(nova_senha) < 8:
+            flash("A senha deve ter pelo menos 8 caracteres.", "erro")
+            return render_template("redefinir_senha.html", token=token)
+
+        if nova_senha != confirmar:
+            flash("As senhas não coincidem.", "erro")
+            return render_template("redefinir_senha.html", token=token)
+
+        usuario = db.get(Usuario, reset.usuario_id)
+        usuario.senha_hash = gerar_hash_senha(nova_senha)
+        reset.usado = True
+        db.commit()
+        registrar_auditoria(usuario.email, "reset_senha_concluido", ip=_ip_cliente())
+        flash("Senha redefinida com sucesso. Faça login.", "ok")
+        return redirect(url_for("auth.login"))
+    finally:
+        db.close()

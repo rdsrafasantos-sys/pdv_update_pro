@@ -160,6 +160,17 @@ class ChavePool(Base):
     usada = Column(Boolean, default=False)
 
 
+class ResetSenha(Base):
+    __tablename__ = "reset_senha"
+
+    id = Column(Integer, primary_key=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    token = Column(String(64), nullable=False, unique=True)
+    expira_em = Column(DateTime, nullable=False)
+    usado = Column(Boolean, default=False)
+    criado_em = Column(DateTime, default=datetime.datetime.utcnow)
+
+
 class Auditoria(Base):
     __tablename__ = "auditoria"
 
