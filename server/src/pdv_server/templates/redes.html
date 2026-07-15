@@ -25,6 +25,24 @@
   .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
   .erro-msg { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
   .text-muted { color: var(--text-faint); }
+  /* ── Wizard ── */
+  .wz-progress { display:flex; align-items:flex-start; margin-bottom:22px; }
+  .wz-step { display:flex; flex-direction:column; align-items:center; gap:5px; flex:1; }
+  .wz-dot { width:28px; height:28px; border-radius:50%; background:var(--surface-2); border:2px solid var(--border-strong); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:var(--text-faint); transition:background .2s,border-color .2s,color .2s; }
+  .wz-step.ativo .wz-dot { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .wz-step.ok   .wz-dot { background:var(--green);  border-color:var(--green);  color:#fff; }
+  .wz-step-label { font-size:11px; color:var(--text-faint); white-space:nowrap; }
+  .wz-step.ativo .wz-step-label { color:var(--text); font-weight:600; }
+  .wz-line { flex:1; height:2px; background:var(--border-strong); margin-top:13px; transition:background .2s; }
+  .wz-line.ok { background:var(--green); }
+  .step-panel { display:none; }
+  .step-panel.ativo { display:block; }
+  .resumo-row { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .resumo-row:last-child { border-bottom:none; }
+  .resumo-row span { color:var(--text-faint); font-size:11.5px; min-width:110px; flex-shrink:0; padding-top:1px; }
+  .resumo-row strong { word-break:break-all; }
+  .wz-nav { display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:14px; border-top:1px solid var(--border); }
+  .wz-nav-r { display:flex; gap:8px; }
   .rede-saude { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
   .saude-badge { font-size: 11px; padding: 3px 9px; border-radius: 99px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
   .saude-verificando { background: var(--surface-2); color: var(--text-faint); }
@@ -223,41 +241,63 @@
 </div>
 
 <div class="modal-overlay" id="modalRede">
-  <div class="modal-card">
+  <div class="modal-card" style="width:500px;">
+    <div class="wz-progress">
+      <div class="wz-step ativo" id="rw-s1"><div class="wz-dot">1</div><div class="wz-step-label">Identificação</div></div>
+      <div class="wz-line" id="rw-l1"></div>
+      <div class="wz-step" id="rw-s2"><div class="wz-dot">2</div><div class="wz-step-label">Conexão</div></div>
+      <div class="wz-line" id="rw-l2"></div>
+      <div class="wz-step" id="rw-s3"><div class="wz-dot">3</div><div class="wz-step-label">Revisão</div></div>
+    </div>
     <div class="modal-title" id="modalTitulo">Nova rede</div>
     <input type="hidden" id="redeId">
-    <div class="field">
-      <label>Nome Fantasia</label>
-      <input id="campoNomeFantasia" placeholder="Ex: Compre Mais">
+
+    <div class="step-panel ativo" id="rw-p1">
+      <div class="field">
+        <label>Nome Fantasia <span class="text-muted">(obrigatório)</span></label>
+        <input id="campoNomeFantasia" placeholder="Ex: Compre Mais">
+      </div>
+      <div class="field">
+        <label>Razão Social <span class="text-muted">opcional</span></label>
+        <input id="campoRazaoSocial" placeholder="Ex: Compre Mais Distribuidora Ltda">
+      </div>
+      <div class="field">
+        <label>CNPJ <span class="text-muted">opcional</span></label>
+        <input id="campoCnpj" placeholder="00.000.000/0000-00">
+      </div>
+      <div class="field">
+        <label>Unidade <span class="text-muted">(obrigatório)</span></label>
+        <select id="campoUnidade"></select>
+      </div>
     </div>
-    <div class="field">
-      <label>Razão Social <span class="text-muted">(opcional — razão social completa cadastrada no CNPJ)</span></label>
-      <input id="campoRazaoSocial" placeholder="Ex: Compre Mais Distribuidora Ltda">
+
+    <div class="step-panel" id="rw-p2">
+      <div class="field">
+        <label>Mongo URI do integrador <span class="text-muted">(obrigatório)</span></label>
+        <input id="campoMongoUri" placeholder="mongodb://192.168.1.20:27016">
+      </div>
+      <div class="field">
+        <label>Token compartilhado com os agentes <span class="text-muted">igual ao PDV_AGENT_TOKEN de cada PDV</span></label>
+        <input id="campoToken" placeholder="pdv-agent-2024">
+      </div>
+      <div class="field">
+        <label>Tailscale Site ID <span class="text-muted">opcional</span></label>
+        <input id="campoSiteId" placeholder="">
+      </div>
     </div>
-    <div class="field">
-      <label>CNPJ <span class="text-muted">(identifica a empresa de forma única)</span></label>
-      <input id="campoCnpj" placeholder="00.000.000/0000-00">
+
+    <div class="step-panel" id="rw-p3">
+      <div id="rw-resumo"></div>
     </div>
-    <div class="field">
-      <label>Unidade</label>
-      <select id="campoUnidade"></select>
-    </div>
-    <div class="field">
-      <label>Mongo URI do integrador</label>
-      <input id="campoMongoUri" placeholder="mongodb://192.168.1.20:27016">
-    </div>
-    <div class="field">
-      <label>Token compartilhado com os agentes <span class="text-muted">(deve ser igual ao PDV_AGENT_TOKEN configurado no agente de cada PDV)</span></label>
-      <input id="campoToken" value="pdv-agent-2024" placeholder="pdv-agent-2024">
-    </div>
-    <div class="field">
-      <label>Tailscale Site ID <span class="text-muted">(opcional — só se o IP do cliente não pode mudar)</span></label>
-      <input id="campoSiteId" placeholder="">
-    </div>
+
     <div class="erro-msg" id="modalErro"></div>
-    <div class="modal-actions">
+    <div class="wz-nav">
       <button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="salvarRede()">Salvar</button>
+      <div class="wz-nav-r">
+        <button class="btn btn-ghost" id="rw-ant" onclick="anteriorRede()" style="display:none;">← Anterior</button>
+        <button class="btn btn-primary" id="rw-prox" onclick="proximoRede()">Próximo →</button>
+        <button class="btn btn-primary" id="rw-salvar" onclick="salvarRede()" style="display:none;">Salvar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -457,17 +497,71 @@ function limparFiltros() {
   filtrar();
 }
 
-// ── Modal ────────────────────────────────────────────────────
+// ── Wizard de Rede ───────────────────────────────────────────
+let _redeStep = 1;
+
+function _goRedeStep(n) {
+  for (let i = 1; i <= 3; i++) {
+    document.getElementById(`rw-s${i}`).className = `wz-step${i === n ? ' ativo' : i < n ? ' ok' : ''}`;
+    document.getElementById(`rw-p${i}`).classList.toggle('ativo', i === n);
+  }
+  document.getElementById('rw-l1').classList.toggle('ok', n > 1);
+  document.getElementById('rw-l2').classList.toggle('ok', n > 2);
+  document.getElementById('rw-ant').style.display    = n > 1 ? '' : 'none';
+  document.getElementById('rw-prox').style.display   = n < 3 ? '' : 'none';
+  document.getElementById('rw-salvar').style.display = n === 3 ? '' : 'none';
+  document.getElementById('modalErro').style.display = 'none';
+  if (n === 3) _renderRedeResumo();
+  _redeStep = n;
+}
+
+function _renderRedeResumo() {
+  const sel = document.getElementById('campoUnidade');
+  const unNome = sel.options[sel.selectedIndex]?.text || '—';
+  const linhas = [
+    ['Nome Fantasia', document.getElementById('campoNomeFantasia').value || '—'],
+    ['Razão Social',  document.getElementById('campoRazaoSocial').value  || '—'],
+    ['CNPJ',         document.getElementById('campoCnpj').value          || '—'],
+    ['Unidade',      unNome],
+    ['Mongo URI',    document.getElementById('campoMongoUri').value       || '—'],
+    ['Token',        document.getElementById('campoToken').value          || '—'],
+    ['Tailscale ID', document.getElementById('campoSiteId').value         || '—'],
+  ];
+  document.getElementById('rw-resumo').innerHTML =
+    linhas.map(([l, v]) => `<div class="resumo-row"><span>${l}</span><strong>${_esc(v)}</strong></div>`).join('');
+}
+
+function _validarRedeStep(step) {
+  const err = document.getElementById('modalErro');
+  err.style.display = 'none';
+  if (step === 1) {
+    if (!document.getElementById('campoNomeFantasia').value.trim()) {
+      err.textContent = 'Nome Fantasia é obrigatório.'; err.style.display = 'block'; return false;
+    }
+    if (!document.getElementById('campoUnidade').value) {
+      err.textContent = 'Selecione uma unidade.'; err.style.display = 'block'; return false;
+    }
+  }
+  if (step === 2) {
+    if (!document.getElementById('campoMongoUri').value.trim()) {
+      err.textContent = 'Mongo URI é obrigatório.'; err.style.display = 'block'; return false;
+    }
+    if (!document.getElementById('campoToken').value.trim()) {
+      err.textContent = 'Token é obrigatório.'; err.style.display = 'block'; return false;
+    }
+  }
+  return true;
+}
+
+function proximoRede()   { if (_validarRedeStep(_redeStep)) _goRedeStep(_redeStep + 1); }
+function anteriorRede()  { _goRedeStep(_redeStep - 1); }
+
 function abrirModalNovaRede() {
   document.getElementById('modalTitulo').textContent = 'Nova rede';
   document.getElementById('redeId').value = '';
-  document.getElementById('campoNomeFantasia').value = '';
-  document.getElementById('campoRazaoSocial').value = '';
-  document.getElementById('campoCnpj').value = '';
-  document.getElementById('campoMongoUri').value = '';
-  document.getElementById('campoToken').value = '';
-  document.getElementById('campoSiteId').value = '';
-  document.getElementById('modalErro').style.display = 'none';
+  ['campoNomeFantasia','campoRazaoSocial','campoCnpj','campoMongoUri','campoToken','campoSiteId']
+    .forEach(id => { document.getElementById(id).value = ''; });
+  _goRedeStep(1);
   document.getElementById('modalRede').classList.add('aberto');
 }
 
@@ -475,16 +569,16 @@ async function editarRede(id) {
   const r = await fetch(`/api/redes/${id}`);
   const dados = await r.json();
   if (dados.erro) { alert(dados.erro); return; }
-  document.getElementById('modalTitulo').textContent = `Editar — ${dados.nome_fantasia}`;
-  document.getElementById('redeId').value = dados.id;
-  document.getElementById('campoNomeFantasia').value = dados.nome_fantasia;
-  document.getElementById('campoRazaoSocial').value  = dados.razao_social || '';
-  document.getElementById('campoCnpj').value         = dados.cnpj || '';
-  document.getElementById('campoUnidade').value      = dados.unidade_id;
-  document.getElementById('campoMongoUri').value     = dados.mongo_uri;
-  document.getElementById('campoToken').value        = dados.token;
-  document.getElementById('campoSiteId').value       = dados.tailscale_site_id || '';
-  document.getElementById('modalErro').style.display = 'none';
+  document.getElementById('modalTitulo').textContent  = `Editar — ${dados.nome_fantasia}`;
+  document.getElementById('redeId').value             = dados.id;
+  document.getElementById('campoNomeFantasia').value  = dados.nome_fantasia;
+  document.getElementById('campoRazaoSocial').value   = dados.razao_social || '';
+  document.getElementById('campoCnpj').value          = dados.cnpj || '';
+  document.getElementById('campoUnidade').value       = dados.unidade_id;
+  document.getElementById('campoMongoUri').value      = dados.mongo_uri;
+  document.getElementById('campoToken').value         = dados.token;
+  document.getElementById('campoSiteId').value        = dados.tailscale_site_id || '';
+  _goRedeStep(1);
   document.getElementById('modalRede').classList.add('aberto');
 }
 

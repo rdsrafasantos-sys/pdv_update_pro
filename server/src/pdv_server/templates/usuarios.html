@@ -68,6 +68,36 @@
 
   /* 2FA modal */
   .modal-2fa { width: 380px; }
+
+  /* Wizard */
+  .wz-progress { display: flex; align-items: center; gap: 0; margin-bottom: 20px; }
+  .wz-step { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: none; }
+  .wz-dot {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2px solid var(--border-strong); background: var(--bg-elevated);
+    color: var(--text-faint); font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; transition: all .2s;
+  }
+  .wz-step-label { font-size: 10.5px; font-weight: 650; color: var(--text-faint); white-space: nowrap; }
+  .wz-step.ativo .wz-dot { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .wz-step.ativo .wz-step-label { color: var(--accent); }
+  .wz-step.ok .wz-dot { border-color: var(--green); background: var(--green); color: #fff; }
+  .wz-step.ok .wz-step-label { color: var(--green); }
+  .wz-line {
+    flex: 1; height: 2px; background: var(--border-strong);
+    margin: 0 6px; margin-bottom: 18px; transition: background .2s;
+  }
+  .wz-line.ok { background: var(--green); }
+  .step-panel { display: none; }
+  .step-panel.ativo { display: block; }
+  .wz-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; }
+  .wz-nav-r { display: flex; gap: 8px; }
+  .nota-acesso-total {
+    background: color-mix(in srgb, var(--green) 12%, transparent);
+    border: 1px solid var(--green); border-radius: var(--radius-sm);
+    padding: 12px 14px; font-size: 12.5px; color: var(--green); margin-bottom: 12px;
+  }
+  #modalUsuario .modal-card { width: 500px; max-height: none; overflow-y: visible; }
   .qr-wrap { display: flex; justify-content: center; margin: 14px 0 10px; }
   .qr-wrap svg { width: 180px !important; height: 180px !important; }
   .secret-code {
@@ -173,74 +203,90 @@
 <!-- ── Modal Usuario ── -->
 <div class="modal-overlay" id="modalUsuario">
   <div class="modal-card">
+    <div class="wz-progress">
+      <div class="wz-step ativo" id="uw-s1"><div class="wz-dot">1</div><div class="wz-step-label">Dados</div></div>
+      <div class="wz-line" id="uw-l1"></div>
+      <div class="wz-step" id="uw-s2"><div class="wz-dot">2</div><div class="wz-step-label">Perfil</div></div>
+      <div class="wz-line" id="uw-l2"></div>
+      <div class="wz-step" id="uw-s3"><div class="wz-dot">3</div><div class="wz-step-label">Acesso</div></div>
+    </div>
     <div class="modal-title" id="modalUsuarioTitulo">Cadastrar usuário</div>
     <input type="hidden" id="usuarioId">
 
-    <div class="field"><label>Nome</label><input id="campoNomeUsuario"></div>
-    <div class="field"><label>E-mail</label><input id="campoEmailUsuario" type="email"></div>
-
-    <!-- Senha: visível diretamente no cadastro; colapsável na edição -->
-    <div id="blocoSenhaCadastro">
-      <div class="field"><label>Senha (mínimo 8 caracteres)</label><input id="campoSenhaUsuario" type="password"></div>
-    </div>
-
-    <div class="field">
-      <label>Perfil</label>
-      <select id="campoPerfilUsuario"><option value="">Sem perfil (sem permissões)</option></select>
-    </div>
-    <div class="checkbox-row">
-      <input type="checkbox" id="campoAcessoTotal" onchange="atualizarVisibilidadeAcesso()">
-      <label style="margin:0;">Acesso total (vê todas as unidades e redes)</label>
-    </div>
-    <div id="blocoAcessoEspecifico">
-      <div class="field">
-        <label>Unidades (acesso a todas as redes delas)</label>
-        <div id="campoUnidadesUsuario" class="check-list">
-          <div class="check-list-vazio">Carregando...</div>
+    <!-- Passo 1: Dados básicos -->
+    <div class="step-panel ativo" id="uw-p1">
+      <div class="field"><label>Nome</label><input id="campoNomeUsuario"></div>
+      <div class="field"><label>E-mail</label><input id="campoEmailUsuario" type="email"></div>
+      <div id="blocoSenhaCadastro">
+        <div class="field"><label>Senha (mínimo 8 caracteres)</label><input id="campoSenhaUsuario" type="password"></div>
+      </div>
+      <div id="blocoSeguranca" style="display:none;">
+        <div class="section-sep">Segurança</div>
+        <button type="button" class="senha-toggle" onclick="toggleSenha()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          <span id="textoToggleSenha">Alterar senha</span>
+        </button>
+        <div id="campaSenhaEdicao" style="display:none;">
+          <div class="field">
+            <label>Nova senha (mínimo 8 caracteres)</label>
+            <input id="campoNovaSenha" type="password" placeholder="Deixe em branco para não alterar">
+          </div>
+        </div>
+        <div class="row-2fa">
+          <div class="row-2fa-info">
+            <div class="row-2fa-label">Autenticação de dois fatores</div>
+            <div class="row-2fa-status" id="status2FATexto">—</div>
+          </div>
+          <div class="row-2fa-actions" id="acoes2FA"></div>
         </div>
       </div>
+    </div>
+
+    <!-- Passo 2: Perfil & configuração -->
+    <div class="step-panel" id="uw-p2">
       <div class="field">
-        <label>Redes específicas</label>
-        <div id="campoRedesUsuario" class="check-list">
-          <div class="check-list-vazio">Carregando...</div>
-        </div>
+        <label>Perfil</label>
+        <select id="campoPerfilUsuario"><option value="">Sem perfil (sem permissões)</option></select>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="campoAcessoTotal">
+        <label style="margin:0;">Acesso total (vê todas as unidades e redes)</label>
+      </div>
+      <div class="checkbox-row" id="linhaAtivo" style="display:none;">
+        <input type="checkbox" id="campoAtivoUsuario">
+        <label style="margin:0;">Usuário ativo</label>
       </div>
     </div>
-    <div class="checkbox-row" id="linhaAtivo" style="display:none;">
-      <input type="checkbox" id="campoAtivoUsuario">
-      <label style="margin:0;">Usuário ativo</label>
-    </div>
 
-    <!-- Seção Segurança — exibida apenas no modo edição -->
-    <div id="blocoSeguranca" style="display:none;">
-      <div class="section-sep">Segurança</div>
-
-      <!-- Alterar senha colapsável -->
-      <button type="button" class="senha-toggle" onclick="toggleSenha()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-        <span id="textoToggleSenha">Alterar senha</span>
-      </button>
-      <div id="campaSenhaEdicao" style="display:none;">
+    <!-- Passo 3: Acesso específico -->
+    <div class="step-panel" id="uw-p3">
+      <div id="notaAcessoTotal" class="nota-acesso-total" style="display:none;">
+        ✅ Acesso total habilitado — este usuário vê todas as unidades e redes automaticamente.
+      </div>
+      <div id="blocoAcessoEspecifico">
         <div class="field">
-          <label>Nova senha (mínimo 8 caracteres)</label>
-          <input id="campoNovaSenha" type="password" placeholder="Deixe em branco para não alterar">
+          <label>Unidades (acesso a todas as redes delas)</label>
+          <div id="campoUnidadesUsuario" class="check-list">
+            <div class="check-list-vazio">Carregando...</div>
+          </div>
         </div>
-      </div>
-
-      <!-- Status 2FA -->
-      <div class="row-2fa">
-        <div class="row-2fa-info">
-          <div class="row-2fa-label">Autenticação de dois fatores</div>
-          <div class="row-2fa-status" id="status2FATexto">—</div>
+        <div class="field">
+          <label>Redes específicas</label>
+          <div id="campoRedesUsuario" class="check-list">
+            <div class="check-list-vazio">Carregando...</div>
+          </div>
         </div>
-        <div class="row-2fa-actions" id="acoes2FA"></div>
       </div>
     </div>
 
     <div class="erro-msg" id="erroUsuario"></div>
-    <div class="modal-actions">
+    <div class="wz-nav">
       <button class="btn btn-ghost" onclick="fecharModalUsuario()">Cancelar</button>
-      <button class="btn btn-primary" onclick="salvarUsuario()">Salvar</button>
+      <div class="wz-nav-r">
+        <button class="btn btn-ghost" id="uw-ant" onclick="anteriorUsuario()" style="display:none;">← Anterior</button>
+        <button class="btn btn-primary" id="uw-prox" onclick="proximoUsuario()">Próximo →</button>
+        <button class="btn btn-primary" id="uw-salvar" onclick="salvarUsuario()" style="display:none;">Salvar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -310,6 +356,8 @@ let unidadesCache = [];
 let redesCache = [];
 let perfisCache = [];
 let senhaEdicaoAberta = false;
+let _userStep = 1;
+let _userEditando = false;
 
 // ── Helpers para lista de checkboxes ──
 function _renderCheckList(id, itens, selecionados = []) {
@@ -339,10 +387,52 @@ function _setChecked(id, ids) {
     .forEach(cb => { cb.checked = ids.includes(parseInt(cb.value, 10)); });
 }
 
-function atualizarVisibilidadeAcesso() {
-  document.getElementById('blocoAcessoEspecifico').style.display =
-    document.getElementById('campoAcessoTotal').checked ? 'none' : 'block';
+// ── Wizard de Usuário ───────────────────────────────────────
+function _goUserStep(n) {
+  for (let i = 1; i <= 3; i++) {
+    document.getElementById(`uw-s${i}`).className = `wz-step${i === n ? ' ativo' : i < n ? ' ok' : ''}`;
+    document.getElementById(`uw-p${i}`).classList.toggle('ativo', i === n);
+  }
+  document.getElementById('uw-l1').classList.toggle('ok', n > 1);
+  document.getElementById('uw-l2').classList.toggle('ok', n > 2);
+  document.getElementById('uw-ant').style.display    = n > 1 ? '' : 'none';
+  document.getElementById('uw-prox').style.display   = n < 3 ? '' : 'none';
+  document.getElementById('uw-salvar').style.display = n === 3 ? '' : 'none';
+  document.getElementById('erroUsuario').style.display = 'none';
+  if (n === 3) _renderAcessoStep();
+  _userStep = n;
 }
+
+function _renderAcessoStep() {
+  const total = document.getElementById('campoAcessoTotal').checked;
+  document.getElementById('notaAcessoTotal').style.display      = total ? 'block' : 'none';
+  document.getElementById('blocoAcessoEspecifico').style.display = total ? 'none' : 'block';
+}
+
+function _validarUserStep(step) {
+  const err = document.getElementById('erroUsuario');
+  err.style.display = 'none';
+  if (step === 1) {
+    if (!document.getElementById('campoNomeUsuario').value.trim()) {
+      err.textContent = 'Nome é obrigatório.'; err.style.display = 'block'; return false;
+    }
+    if (!_userEditando) {
+      if (!document.getElementById('campoEmailUsuario').value.trim()) {
+        err.textContent = 'E-mail é obrigatório.'; err.style.display = 'block'; return false;
+      }
+      const senha = document.getElementById('campoSenhaUsuario').value;
+      if (!senha || senha.length < 8) {
+        err.textContent = 'A senha deve ter no mínimo 8 caracteres.'; err.style.display = 'block'; return false;
+      }
+    }
+  }
+  return true;
+}
+
+function proximoUsuario()  { if (_validarUserStep(_userStep)) _goUserStep(_userStep + 1); }
+function anteriorUsuario() { _goUserStep(_userStep - 1); }
+
+function atualizarVisibilidadeAcesso() { /* handled by _renderAcessoStep on step 3 navigation */ }
 
 function toggleSenha() {
   senhaEdicaoAberta = !senhaEdicaoAberta;
@@ -452,6 +542,7 @@ function renderPerfis(perfis) {
 
 // ── Usuario: modal ──
 function abrirModalNovoUsuario() {
+  _userEditando = false;
   document.getElementById('modalUsuarioTitulo').textContent = 'Cadastrar usuário';
   document.getElementById('usuarioId').value = '';
   document.getElementById('campoNomeUsuario').value = '';
@@ -465,8 +556,7 @@ function abrirModalNovoUsuario() {
   document.getElementById('linhaAtivo').style.display = 'none';
   _setChecked('campoUnidadesUsuario', []);
   _setChecked('campoRedesUsuario', []);
-  atualizarVisibilidadeAcesso();
-  document.getElementById('erroUsuario').style.display = 'none';
+  _goUserStep(1);
   document.getElementById('modalUsuario').classList.add('aberto');
 }
 
@@ -475,30 +565,25 @@ async function editarUsuario(id) {
   const u = await r.json();
   if (u.erro) { alert(u.erro); return; }
 
+  _userEditando = true;
   document.getElementById('modalUsuarioTitulo').textContent = `Editar — ${u.nome}`;
   document.getElementById('usuarioId').value = u.id;
   document.getElementById('campoNomeUsuario').value = u.nome;
   document.getElementById('campoEmailUsuario').value = u.email;
   document.getElementById('campoEmailUsuario').disabled = true;
-
-  // Esconder campo senha do modo cadastro; mostrar seção segurança
   document.getElementById('blocoSenhaCadastro').style.display = 'none';
   document.getElementById('blocoSeguranca').style.display = 'block';
 
-  // Reset estado da senha
   senhaEdicaoAberta = false;
   document.getElementById('campaSenhaEdicao').style.display = 'none';
   document.getElementById('textoToggleSenha').textContent = 'Alterar senha';
   document.getElementById('campoNovaSenha').value = '';
 
-  // 2FA status e ações
   const status2FA = document.getElementById('status2FATexto');
   const acoes2FA  = document.getElementById('acoes2FA');
   status2FA.textContent = u.totp_habilitado ? '🔐 Ativo' : '⚠ Pendente — não configurado';
   status2FA.style.color  = u.totp_habilitado ? 'var(--green)' : 'var(--amber)';
-
   acoes2FA.innerHTML = '';
-  // Usuário editando a si mesmo sem 2FA: botão Configurar
   if (u.id === EU_ID && !u.totp_habilitado) {
     const btn = document.createElement('button');
     btn.className = 'btn btn-ghost btn-sm';
@@ -506,7 +591,6 @@ async function editarUsuario(id) {
     btn.onclick = abrirModal2FA;
     acoes2FA.appendChild(btn);
   }
-  // Super-admin pode redefinir 2FA de qualquer usuário com 2FA ativo
   if (EU_SUPER && u.totp_habilitado) {
     const btn = document.createElement('button');
     btn.className = 'btn btn-ghost btn-sm';
@@ -521,8 +605,7 @@ async function editarUsuario(id) {
   document.getElementById('campoAtivoUsuario').checked = u.ativo;
   _setChecked('campoUnidadesUsuario', u.unidade_ids);
   _setChecked('campoRedesUsuario', u.rede_ids);
-  atualizarVisibilidadeAcesso();
-  document.getElementById('erroUsuario').style.display = 'none';
+  _goUserStep(1);
   document.getElementById('modalUsuario').classList.add('aberto');
 }
 
