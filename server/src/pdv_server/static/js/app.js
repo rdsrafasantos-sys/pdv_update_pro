@@ -441,7 +441,7 @@ async function _verificarCompatIntegrador(versao_pdvpro) {
     const d = await fetch(API(`/compat/verificar?versao_pdvpro=${encodeURIComponent(versao_pdvpro)}`))
       .then(r => r.json()).catch(() => null);
     if (_pdvCompatVersaoChecked === versao_pdvpro) {
-      _pdvCompatResult = d;
+      _pdvCompatResult = d ?? { ok: true, bloqueado: false };
       atualizarBotaoPdv();
     }
   } catch (_) {
@@ -522,6 +522,8 @@ function atualizarBotaoPdv() {
         html += `<div class="card aviso-versao aviso-indefinido">⚠️ ${c.aviso}</div>`;
       } else if (c.ok && c.versao_min) {
         html += `<div class="card aviso-versao aviso-ok">✅ Integrador compatível — atual: ${c.versao_atual || "?"}, mínimo: ${c.versao_min}</div>`;
+      } else if (c.ok && !c.versao_min && !c.erro) {
+        html += `<div class="card aviso-versao aviso-neutro" style="opacity:.7">ℹ️ Tabela de compatibilidade indisponível para v${arquivo.versao} — verifique o integrador manualmente.</div>`;
       }
     } else if (_pdvCompatVersaoChecked === arquivo.versao && !_pdvCompatResult) {
       bloqueadoPorVersao = true;

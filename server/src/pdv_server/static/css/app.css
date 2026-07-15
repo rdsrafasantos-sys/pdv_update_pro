@@ -195,6 +195,7 @@ input:checked + .slider:before { transform: translateX(17px); background: #1a0f0
 .aviso-versao.aviso-ok { color: var(--green); background: var(--green-dim); border: 1px solid var(--green); }
 .aviso-versao.aviso-bloqueado { color: var(--red); background: var(--red-dim); border: 1px solid var(--red); }
 .aviso-versao.aviso-indefinido { color: var(--amber); background: var(--amber-dim); border: 1px solid var(--amber); }
+.aviso-versao.aviso-neutro { color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border-strong); }
 
 /* Upload progress */
 .upload-progress { margin-top: 10px; display: none; }
