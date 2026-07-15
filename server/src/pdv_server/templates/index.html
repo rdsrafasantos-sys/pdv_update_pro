@@ -181,21 +181,6 @@
             <div id="dashGrafico"><div class="empty">Carregando...</div></div>
           </div>
 
-          <div class="card">
-            <div class="section-title">⚡ Atalhos rápidos</div>
-            <div class="quick-actions">
-              {% if _pode_pdv_tab %}
-              <button class="btn-quick" onclick="mostrarView('atualizacoes');mostrarAtualizacoesTab('pdv')">📦 Ir para Atualização de PDV</button>
-              {% endif %}
-              {% if usuario_atual.pode_atu_agente %}
-              <button class="btn-quick" onclick="mostrarView('atualizacoes');mostrarAtualizacoesTab('agente')">🤖 Ir para Atualização de Agente</button>
-              {% endif %}
-              {% if _pode_replic_view %}
-              <button class="btn-quick" onclick="mostrarView('replicacao')">🔍 Ir para Verificação de Replicação</button>
-              {% endif %}
-              <button class="btn-quick" onclick="redescobrir()">🔄 Redescobrir PDVs</button>
-            </div>
-          </div>
         </div>
 
         <!-- ═══════════════ ATUALIZAÇÕES ═══════════════ -->
