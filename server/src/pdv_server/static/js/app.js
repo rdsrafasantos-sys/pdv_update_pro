@@ -767,15 +767,30 @@ async function listarLogsSelecionados() {
         el.innerHTML = '<div class="empty">Nenhum arquivo de log encontrado em C:\\VRPdv\\logs.</div>';
         continue;
       }
-      el.innerHTML = dados.arquivos.map(a => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
-          <div>
-            <div>${a.nome}</div>
-            <div class="text-muted" style="font-size:11px;">${a.modificado} — ${_formatarTamanho(a.tamanho)}</div>
-          </div>
-          <a class="btn-verify" href="${API(`/pdv/${loja_id}/${pdvId}/logs/${encodeURIComponent(a.nome)}`)}" download>⬇️ Baixar</a>
-        </div>
-      `).join("");
+      let html = "";
+      let dataAnterior = null;
+      for (const a of dados.arquivos) {
+        const data = a.modificado.slice(0, 10); // YYYY-MM-DD
+        if (data !== dataAnterior) {
+          const [ano, mes, dia] = data.split("-");
+          html += `
+            <div style="font-size:11px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;
+                        margin-top:${dataAnterior ? "14px" : "2px"};padding-top:${dataAnterior ? "10px" : "0"};
+                        ${dataAnterior ? "border-top:1px solid var(--border);" : ""}">
+              📅 ${dia}/${mes}/${ano}
+            </div>`;
+          dataAnterior = data;
+        }
+        html += `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
+            <div>
+              <div>${a.nome}</div>
+              <div class="text-muted" style="font-size:11px;">${a.modificado} — ${_formatarTamanho(a.tamanho)}</div>
+            </div>
+            <a class="btn-verify" href="${API(`/pdv/${loja_id}/${pdvId}/logs/${encodeURIComponent(a.nome)}`)}" download>⬇️ Baixar</a>
+          </div>`;
+      }
+      el.innerHTML = html;
     } catch (e) {
       el.innerHTML = `<span style="color:#dc2626;">⛔ Falha ao contatar o servidor: ${e}</span>`;
     }
