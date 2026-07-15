@@ -564,6 +564,26 @@
       <div class="dash-loading-msg" id="dashLoadingMsg">Buscando lojas e histórico...</div>
     </div>
   </div>
+
+  <!-- ── Modal seleção de tabelas de replicação ── -->
+  <div id="modalTabelas" class="tabelas-overlay">
+    <div class="tabelas-card">
+      <div class="tabelas-titulo">Selecionar tabelas</div>
+      <div class="tabelas-sub">Escolha quais tabelas verificar nesta execução.</div>
+
+      <label class="tabelas-marcar-todas">
+        <input type="checkbox" id="tabMarcaTodas" onchange="toggleTodasTabelas(this.checked)">
+        Marcar todas
+      </label>
+
+      <div id="listaTabelas" class="tabelas-lista"></div>
+
+      <div class="tabelas-acoes">
+        <button class="btn-verify" onclick="fecharSeletorTabelas()">Cancelar</button>
+        <button class="btn-update" onclick="confirmarVerificacaoTabelas()">🔍 Verificar</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <footer style="text-align:center;padding:18px 0 10px;font-size:11px;color:var(--text-muted);opacity:.6;user-select:none;">
@@ -591,25 +611,5 @@ window.PERMS = {
 };
 </script>
 <script src="{{ url_for('static', filename='js/app.js') }}?v={{ server_version }}"></script>
-
-<!-- ── Modal seleção de tabelas de replicação ── -->
-<div id="modalTabelas" class="tabelas-overlay">
-  <div class="tabelas-card">
-    <div class="tabelas-titulo">Selecionar tabelas</div>
-    <div class="tabelas-sub">Escolha quais tabelas verificar nesta execução.</div>
-
-    <label class="tabelas-marcar-todas">
-      <input type="checkbox" id="tabMarcaTodas" onchange="toggleTodasTabelas(this.checked)">
-      Marcar todas
-    </label>
-
-    <div id="listaTabelas" class="tabelas-lista"></div>
-
-    <div class="tabelas-acoes">
-      <button class="btn-verify" onclick="fecharSeletorTabelas()">Cancelar</button>
-      <button class="btn-update" onclick="confirmarVerificacaoTabelas()">🔍 Verificar</button>
-    </div>
-  </div>
-</div>
 </body>
 </html>
