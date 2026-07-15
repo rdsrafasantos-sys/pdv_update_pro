@@ -262,12 +262,29 @@ def _checar_cnpj_disponivel(db, cnpj, ignorar_rede_id=None):
         raise ValueError(f"Ja existe uma rede com este CNPJ: '{existente.nome_fantasia}'.")
 
 
+_TOKEN_MINIMO = 16
+_TOKEN_PROIBIDO = "pdv-agent-2024"
+
+
+def _validar_token_agente(token):
+    """Mesma regra que o agente (config.py) exige para PDV_AGENT_TOKEN --
+    um token mais curto nunca vai conseguir autenticar em nenhum PDV."""
+    if len(token) < _TOKEN_MINIMO:
+        raise ValueError(
+            f"Token muito curto ({len(token)} caracteres). "
+            f"O agente dos PDVs exige no minimo {_TOKEN_MINIMO} caracteres."
+        )
+    if token == _TOKEN_PROIBIDO:
+        raise ValueError("Nao use o valor padrao inseguro. Escolha um token unico.")
+
+
 def criar_rede(nome_fantasia, unidade_id, mongo_uri, token, tailscale_site_id="", cnpj="", razao_social=""):
     nome_fantasia = (nome_fantasia or "").strip()
     mongo_uri = (mongo_uri or "").strip()
     token = (token or "").strip()
     if not nome_fantasia or not unidade_id or not mongo_uri or not token:
         raise ValueError("Nome fantasia, unidade, Mongo URI e token sao obrigatorios.")
+    _validar_token_agente(token)
     cnpj_normalizado = validar_cnpj(cnpj) if cnpj else None
 
     db = SessionLocal()
@@ -313,7 +330,9 @@ def editar_rede(rede_id, nome_fantasia, unidade_id, mongo_uri, token, tailscale_
         if mongo_uri:
             rede.mongo_uri_cifrado = cifrar(mongo_uri.strip())
         if token:
-            rede.token_cifrado = cifrar(token.strip())
+            token = token.strip()
+            _validar_token_agente(token)
+            rede.token_cifrado = cifrar(token)
         if tailscale_site_id is not None:
             rede.tailscale_site_id_cifrado = cifrar(tailscale_site_id) if tailscale_site_id else None
         if cnpj is not None:

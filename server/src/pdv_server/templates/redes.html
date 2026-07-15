@@ -277,8 +277,8 @@
         <input id="campoMongoUri" placeholder="mongodb://192.168.1.20:27016">
       </div>
       <div class="field">
-        <label>Token compartilhado com os agentes <span class="text-muted">igual ao PDV_AGENT_TOKEN de cada PDV</span></label>
-        <input id="campoToken" placeholder="pdv-agent-2024">
+        <label>Token compartilhado com os agentes <span class="text-muted">igual ao PDV_AGENT_TOKEN de cada PDV — mínimo 16 caracteres</span></label>
+        <input id="campoToken" placeholder="ex: a1b2c3d4e5f6...">
       </div>
       <div class="field">
         <label>Tailscale Site ID <span class="text-muted">opcional</span></label>
@@ -546,8 +546,13 @@ function _validarRedeStep(step) {
     if (!document.getElementById('campoMongoUri').value.trim()) {
       err.textContent = 'Mongo URI é obrigatório.'; err.style.display = 'block'; return false;
     }
-    if (!document.getElementById('campoToken').value.trim()) {
+    const tokenVal = document.getElementById('campoToken').value.trim();
+    if (!tokenVal) {
       err.textContent = 'Token é obrigatório.'; err.style.display = 'block'; return false;
+    }
+    if (tokenVal.length < 16) {
+      err.textContent = `Token muito curto (${tokenVal.length} caracteres) — o agente dos PDVs exige no mínimo 16.`;
+      err.style.display = 'block'; return false;
     }
   }
   return true;
