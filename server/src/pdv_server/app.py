@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 from pdv_server.auth.gestao import usuario_pode_acessar_rede
 from pdv_server.auth.models import init_db
 from pdv_server.auth.routes import auth_bp, exigir_permissao, limiter, login_manager
-from pdv_server.config import MASTER_KEY, SECRET_KEY
+from pdv_server.config import INTEGRADOR_DATA_DIR, MASTER_KEY, SECRET_KEY
 from pdv_server.contexto import RedeInativa, RedeNaoEncontrada, obter_contexto
 from pdv_server.painel.routes import painel_bp
 from pdv_server.dispatch import (
@@ -68,6 +68,7 @@ def _headers_seguranca(response):
 
 
 init_db()
+pdv_compat.iniciar_refresh_automatico(INTEGRADOR_DATA_DIR)
 
 
 @app.route("/api/versao")

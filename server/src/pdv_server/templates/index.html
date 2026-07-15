@@ -53,9 +53,7 @@
       {% if not usuario_atual.totp_habilitado %}
       <a href="{{ url_for('auth.configurar_2fa') }}" style="color:var(--vr-orange);">⚠️ Configurar 2FA</a>
       {% endif %}
-      <form method="post" action="{{ url_for('auth.logout') }}" style="display:inline;">
-        <button type="submit" class="text-muted" style="background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;font-size:13px;">Sair</button>
-      </form>
+      <button type="button" class="text-muted" style="background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;font-size:13px;" onclick="fazerLogout()">Sair</button>
     </div>
   </div>
 

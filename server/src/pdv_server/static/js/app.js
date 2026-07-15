@@ -5,6 +5,11 @@ function API(caminho) {
   return `/api/${window.REDE_ID}${caminho}`;
 }
 
+function fazerLogout() {
+  fetch('/logout', { method: 'POST' }).finally(() => { window.location.href = '/login'; });
+}
+window.fazerLogout = fazerLogout;
+
 // ──────────────────────────────────────────────
 // ESTADO GLOBAL
 // ──────────────────────────────────────────────
