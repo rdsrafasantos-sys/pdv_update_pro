@@ -231,6 +231,9 @@
                 <div id="statusPdvInfoTexto" class="text-muted" style="font-size:12px;">status_pdv.exe: envie junto para atualizar o painel de acompanhamento</div>
                 <input type="file" id="statusPdvInput" accept=".exe" style="display:none" onchange="uploadStatusPdv(this)">
                 <button class="btn-atualizar-agente" id="btnUploadStatusPdv" style="margin-top:6px;font-size:12px;padding:6px 14px;" onclick="document.getElementById('statusPdvInput').click()">Enviar novo status_pdv.exe</button>
+                <div class="upload-progress" id="statusPdvUploadProgress">
+                  <div class="bar-wrap-upload"><div class="bar" id="statusPdvUploadBar"></div></div>
+                </div>
               </div>
             </div>
             {{ seletor_pdv("agente", "🏪 Lojas & PDVs") }}
@@ -258,7 +261,7 @@
               </div>
               <div class="upload-progress" id="uploadProgress">
                 <div class="text-muted" style="font-size:12px;">Enviando...</div>
-                <div class="bar-wrap-upload"><div class="bar" style="width:100%"></div></div>
+                <div class="bar-wrap-upload"><div class="bar" id="uploadBar"></div></div>
               </div>
               {% endif %}
               <div class="file-list" id="fileList"></div>

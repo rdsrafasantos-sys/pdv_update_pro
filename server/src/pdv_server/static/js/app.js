@@ -372,20 +372,38 @@ function uploadAgente(input) {
 }
 window.uploadAgente = uploadAgente;
 
-async function uploadStatusPdv(input) {
+function uploadStatusPdv(input) {
   const arquivo = input.files[0];
   if (!arquivo) return;
   const btn = document.getElementById("btnUploadStatusPdv");
   const info = document.getElementById("statusPdvInfoTexto");
-  if (btn) { btn.disabled = true; btn.textContent = `Enviando ${(arquivo.size / 1048576).toFixed(1)} MB...`; }
+  const progressWrap = document.getElementById("statusPdvUploadProgress");
+  const bar = document.getElementById("statusPdvUploadBar");
+
+  if (btn) { btn.disabled = true; btn.textContent = `⏳ Enviando ${(arquivo.size / 1048576).toFixed(1)} MB...`; }
   if (info) info.textContent = "Enviando status_pdv.exe...";
+  if (progressWrap) progressWrap.style.display = "block";
+  if (bar) bar.style.width = "0%";
+
   const fd = new FormData();
   fd.append("arquivo", arquivo);
-  const r = await fetch(API("/upload_agente"), { method: "POST", body: fd });
-  const dados = await r.json();
-  input.value = "";
-  if (btn) { btn.disabled = false; btn.textContent = "Enviar novo status_pdv.exe"; }
-  if (info) info.textContent = dados.mensagem || dados.erro || "Concluido";
+
+  const xhr = new XMLHttpRequest();
+  xhr.upload.addEventListener("progress", (e) => {
+    if (e.lengthComputable && bar) {
+      bar.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
+    }
+  });
+  xhr.addEventListener("loadend", () => {
+    input.value = "";
+    if (btn) { btn.disabled = false; btn.textContent = "Enviar novo status_pdv.exe"; }
+    if (progressWrap) progressWrap.style.display = "none";
+    let dados = {};
+    try { dados = JSON.parse(xhr.responseText); } catch (e) {}
+    if (info) info.textContent = dados.mensagem || dados.erro || "Concluido";
+  });
+  xhr.open("POST", API("/upload_agente"));
+  xhr.send(fd);
 }
 window.uploadStatusPdv = uploadStatusPdv;
 
@@ -419,14 +437,29 @@ window.iniciarAtualizacaoAgente = iniciarAtualizacaoAgente;
 // ──────────────────────────────────────────────
 // ATUALIZACAO DE PDV (view "pdv") — upload de .zip + envio
 // ──────────────────────────────────────────────
-async function fazerUpload(file) {
+function fazerUpload(file) {
   const fd = new FormData();
   fd.append("arquivo", file);
   const progEl = document.getElementById("uploadProgress");
+  const bar = document.getElementById("uploadBar");
   if (progEl) progEl.style.display = "block";
-  await fetch(API("/upload"), { method: "POST", body: fd });
-  if (progEl) progEl.style.display = "none";
-  await carregarArquivos();
+  if (bar) bar.style.width = "0%";
+
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable && bar) {
+        bar.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
+      }
+    });
+    xhr.addEventListener("loadend", async () => {
+      if (progEl) progEl.style.display = "none";
+      await carregarArquivos();
+      resolve();
+    });
+    xhr.open("POST", API("/upload"));
+    xhr.send(fd);
+  });
 }
 
 async function carregarArquivos() {
