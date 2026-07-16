@@ -336,19 +336,39 @@ async function verificarAgenteDisponivel() {
   }
 }
 
-async function uploadAgente(input) {
+function uploadAgente(input) {
   const arquivo = input.files[0];
   if (!arquivo) return;
   const btn = document.getElementById("btnUploadAgente");
   const info = document.getElementById("agenteInfoTexto");
+  const badge = document.getElementById("agenteBadge");
+  const progressWrap = document.getElementById("agenteUploadProgress");
+  const bar = document.getElementById("agenteUploadBar");
+
   if (btn) { btn.disabled = true; btn.textContent = `⏳ Enviando ${(arquivo.size / 1048576).toFixed(1)} MB...`; }
   if (info) info.textContent = "Enviando agente.exe para o servidor...";
+  if (badge) { badge.className = "agente-badge enviando"; badge.textContent = "⏳ aguarde..."; }
+  if (progressWrap) progressWrap.style.display = "block";
+  if (bar) bar.style.width = "0%";
+
   const fd = new FormData();
   fd.append("arquivo", arquivo);
-  await fetch(API("/upload_agente"), { method: "POST", body: fd });
-  input.value = "";
-  if (btn) { btn.disabled = false; btn.textContent = "Enviar novo agente.exe"; }
-  await verificarAgenteDisponivel();
+
+  const xhr = new XMLHttpRequest();
+  xhr.upload.addEventListener("progress", (e) => {
+    if (e.lengthComputable && bar) {
+      bar.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
+    }
+  });
+  xhr.addEventListener("loadend", async () => {
+    input.value = "";
+    if (btn) { btn.disabled = false; btn.textContent = "Enviar novo agente.exe"; }
+    if (progressWrap) progressWrap.style.display = "none";
+    if (info) info.textContent = "Verificando envio...";
+    await verificarAgenteDisponivel();
+  });
+  xhr.open("POST", API("/upload_agente"));
+  xhr.send(fd);
 }
 window.uploadAgente = uploadAgente;
 
@@ -741,6 +761,15 @@ function _formatarTamanho(bytes) {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
+function _sincronizarLimitesData() {
+  const de = document.getElementById("logsDataDe");
+  const ate = document.getElementById("logsDataAte");
+  if (!de || !ate) return;
+  ate.min = de.value || "";
+  de.max = ate.value || "";
+}
+window._sincronizarLimitesData = _sincronizarLimitesData;
+
 async function listarLogsSelecionados() {
   const loja_id = seletores.replicacao.lojaAtiva;
   const pdv_ids = Array.from(seletores.replicacao.selecionados);
@@ -749,6 +778,10 @@ async function listarLogsSelecionados() {
 
   const desde = document.getElementById("logsDataDe").value;
   const ate = document.getElementById("logsDataAte").value;
+  if (desde && ate && desde > ate) {
+    cont.innerHTML = '<div class="empty" style="color:#dc2626;">⛔ O período é inválido: "De" não pode ser depois de "Até".</div>';
+    return;
+  }
   const query = new URLSearchParams();
   if (desde) query.set("desde", desde);
   if (ate) query.set("ate", ate);

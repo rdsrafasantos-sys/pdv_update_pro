@@ -180,6 +180,7 @@ input:checked + .slider:before { transform: translateX(17px); background: #1a0f0
 .agente-badge { font-size:11px; padding:3px 9px; border-radius:99px; font-weight:650; }
 .agente-badge.disponivel { background: var(--green-dim); color: var(--green); }
 .agente-badge.indisponivel { background: var(--surface-2); color: var(--text-faint); }
+.agente-badge.enviando { background: var(--amber-dim); color: var(--amber); }
 .btn-atualizar-agente {
   padding:8px 15px; border-radius:8px; font-size:12.5px; cursor:pointer; font-weight:600;
   font-family:inherit; transition:all .15s; background: transparent; border: 1.5px solid var(--vr-orange); color: var(--vr-orange);

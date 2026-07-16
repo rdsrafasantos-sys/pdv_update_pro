@@ -224,6 +224,9 @@
               </div>
               <input type="file" id="agenteInput" accept=".exe" style="display:none" onchange="uploadAgente(this)">
               <button class="btn-atualizar-agente" id="btnUploadAgente" onclick="document.getElementById('agenteInput').click()">Enviar novo agente.exe</button>
+              <div class="upload-progress" id="agenteUploadProgress">
+                <div class="bar-wrap-upload"><div class="bar" id="agenteUploadBar"></div></div>
+              </div>
               <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
                 <div id="statusPdvInfoTexto" class="text-muted" style="font-size:12px;">status_pdv.exe: envie junto para atualizar o painel de acompanhamento</div>
                 <input type="file" id="statusPdvInput" accept=".exe" style="display:none" onchange="uploadStatusPdv(this)">
@@ -400,9 +403,9 @@
             <div class="actions-row">
               <div style="display:flex;align-items:center;gap:8px;">
                 <span class="text-muted" style="font-size:12px;">De</span>
-                <input type="date" id="logsDataDe" style="padding:6px 8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font-size:12.5px;">
+                <input type="date" id="logsDataDe" onchange="_sincronizarLimitesData()" style="padding:6px 8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font-size:12.5px;">
                 <span class="text-muted" style="font-size:12px;">Até</span>
-                <input type="date" id="logsDataAte" style="padding:6px 8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font-size:12.5px;">
+                <input type="date" id="logsDataAte" onchange="_sincronizarLimitesData()" style="padding:6px 8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font-size:12.5px;">
               </div>
               <button class="btn-verify" onclick="listarLogsSelecionados()">📄 Listar Logs</button>
             </div>
