@@ -16,8 +16,9 @@ from pdv_server.config import INTEGRADOR_DATA_DIR, MASTER_KEY, SECRET_KEY
 from pdv_server.contexto import RedeInativa, RedeNaoEncontrada, obter_contexto
 from pdv_server.painel.routes import painel_bp
 from pdv_server.dispatch import (
-    baixar_log_pdv, enviar_agente_para_pdvs, get_atualizacoes_loja,
-    iniciar_envio_zip, listar_logs_pdv, reiniciar_mongo_pdv,
+    baixar_log_pdv, enviar_agente_para_pdvs, extrair_vendas_de_log,
+    get_atualizacoes_loja, iniciar_envio_zip, ler_conteudo_log_pdv,
+    listar_logs_pdv, reenviar_venda_service_manager, reiniciar_mongo_pdv,
 )
 from pdv_server.discovery import (
     encontrar_pdv, endereco_alcancavel, get_lojas, invalidar_cache,
@@ -249,6 +250,40 @@ def api_baixar_log_pdv(contexto, loja_id, pdv_id, nome):
         headers={"Content-Disposition": f'attachment; filename="{nome_seguro}"'},
         content_type=r.headers.get("Content-Type", "application/octet-stream"),
     )
+
+
+@app.route("/api/<int:rede_id>/pdv/<loja_id>/<pdv_id>/logs/<path:nome>/vendas", methods=["GET"])
+@com_rede
+@exigir_permissao("pode_replic_verificar")
+def api_extrair_vendas_log(contexto, loja_id, pdv_id, nome):
+    pdv = encontrar_pdv(contexto, loja_id, pdv_id)
+    if not pdv:
+        return jsonify({"erro": "PDV não encontrado"}), 404
+    nome_seguro = os.path.basename(nome)
+    texto = ler_conteudo_log_pdv(contexto, pdv, nome_seguro)
+    if texto is None:
+        return jsonify({"erro": "Falha ao ler o log do PDV"}), 502
+    vendas = extrair_vendas_de_log(texto)
+    return jsonify({"ok": True, "vendas": vendas})
+
+
+@app.route("/api/<int:rede_id>/pdv/<loja_id>/<pdv_id>/venda/reenviar", methods=["POST"])
+@com_rede
+@exigir_permissao("pode_replic_verificar")
+def api_reenviar_venda(contexto, loja_id, pdv_id):
+    pdv = encontrar_pdv(contexto, loja_id, pdv_id)
+    if not pdv:
+        return jsonify({"erro": "PDV não encontrado"}), 404
+    payload = request.json or {}
+    if not payload:
+        return jsonify({"erro": "Payload da venda vazio"}), 400
+    resultado = reenviar_venda_service_manager(contexto, payload)
+    registrar_auditoria(
+        current_user.email, "reenviar_venda",
+        detalhes=f"rede={contexto.rede_id} pdv={pdv_id} cupom={payload.get('numeroCupom')}",
+        ip=_ip(),
+    )
+    return jsonify(resultado)
 
 
 @app.route("/api/<int:rede_id>/upload", methods=["POST"])

@@ -1,12 +1,22 @@
 import hashlib
 import hmac as _hmac_mod
+import json
 import os
+import re
 import threading
 import time
+from urllib.parse import urlparse
 
 import requests
 
 from pdv_server.discovery import endereco_alcancavel
+
+SERVICE_MANAGER_PORTA = 27571
+
+_BLOCO_VENDA_JSON_RE = re.compile(
+    r"-{3,}\s*JSON\s*-{3,}(.*?)-{3,}\s*FIM\s*JSON\s*-{3,}",
+    re.DOTALL | re.IGNORECASE,
+)
 
 
 def _hmac_arquivo(caminho: str, token: str) -> str:
@@ -153,6 +163,80 @@ def baixar_log_pdv(contexto, pdv, nome_arquivo):
         timeout=30,
         stream=True,
     )
+
+
+def ler_conteudo_log_pdv(contexto, pdv, nome_arquivo):
+    """Le o conteudo de um log do PDV como texto (para extrair vendas), em vez
+    de repassar como download. Retorna None em caso de falha."""
+    ip = pdv["ip"]
+    endereco = endereco_alcancavel(ip, contexto.tailscale_site_id)
+    try:
+        r = requests.get(
+            f"http://{endereco}:5000/logs/{nome_arquivo}",
+            headers={"X-Agent-Token": contexto.token},
+            timeout=30,
+        )
+        if r.status_code != 200:
+            return None
+        return r.text
+    except Exception:
+        return None
+
+
+def extrair_vendas_de_log(texto):
+    """Extrai os payloads JSON de venda de um log_api, delimitados por
+    "--------- JSON ---------" ... "--------- FIM JSON ---------". Blocos que
+    nao forem JSON valido ou nao parecerem uma venda (sem numeroCupom) sao
+    ignorados silenciosamente -- o log pode conter outros tipos de payload."""
+    vendas = []
+    for m in _BLOCO_VENDA_JSON_RE.finditer(texto):
+        bruto = m.group(1).strip()
+        try:
+            obj = json.loads(bruto)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(obj, dict) or "numeroCupom" not in obj:
+            continue
+        vendas.append({
+            "resumo": {
+                "numeroCupom": obj.get("numeroCupom"),
+                "pdv": obj.get("pdv"),
+                "idLoja": obj.get("idLoja"),
+                "total": obj.get("total"),
+                "dataHoraInicio": obj.get("dataHoraInicio"),
+                "cancelado": obj.get("cancelado", False),
+            },
+            "payload": obj,
+        })
+    return vendas
+
+
+def _service_manager_host(contexto):
+    return urlparse(contexto.mongo_uri).hostname
+
+
+def reenviar_venda_service_manager(contexto, payload):
+    """Reenvia uma venda diretamente ao Service Manager (VRIntegradorMaster),
+    o mesmo host usado no mongo_uri da rede, so que na porta da API REST."""
+    host = _service_manager_host(contexto)
+    if not host:
+        return {"ok": False, "erro": "Nao foi possivel determinar o host do Service Manager."}
+    endereco = endereco_alcancavel(host, contexto.tailscale_site_id)
+    try:
+        r = requests.post(
+            f"http://{endereco}:{SERVICE_MANAGER_PORTA}/v2/venda/pdv/importar",
+            json=payload,
+            timeout=20,
+        )
+        try:
+            corpo = r.json()
+        except ValueError:
+            corpo = {"texto": r.text}
+        return {"ok": r.status_code in (200, 201), "status_code": r.status_code, "resposta": corpo}
+    except requests.exceptions.ConnectionError:
+        return {"ok": False, "erro": f"Service Manager ({host}) não acessível na porta {SERVICE_MANAGER_PORTA}."}
+    except Exception as e:
+        return {"ok": False, "erro": str(e)}
 
 
 def _enviar_para_pdv(contexto, loja_id, pdv, caminho_zip):
