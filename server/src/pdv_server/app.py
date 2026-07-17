@@ -16,9 +16,10 @@ from pdv_server.config import INTEGRADOR_DATA_DIR, MASTER_KEY, SECRET_KEY
 from pdv_server.contexto import RedeInativa, RedeNaoEncontrada, obter_contexto
 from pdv_server.painel.routes import painel_bp
 from pdv_server.dispatch import (
-    baixar_log_pdv, enviar_agente_para_pdvs, extrair_vendas_de_log,
+    baixar_log_pdv, enviar_agente_para_pdvs, extrair_payloads_de_log,
     get_atualizacoes_loja, iniciar_envio_zip, ler_conteudo_log_pdv,
-    listar_logs_pdv, reenviar_venda_service_manager, reiniciar_mongo_pdv,
+    listar_logs_pdv, reenviar_nfce_service_manager,
+    reenviar_venda_service_manager, reiniciar_mongo_pdv,
 )
 from pdv_server.discovery import (
     encontrar_pdv, endereco_alcancavel, get_lojas, invalidar_cache,
@@ -252,10 +253,10 @@ def api_baixar_log_pdv(contexto, loja_id, pdv_id, nome):
     )
 
 
-@app.route("/api/<int:rede_id>/pdv/<loja_id>/<pdv_id>/logs/<path:nome>/vendas", methods=["GET"])
+@app.route("/api/<int:rede_id>/pdv/<loja_id>/<pdv_id>/logs/<path:nome>/documentos", methods=["GET"])
 @com_rede
 @exigir_permissao("pode_replic_verificar")
-def api_extrair_vendas_log(contexto, loja_id, pdv_id, nome):
+def api_extrair_documentos_log(contexto, loja_id, pdv_id, nome):
     pdv = encontrar_pdv(contexto, loja_id, pdv_id)
     if not pdv:
         return jsonify({"erro": "PDV não encontrado"}), 404
@@ -263,8 +264,8 @@ def api_extrair_vendas_log(contexto, loja_id, pdv_id, nome):
     texto = ler_conteudo_log_pdv(contexto, pdv, nome_seguro)
     if texto is None:
         return jsonify({"erro": "Falha ao ler o log do PDV"}), 502
-    vendas = extrair_vendas_de_log(texto)
-    return jsonify({"ok": True, "vendas": vendas})
+    documentos = extrair_payloads_de_log(texto)
+    return jsonify({"ok": True, "documentos": documentos})
 
 
 @app.route("/api/<int:rede_id>/pdv/<loja_id>/<pdv_id>/venda/reenviar", methods=["POST"])
@@ -280,6 +281,25 @@ def api_reenviar_venda(contexto, loja_id, pdv_id):
     resultado = reenviar_venda_service_manager(contexto, payload)
     registrar_auditoria(
         current_user.email, "reenviar_venda",
+        detalhes=f"rede={contexto.rede_id} pdv={pdv_id} cupom={payload.get('numeroCupom')}",
+        ip=_ip(),
+    )
+    return jsonify(resultado)
+
+
+@app.route("/api/<int:rede_id>/pdv/<loja_id>/<pdv_id>/nfce/reenviar", methods=["POST"])
+@com_rede
+@exigir_permissao("pode_replic_verificar")
+def api_reenviar_nfce(contexto, loja_id, pdv_id):
+    pdv = encontrar_pdv(contexto, loja_id, pdv_id)
+    if not pdv:
+        return jsonify({"erro": "PDV não encontrado"}), 404
+    payload = request.json or {}
+    if not payload:
+        return jsonify({"erro": "Payload da NFC-e vazio"}), 400
+    resultado = reenviar_nfce_service_manager(contexto, payload)
+    registrar_auditoria(
+        current_user.email, "reenviar_nfce",
         detalhes=f"rede={contexto.rede_id} pdv={pdv_id} cupom={payload.get('numeroCupom')}",
         ip=_ip(),
     )

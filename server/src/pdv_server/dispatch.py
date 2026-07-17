@@ -183,48 +183,67 @@ def ler_conteudo_log_pdv(contexto, pdv, nome_arquivo):
         return None
 
 
-def extrair_vendas_de_log(texto):
-    """Extrai os payloads JSON de venda de um log_api, delimitados por
-    "--------- JSON ---------" ... "--------- FIM JSON ---------". Blocos que
-    nao forem JSON valido ou nao parecerem uma venda (sem numeroCupom) sao
-    ignorados silenciosamente -- o log pode conter outros tipos de payload."""
-    vendas = []
+def extrair_payloads_de_log(texto):
+    """Extrai os payloads (venda ou NFC-e) de um log_api, delimitados por
+    "--------- JSON ---------" ... "--------- FIM JSON ---------". Os dois
+    tipos usam o mesmo delimitador -- a classificacao e feita pelo formato do
+    conteudo: presenca de "xml"/"chaveacesso" indica NfceDTO, presenca de
+    "numeroCupom" sem esses campos indica VendaDTO. Blocos que nao forem JSON
+    valido ou nao baterem com nenhum dos dois formatos sao ignorados
+    silenciosamente -- o log pode conter outros tipos de payload."""
+    itens = []
     for m in _BLOCO_VENDA_JSON_RE.finditer(texto):
         bruto = m.group(1).strip()
         try:
             obj = json.loads(bruto)
         except (json.JSONDecodeError, ValueError):
             continue
-        if not isinstance(obj, dict) or "numeroCupom" not in obj:
+        if not isinstance(obj, dict):
             continue
-        vendas.append({
-            "resumo": {
-                "numeroCupom": obj.get("numeroCupom"),
-                "pdv": obj.get("pdv"),
-                "idLoja": obj.get("idLoja"),
-                "total": obj.get("total"),
-                "dataHoraInicio": obj.get("dataHoraInicio"),
-                "cancelado": obj.get("cancelado", False),
-            },
-            "payload": obj,
-        })
-    return vendas
+
+        if "xml" in obj or "chaveacesso" in obj:
+            itens.append({
+                "tipo": "nfce",
+                "resumo": {
+                    "numeroCupom": obj.get("numeroCupom"),
+                    "pdv": obj.get("pdv"),
+                    "idLoja": obj.get("idLoja"),
+                    "situacao": obj.get("situacao"),
+                    "motivorejeicao": obj.get("motivorejeicao"),
+                    "datahoraemissao": obj.get("datahoraemissao"),
+                },
+                "payload": obj,
+            })
+        elif "numeroCupom" in obj:
+            itens.append({
+                "tipo": "venda",
+                "resumo": {
+                    "numeroCupom": obj.get("numeroCupom"),
+                    "pdv": obj.get("pdv"),
+                    "idLoja": obj.get("idLoja"),
+                    "total": obj.get("total"),
+                    "dataHoraInicio": obj.get("dataHoraInicio"),
+                    "cancelado": obj.get("cancelado", False),
+                },
+                "payload": obj,
+            })
+    return itens
 
 
 def _service_manager_host(contexto):
     return urlparse(contexto.mongo_uri).hostname
 
 
-def reenviar_venda_service_manager(contexto, payload):
-    """Reenvia uma venda diretamente ao Service Manager (VRIntegradorMaster),
-    o mesmo host usado no mongo_uri da rede, so que na porta da API REST."""
+def _post_service_manager(contexto, path, payload):
+    """POST generico para a API REST do Service Manager (VRIntegradorMaster),
+    no mesmo host usado no mongo_uri da rede, so que na porta da API REST."""
     host = _service_manager_host(contexto)
     if not host:
         return {"ok": False, "erro": "Nao foi possivel determinar o host do Service Manager."}
     endereco = endereco_alcancavel(host, contexto.tailscale_site_id)
     try:
         r = requests.post(
-            f"http://{endereco}:{SERVICE_MANAGER_PORTA}/v2/venda/pdv/importar",
+            f"http://{endereco}:{SERVICE_MANAGER_PORTA}{path}",
             json=payload,
             timeout=20,
         )
@@ -237,6 +256,14 @@ def reenviar_venda_service_manager(contexto, payload):
         return {"ok": False, "erro": f"Service Manager ({host}) não acessível na porta {SERVICE_MANAGER_PORTA}."}
     except Exception as e:
         return {"ok": False, "erro": str(e)}
+
+
+def reenviar_venda_service_manager(contexto, payload):
+    return _post_service_manager(contexto, "/v2/venda/pdv/importar", payload)
+
+
+def reenviar_nfce_service_manager(contexto, payload):
+    return _post_service_manager(contexto, "/v1/nfce/importar", payload)
 
 
 def _enviar_para_pdv(contexto, loja_id, pdv, caminho_zip):

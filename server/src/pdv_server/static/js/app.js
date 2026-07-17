@@ -857,7 +857,7 @@ async function listarLogsSelecionados() {
           dataAnterior = data;
         }
         const ehLogApi = a.nome.toLowerCase().includes("log_api");
-        const painelId = `vendas-${pdvId}-${a.nome}`.replace(/[^a-zA-Z0-9-]/g, "_");
+        const painelId = `docs-${pdvId}-${a.nome}`.replace(/[^a-zA-Z0-9-]/g, "_");
         html += `
           <div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
             <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -866,7 +866,7 @@ async function listarLogsSelecionados() {
                 <div class="text-muted" style="font-size:11px;">${a.modificado} — ${_formatarTamanho(a.tamanho)}</div>
               </div>
               <div style="display:flex;gap:6px;">
-                ${ehLogApi ? `<button class="btn-verify" onclick="verVendasLog('${loja_id}','${pdvId}','${a.nome}','${painelId}')">🔍 Ver vendas</button>` : ""}
+                ${ehLogApi ? `<button class="btn-verify" onclick="verDocumentosLog('${loja_id}','${pdvId}','${a.nome}','${painelId}')">🔍 Ver vendas/NFC-e</button>` : ""}
                 <a class="btn-verify" href="${API(`/pdv/${loja_id}/${pdvId}/logs/${encodeURIComponent(a.nome)}`)}" download>⬇️ Baixar</a>
               </div>
             </div>
@@ -881,9 +881,25 @@ async function listarLogsSelecionados() {
 }
 window.listarLogsSelecionados = listarLogsSelecionados;
 
-let _vendasCache = {};
+let _documentosCache = {};
 
-async function verVendasLog(loja_id, pdvId, nomeArquivo, painelId) {
+function _resumoDocumento(item) {
+  const s = item.resumo;
+  if (item.tipo === "nfce") {
+    return `
+      🧾 NFC-e · Cupom <strong>${s.numeroCupom ?? "—"}</strong> · PDV ${s.pdv ?? "—"} · Loja ${s.idLoja ?? "—"}
+      · situação ${s.situacao ?? "—"} · ${s.datahoraemissao ?? "—"}
+      ${s.motivorejeicao ? ` · <span style="color:var(--red);">${s.motivorejeicao}</span>` : ""}
+    `;
+  }
+  return `
+    🛒 Venda · Cupom <strong>${s.numeroCupom ?? "—"}</strong> · PDV ${s.pdv ?? "—"} · Loja ${s.idLoja ?? "—"}
+    · R$ ${s.total != null ? Number(s.total).toFixed(2) : "—"} · ${s.dataHoraInicio ?? "—"}
+    ${s.cancelado ? ' <span style="color:var(--amber);">(cancelada)</span>' : ""}
+  `;
+}
+
+async function verDocumentosLog(loja_id, pdvId, nomeArquivo, painelId) {
   const painel = document.getElementById(painelId);
   if (!painel) return;
 
@@ -892,53 +908,50 @@ async function verVendasLog(loja_id, pdvId, nomeArquivo, painelId) {
     return;
   }
   painel.style.display = "block";
-  painel.innerHTML = '<div class="text-muted" style="font-size:12px;">Lendo log e extraindo vendas...</div>';
+  painel.innerHTML = '<div class="text-muted" style="font-size:12px;">Lendo log e extraindo documentos...</div>';
 
   try {
-    const r = await fetch(API(`/pdv/${loja_id}/${pdvId}/logs/${encodeURIComponent(nomeArquivo)}/vendas`));
+    const r = await fetch(API(`/pdv/${loja_id}/${pdvId}/logs/${encodeURIComponent(nomeArquivo)}/documentos`));
     const dados = await r.json();
     if (!dados.ok) {
       painel.innerHTML = `<span style="color:#dc2626;">⛔ ${dados.erro || "Falha ao ler o log"}</span>`;
       return;
     }
-    if (!dados.vendas || dados.vendas.length === 0) {
-      painel.innerHTML = '<div class="empty" style="padding:10px;">Nenhuma venda encontrada nesse arquivo.</div>';
+    if (!dados.documentos || dados.documentos.length === 0) {
+      painel.innerHTML = '<div class="empty" style="padding:10px;">Nenhuma venda ou NFC-e encontrada nesse arquivo.</div>';
       return;
     }
-    painel.innerHTML = dados.vendas.map((v, i) => {
+    painel.innerHTML = dados.documentos.map((item, i) => {
       const chave = `${painelId}-${i}`;
-      _vendasCache[chave] = v.payload;
-      const s = v.resumo;
+      _documentosCache[chave] = item;
       return `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:6px;background:var(--bg-elevated);margin-top:4px;font-size:12px;">
-          <div>
-            Cupom <strong>${s.numeroCupom ?? "—"}</strong> · PDV ${s.pdv ?? "—"} · Loja ${s.idLoja ?? "—"}
-            · R$ ${s.total != null ? Number(s.total).toFixed(2) : "—"} · ${s.dataHoraInicio ?? "—"}
-            ${s.cancelado ? ' <span style="color:var(--amber);">(cancelada)</span>' : ""}
-          </div>
-          <button class="btn-verify" id="reenviar-${chave}" onclick="reenviarVenda('${loja_id}','${pdvId}','${chave}')">📤 Reenviar</button>
+          <div>${_resumoDocumento(item)}</div>
+          <button class="btn-verify" id="reenviar-${chave}" onclick="reenviarDocumento('${loja_id}','${pdvId}','${chave}')">📤 Reenviar</button>
         </div>`;
     }).join("");
   } catch (e) {
     painel.innerHTML = `<span style="color:#dc2626;">⛔ Falha ao contatar o servidor: ${e}</span>`;
   }
 }
-window.verVendasLog = verVendasLog;
+window.verDocumentosLog = verDocumentosLog;
 
-async function reenviarVenda(loja_id, pdvId, chave) {
-  const payload = _vendasCache[chave];
+async function reenviarDocumento(loja_id, pdvId, chave) {
+  const item = _documentosCache[chave];
   const btn = document.getElementById(`reenviar-${chave}`);
-  if (!payload || !btn) return;
-  if (!confirm(`Reenviar a venda — Cupom ${payload.numeroCupom} — para o Service Manager?`)) return;
+  if (!item || !btn) return;
+  const rotulo = item.tipo === "nfce" ? "NFC-e" : "venda";
+  if (!confirm(`Reenviar a ${rotulo} — Cupom ${item.payload.numeroCupom} — para o Service Manager?`)) return;
 
+  const endpoint = item.tipo === "nfce" ? "nfce/reenviar" : "venda/reenviar";
   btn.disabled = true;
   const textoOriginal = btn.textContent;
   btn.textContent = "⏳ Enviando...";
 
   try {
-    const r = await fetch(API(`/pdv/${loja_id}/${pdvId}/venda/reenviar`), {
+    const r = await fetch(API(`/pdv/${loja_id}/${pdvId}/${endpoint}`), {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(item.payload),
     });
     const dados = await r.json();
     if (dados.ok) {
@@ -955,7 +968,7 @@ async function reenviarVenda(loja_id, pdvId, chave) {
     alert(`Falha ao contatar o servidor: ${e}`);
   }
 }
-window.reenviarVenda = reenviarVenda;
+window.reenviarDocumento = reenviarDocumento;
 
 async function carregarConfigReplicacaoAuto() {
   const r = await fetch(API("/replicacao/config"));
