@@ -888,7 +888,9 @@ function _resumoDocumento(item) {
   if (item.tipo === "nfce") {
     return `
       🧾 NFC-e · Cupom <strong>${s.numeroCupom ?? "—"}</strong> · PDV ${s.pdv ?? "—"} · Loja ${s.idLoja ?? "—"}
-      · situação ${s.situacao ?? "—"} · ${s.datahoraemissao ?? "—"}
+      ${s.valor != null ? `· R$ ${Number(s.valor).toFixed(2)} ` : ""}· ${s.datahoraemissao ?? "—"}
+      ${s.chaveNFCe ? ` · <span class="text-muted" style="font-size:10.5px;">chave ${s.chaveNFCe}</span>` : ""}
+      ${s.situacao ? ` · situação ${s.situacao}` : ""}
       ${s.motivorejeicao ? ` · <span style="color:var(--red);">${s.motivorejeicao}</span>` : ""}
     `;
   }

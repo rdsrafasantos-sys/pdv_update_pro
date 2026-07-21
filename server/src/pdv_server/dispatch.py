@@ -12,10 +12,19 @@ import requests
 from pdv_server.discovery import endereco_alcancavel
 
 SERVICE_MANAGER_PORTA = 27571
+SERVICE_MANAGER_PREFIXO = "/api"
 
 _BLOCO_VENDA_JSON_RE = re.compile(
     r"-{3,}\s*JSON\s*-{3,}(.*?)-{3,}\s*FIM\s*JSON\s*-{3,}",
     re.DOTALL | re.IGNORECASE,
+)
+
+# Cada linha do log_api vem prefixada com "YYYY/MM/DD HH:MM:SS " (inclusive as
+# linhas do proprio corpo do JSON) -- precisa ser removido de cada linha antes
+# do json.loads, senao vira lixo no meio do texto e o parse falha silenciosamente.
+_PREFIXO_LINHA_LOG_RE = re.compile(
+    r"^\s*\d{4}[/-]\d{2}[/-]\d{2}\s+\d{2}:\d{2}:\d{2}\s?",
+    re.MULTILINE,
 )
 
 
@@ -185,15 +194,19 @@ def ler_conteudo_log_pdv(contexto, pdv, nome_arquivo):
 
 def extrair_payloads_de_log(texto):
     """Extrai os payloads (venda ou NFC-e) de um log_api, delimitados por
-    "--------- JSON ---------" ... "--------- FIM JSON ---------". Os dois
-    tipos usam o mesmo delimitador -- a classificacao e feita pelo formato do
-    conteudo: presenca de "xml"/"chaveacesso" indica NfceDTO, presenca de
-    "numeroCupom" sem esses campos indica VendaDTO. Blocos que nao forem JSON
-    valido ou nao baterem com nenhum dos dois formatos sao ignorados
-    silenciosamente -- o log pode conter outros tipos de payload."""
+    "--------- JSON ---------" ... "--------- FIM JSON ---------". Cada linha
+    do log (inclusive as do corpo do JSON) vem prefixada com
+    "YYYY/MM/DD HH:MM:SS " -- precisa remover antes do json.loads.
+
+    Os dois tipos usam o mesmo delimitador -- a classificacao e feita pelo
+    formato do conteudo: presenca de "chaveNFCe"/"emissaoNotaFiscalEmitente"
+    ou "xml"/"chaveacesso" indica NFC-e, presenca de "numeroCupom" sem esses
+    campos indica venda comum. Blocos que nao forem JSON valido ou nao
+    baterem com nenhum dos dois formatos sao ignorados silenciosamente -- o
+    log pode conter outros tipos de payload."""
     itens = []
     for m in _BLOCO_VENDA_JSON_RE.finditer(texto):
-        bruto = m.group(1).strip()
+        bruto = _PREFIXO_LINHA_LOG_RE.sub("", m.group(1)).strip()
         try:
             obj = json.loads(bruto)
         except (json.JSONDecodeError, ValueError):
@@ -201,16 +214,20 @@ def extrair_payloads_de_log(texto):
         if not isinstance(obj, dict):
             continue
 
-        if "xml" in obj or "chaveacesso" in obj:
+        eh_nfce = any(k in obj for k in ("xml", "chaveacesso", "chaveNFCe", "emissaoNotaFiscalEmitente"))
+        if eh_nfce:
+            emitente = obj.get("emissaoNotaFiscalEmitente") or {}
             itens.append({
                 "tipo": "nfce",
                 "resumo": {
                     "numeroCupom": obj.get("numeroCupom"),
-                    "pdv": obj.get("pdv"),
-                    "idLoja": obj.get("idLoja"),
+                    "pdv": obj.get("numeroPDV", obj.get("pdv")),
+                    "idLoja": emitente.get("idLoja", obj.get("idLoja")),
                     "situacao": obj.get("situacao"),
                     "motivorejeicao": obj.get("motivorejeicao"),
-                    "datahoraemissao": obj.get("datahoraemissao"),
+                    "chaveNFCe": obj.get("chaveNFCe"),
+                    "datahoraemissao": obj.get("dataHoraEmissao", obj.get("datahoraemissao")),
+                    "valor": obj.get("valorNfe"),
                 },
                 "payload": obj,
             })
@@ -243,7 +260,7 @@ def _post_service_manager(contexto, path, payload):
     endereco = endereco_alcancavel(host, contexto.tailscale_site_id)
     try:
         r = requests.post(
-            f"http://{endereco}:{SERVICE_MANAGER_PORTA}{path}",
+            f"http://{endereco}:{SERVICE_MANAGER_PORTA}{SERVICE_MANAGER_PREFIXO}{path}",
             json=payload,
             timeout=20,
         )
