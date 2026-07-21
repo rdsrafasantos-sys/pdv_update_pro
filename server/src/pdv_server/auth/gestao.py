@@ -3,6 +3,7 @@ cada rede (Mongo URI, token, Tailscale Site ID) sao sempre cifrados antes
 de ir para o banco -- ver auth/crypto.py. Quem usa: rotas em
 painel/routes.py e app.py (resolucao de permissao)."""
 import datetime
+import logging
 import re
 import secrets
 import threading
@@ -15,6 +16,8 @@ from pdv_server.auth.models import (
 )
 from pdv_server.auth.security import gerar_hash_senha
 from pdv_server.config import PAINEL_CALLBACK_URL, TAILSCALE_AUTH_KEY_SERVICE_MANAGER
+
+log = logging.getLogger(__name__)
 
 # ── Pool de auth keys pre-geradas ────────────────────────────────────────────
 # Chaves geradas via OAuth em background, cifradas no banco. Geração de script
@@ -615,7 +618,7 @@ def _finalizar_automacao_em_background(instalacao_id):
         _finalizar_automacao_instalacao(registro)
         db.commit()
     except Exception:
-        pass
+        log.exception("Falha ao finalizar automacao da instalacao %s", instalacao_id)
     finally:
         db.close()
 
@@ -671,6 +674,7 @@ def _perfil_para_dict(perfil):
         "pode_replic_config": bool(perfil.pode_replic_config),
         "pode_config_banco": bool(perfil.pode_config_banco),
         "pode_config_integrador": bool(perfil.pode_config_integrador),
+        "pode_reenviar_documentos": bool(perfil.pode_reenviar_documentos),
         "total_usuarios": len(perfil.usuarios),
     }
 
@@ -691,7 +695,8 @@ def criar_perfil(nome, descricao="", pode_gerenciar_redes=False,
                   pode_atu_pdv_disparar=False, pode_atu_pdv_limpar=False,
                   pode_atu_integrador=False,
                   pode_replic_verificar=False, pode_replic_config=False,
-                  pode_config_banco=False, pode_config_integrador=False):
+                  pode_config_banco=False, pode_config_integrador=False,
+                  pode_reenviar_documentos=False):
     nome = (nome or "").strip()
     if not nome:
         raise ValueError("Nome do perfil e obrigatorio.")
@@ -714,6 +719,7 @@ def criar_perfil(nome, descricao="", pode_gerenciar_redes=False,
             pode_replic_config=bool(pode_replic_config),
             pode_config_banco=bool(pode_config_banco),
             pode_config_integrador=bool(pode_config_integrador),
+            pode_reenviar_documentos=bool(pode_reenviar_documentos),
         )
         db.add(perfil)
         db.commit()
@@ -729,7 +735,8 @@ def editar_perfil(perfil_id, nome=None, descricao=None, pode_gerenciar_redes=Non
                    pode_atu_pdv_disparar=None, pode_atu_pdv_limpar=None,
                    pode_atu_integrador=None,
                    pode_replic_verificar=None, pode_replic_config=None,
-                   pode_config_banco=None, pode_config_integrador=None):
+                   pode_config_banco=None, pode_config_integrador=None,
+                   pode_reenviar_documentos=None):
     db = SessionLocal()
     try:
         perfil = db.get(Perfil, perfil_id)
@@ -750,7 +757,8 @@ def editar_perfil(perfil_id, nome=None, descricao=None, pode_gerenciar_redes=Non
         for flag in ("pode_atu_agente", "pode_atu_pdv_upload", "pode_atu_pdv_disparar",
                      "pode_atu_pdv_limpar", "pode_atu_integrador",
                      "pode_replic_verificar", "pode_replic_config",
-                     "pode_config_banco", "pode_config_integrador"):
+                     "pode_config_banco", "pode_config_integrador",
+                     "pode_reenviar_documentos"):
             valor = locals()[flag]
             if valor is not None:
                 setattr(perfil, flag, bool(valor))
@@ -913,6 +921,7 @@ _TODAS_FLAGS_SECAO = (
     "pode_atu_pdv_limpar", "pode_atu_integrador",
     "pode_replic_verificar", "pode_replic_config",
     "pode_config_banco", "pode_config_integrador",
+    "pode_reenviar_documentos",
 )
 
 

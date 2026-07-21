@@ -71,8 +71,11 @@ def atualizar_stream(cfg: dict, nova_versao: str):
     def erro(txt):
         return {"tipo": "erro", "texto": txt}
 
-    # Valida formato da versão
-    if not re.match(r'^v?\d+\.\d+\.\d+', nova_versao):
+    # Valida formato da versão -- ancorado em \Z (fim absoluto da string, sem
+    # exceção para newline final) para nao aceitar nada alem de "vX.Y.Z".
+    # Sem essa ancora, nova_versao poderia conter uma quebra de linha e escapar
+    # do heredoc usado mais abaixo para gravar o docker-compose remoto.
+    if not re.match(r'^v?\d+\.\d+\.\d+\Z', nova_versao):
         yield erro(f"Versão inválida: '{nova_versao}'. Use o formato v2.3.0")
         yield {"tipo": "fim", "sucesso": False}
         return
@@ -115,11 +118,16 @@ def atualizar_stream(cfg: dict, nova_versao: str):
             f"{IMAGE_PREFIX}{versao_antiga}",
             f"{IMAGE_PREFIX}{nova_versao}",
         )
-        # Escreve via heredoc para evitar problemas com caracteres especiais
-        escaped = novo_conteudo.replace("'", "'\\''")
-        _, err_w, code_w = _exec(client, f"cat > ~/{COMPOSE_PATH} << 'HEREDOC_EOF'\n{novo_conteudo}\nHEREDOC_EOF")
-        if code_w != 0:
-            yield erro(f"Erro ao gravar compose: {err_w.strip()}")
+        # Escreve via SFTP em vez de heredoc -- nunca interpolar conteudo
+        # arbitrario dentro de um comando shell. O caminho e relativo ao
+        # diretorio home do usuario SSH (mesma raiz que "~/" no cat acima).
+        try:
+            sftp = client.open_sftp()
+            with sftp.file(COMPOSE_PATH, "w") as f:
+                f.write(novo_conteudo)
+            sftp.close()
+        except Exception as e:
+            yield erro(f"Erro ao gravar compose: {e}")
             client.close()
             yield {"tipo": "fim", "sucesso": False}
             return

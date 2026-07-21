@@ -221,7 +221,7 @@
           </div>
           <div class="field">
             <label>Token compartilhado com os agentes PDV <span class="text-muted">(deve bater com PDV_AGENT_TOKEN no agente de cada PDV)</span></label>
-            <input id="campoPasso3Token" placeholder="Carregando..." type="text">
+            <input id="campoPasso3Token" placeholder="Gerado automaticamente" type="text">
           </div>
           <div class="field">
             <label>Mongo URI <span class="text-muted">(gerado automaticamente — edite só se necessário)</span></label>
@@ -309,11 +309,17 @@
             <div style="flex:1;">
               <div style="font-size:13px; font-weight:650; margin-bottom:4px;">Baixar o arquivo de configuração</div>
               <div class="text-muted" style="font-size:12px; margin-bottom:10px;">
-                Contém o token e a auth key pré-configurados. Importe no instalador para preencher tudo automaticamente.
+                Contém o token (específico desta rede) e a auth key pré-configurados. Importe no instalador para preencher tudo automaticamente.
               </div>
-              <a href="/api/pdv/config-arquivo" download="pdv_config.ini"
-                 class="btn btn-primary btn-sm"
-                 style="display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
+              <div class="field" style="max-width:320px; margin-bottom:10px;">
+                <label style="font-size:11px;">Rede / cliente deste PDV</label>
+                <select id="campoPdvConfigRede" onchange="atualizarLinkConfigPdv()">
+                  <option value="">Selecione a rede...</option>
+                </select>
+              </div>
+              <a href="#" id="linkConfigPdv" download="pdv_config.ini"
+                 class="btn btn-primary btn-sm" aria-disabled="true"
+                 style="display:inline-flex; align-items:center; gap:6px; text-decoration:none; opacity:.5; pointer-events:none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;">
                   <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
@@ -415,6 +421,10 @@
 </div><!-- /shell -->
 
 <script>
+function _esc(str) {
+  return String(str ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
 // ── Navegação entre tabs ──────────────────────────────────────────────────────
 function mostrarTab(nome) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -450,8 +460,8 @@ async function carregarHistorico() {
       ${registros.map(r => `
         <tr>
           <td><b>${r.site_id}</b></td>
-          <td>${r.cliente_nome || '<span class="text-muted">—</span>'}</td>
-          <td>${r.cliente_cnpj || '<span class="text-muted">—</span>'}</td>
+          <td>${r.cliente_nome ? _esc(r.cliente_nome) : '<span class="text-muted">—</span>'}</td>
+          <td>${r.cliente_cnpj ? _esc(r.cliente_cnpj) : '<span class="text-muted">—</span>'}</td>
           <td>${(STATUS_LABEL[r.status] || [r.status])[0]}</td>
           <td>${r.usuario_email || '—'}</td>
           <td>${r.criado_em || '—'}</td>
@@ -607,6 +617,10 @@ let _intOk = false;
 
 function mostrarPasso4(redeId, tailscaleIp, erpIp) {
   redeAtual = redeId;
+  carregarRedesParaConfigPdv().then(() => {
+    const sel = document.getElementById('campoPdvConfigRede');
+    if (sel) { sel.value = String(redeId); atualizarLinkConfigPdv(); }
+  });
   const card = document.getElementById('cardPasso4');
   card.style.display = 'block';
   card.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -727,14 +741,46 @@ async function criarRede() {
 }
 
 // ── Service Manager — Token (preenchimento do passo 3) ───────────────────────
-async function carregarTokenAgente() {
-  try {
-    const d = await fetch('/api/token-agente').then(r => r.json());
-    if (d.token) document.getElementById('campoPasso3Token').value = d.token;
-  } catch (_) {}
+// Cada rede precisa do seu PRÓPRIO token, único -- nunca reaproveitar um valor
+// compartilhado entre clientes (quebraria o isolamento multi-tenant). Gerado
+// localmente no navegador, nunca lido de um endpoint global do servidor.
+function gerarTokenAleatorio(bytes = 32) {
+  const arr = new Uint8Array(bytes);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function preencherTokenNovo() {
+  const campo = document.getElementById('campoPasso3Token');
+  if (campo && !campo.value) campo.value = gerarTokenAleatorio();
 }
 
 // ── PDV — Instalador ─────────────────────────────────────────────────────────
+async function carregarRedesParaConfigPdv() {
+  try {
+    const redes = await fetch('/api/redes').then(r => r.json());
+    const sel = document.getElementById('campoPdvConfigRede');
+    sel.innerHTML = '<option value="">Selecione a rede...</option>' +
+      redes.map(r => `<option value="${r.id}">${_esc(r.nome_fantasia)}</option>`).join('');
+  } catch (_) {}
+}
+
+function atualizarLinkConfigPdv() {
+  const redeId = document.getElementById('campoPdvConfigRede').value;
+  const link = document.getElementById('linkConfigPdv');
+  if (redeId) {
+    link.href = `/api/${redeId}/pdv/config-arquivo`;
+    link.style.opacity = '1';
+    link.style.pointerEvents = 'auto';
+    link.removeAttribute('aria-disabled');
+  } else {
+    link.href = '#';
+    link.style.opacity = '.5';
+    link.style.pointerEvents = 'none';
+    link.setAttribute('aria-disabled', 'true');
+  }
+}
+
 async function carregarInfoAgente() {
   const info = await fetch('/api/setup/info').then(r => r.json()).catch(() => ({ disponivel: false }));
   const statusEl = document.getElementById('setupStatus');
@@ -848,7 +894,8 @@ async function salvarAuthKeyPdv() {
 // ── Init ─────────────────────────────────────────────────────────────────────
 carregarHistorico();
 carregarInfoAgente();
-carregarTokenAgente();
+carregarRedesParaConfigPdv();
+preencherTokenNovo();
 verificarAuthKeyPdv();
 
 function fazerLogout() {

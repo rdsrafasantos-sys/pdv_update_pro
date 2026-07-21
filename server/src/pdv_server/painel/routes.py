@@ -277,6 +277,7 @@ def api_criar_perfil():
             pode_replic_config=dados.get("pode_replic_config", False),
             pode_config_banco=dados.get("pode_config_banco", False),
             pode_config_integrador=dados.get("pode_config_integrador", False),
+            pode_reenviar_documentos=dados.get("pode_reenviar_documentos", False),
         )
         registrar_auditoria(current_user.email, "criar_perfil", detalhes=dados.get("nome", ""), ip=_ip())
         return jsonify(resultado)
@@ -304,6 +305,7 @@ def api_editar_perfil(perfil_id):
             pode_replic_config=dados.get("pode_replic_config"),
             pode_config_banco=dados.get("pode_config_banco"),
             pode_config_integrador=dados.get("pode_config_integrador"),
+            pode_reenviar_documentos=dados.get("pode_reenviar_documentos"),
         )
         registrar_auditoria(current_user.email, "editar_perfil", detalhes=f"id={perfil_id}", ip=_ip())
         return jsonify(resultado)

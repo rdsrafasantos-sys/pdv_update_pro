@@ -199,7 +199,7 @@ function renderLojaTabs(key) {
   if (!seletores[key].lojaAtiva) seletores[key].lojaAtiva = lojas[0].id;
   el.innerHTML = lojas.map(l => `
     <div class="tab ${l.id === seletores[key].lojaAtiva ? 'active' : ''}" onclick="selecionarLoja('${key}','${l.id}')">
-      ${l.nome} <span class="text-muted">(${l.pdvs.length})</span>
+      ${_escHtml(l.nome)} <span class="text-muted">(${l.pdvs.length})</span>
     </div>
   `).join("");
   renderPDVs(key);
@@ -249,8 +249,8 @@ function renderPDVs(key) {
     const modelTag = mInfo ? tagModelo(mInfo.modelo_id, mInfo.modelo) : "";
     return `
       <div class="pdv-card ${sel ? 'selected' : ''}" onclick="togglePDV('${key}','${pdv.id}')">
-        <div class="pdv-name">${pdv.nome || pdv.id}</div>
-        <div class="pdv-ip">${pdv.ip}</div>
+        <div class="pdv-name">${_escHtml(pdv.nome || pdv.id)}</div>
+        <div class="pdv-ip">${_escHtml(pdv.ip)}</div>
         ${modelTag}
         ${versaoPdv}
         ${badge}
@@ -920,13 +920,14 @@ async function verDocumentosLog(loja_id, pdvId, nomeArquivo, painelId) {
     painel.innerHTML = dados.documentos.map((item, i) => {
       const chave = `${painelId}-${i}`;
       _documentosCache[chave] = item;
+      const botoesReenvio = window.PERMS?.pode_reenviar_documentos
+        ? `<button class="btn-verify" id="reenviar-${chave}-venda" onclick="reenviarDocumento('${loja_id}','${pdvId}','${chave}','venda')">🛒 Reenviar Venda</button>
+           <button class="btn-verify" id="reenviar-${chave}-nfce" onclick="reenviarDocumento('${loja_id}','${pdvId}','${chave}','nfce')">🧾 Reenviar NFC-e</button>`
+        : '';
       return `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:6px;background:var(--bg-elevated);margin-top:4px;font-size:12px;gap:10px;">
           <div>${_resumoDocumento(item)}</div>
-          <div style="display:flex;gap:6px;flex-shrink:0;">
-            <button class="btn-verify" id="reenviar-${chave}-venda" onclick="reenviarDocumento('${loja_id}','${pdvId}','${chave}','venda')">🛒 Reenviar Venda</button>
-            <button class="btn-verify" id="reenviar-${chave}-nfce" onclick="reenviarDocumento('${loja_id}','${pdvId}','${chave}','nfce')">🧾 Reenviar NFC-e</button>
-          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">${botoesReenvio}</div>
         </div>`;
     }).join("");
   } catch (e) {
@@ -1080,9 +1081,9 @@ async function _carregarLojasErp() {
     }
     el.innerHTML = dados.lojas.map(l => `
       <div class="kpi-loja-item">
-        <div class="kpi-loja-nome">${l.nome || l.apelido || "—"}</div>
-        ${l.apelido ? `<div class="kpi-loja-apelido">📍 ${l.apelido}</div>` : ""}
-        ${l.cnpj ? `<div class="kpi-loja-cnpj">${_formatarCnpj(l.cnpj)}</div>` : ""}
+        <div class="kpi-loja-nome">${_escHtml(l.nome || l.apelido || "—")}</div>
+        ${l.apelido ? `<div class="kpi-loja-apelido">📍 ${_escHtml(l.apelido)}</div>` : ""}
+        ${l.cnpj ? `<div class="kpi-loja-cnpj">${_escHtml(_formatarCnpj(l.cnpj))}</div>` : ""}
       </div>`).join("");
   } catch (e) {
     clearTimeout(timer);
@@ -1424,8 +1425,8 @@ function renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, erroErp, ocultarOffline) 
     const pdvsExibidos = ocultarOffline ? loja.pdvs.filter(p => p.status === "online") : loja.pdvs;
     const cards = pdvsExibidos.map(p => {
       const { texto, classe } = rotuloStatusPdv(p.status);
-      const nome = p.pdv && p.pdv.nome ? p.pdv.nome : p.pdvId;
-      const ip = p.pdv ? `<div class="pdv-ip">${p.pdv.ip}</div>` : '<div class="pdv-ip text-muted">IP desconhecido</div>';
+      const nome = _escHtml(p.pdv && p.pdv.nome ? p.pdv.nome : p.pdvId);
+      const ip = p.pdv ? `<div class="pdv-ip">${_escHtml(p.pdv.ip)}</div>` : '<div class="pdv-ip text-muted">IP desconhecido</div>';
       const versao = p.pdv && p.pdv.versao ? `<div class="pdv-versao">v${p.pdv.versao}</div>` : "";
       const replicacao = p.status === "online" ? cardReplicacaoPdv(ultimaPorPdv[p.pdvId]) : "";
       const sysinfoSlot = p.status === "online" ? `<div id="pdvsysinfo-${p.pdvId}"></div>` : "";
@@ -1445,7 +1446,7 @@ function renderLojasEPdvs(lojasCruzadas, ultimaPorPdv, erroErp, ocultarOffline) 
     }).join("");
     return `
       <div class="dash-loja-grupo">
-        <div class="dash-loja-titulo">${loja.nome} (${online}/${total} online — ${total} ativo(s) cadastrado(s) no ERP)</div>
+        <div class="dash-loja-titulo">${_escHtml(loja.nome)} (${online}/${total} online — ${total} ativo(s) cadastrado(s) no ERP)</div>
         ${pdvsExibidos.length > 0 ? `<div class="dash-pdv-grid">${cards}</div>` : '<div class="empty">Nenhum PDV online nesta loja.</div>'}
       </div>
     `;
@@ -1536,11 +1537,11 @@ async function carregarDashboard() {
       ? '<div class="empty">Nenhuma loja. O integrador pode estar offline.</div>'
       : lojas.map(l => `
           <div class="dash-loja-grupo">
-            <div class="dash-loja-titulo">${l.nome} — verificando online...</div>
+            <div class="dash-loja-titulo">${_escHtml(l.nome)} — verificando online...</div>
             <div class="dash-pdv-grid">${l.pdvs.map(p =>
               `<div class="pdv-card" style="cursor:default;">
-                <div class="pdv-name">${p.nome || p.id}</div>
-                <div class="pdv-ip text-muted">${p.ip || ""}</div>
+                <div class="pdv-name">${_escHtml(p.nome || p.id)}</div>
+                <div class="pdv-ip text-muted">${_escHtml(p.ip || "")}</div>
                 <div class="badge"><span class="dot"></span>Verificando...</div>
               </div>`).join("")}
             </div>
@@ -1624,7 +1625,7 @@ function _dashFase2(lojasList, historico) {
           const on = loja.pdvs.filter(p => p.status === "online").length;
           const of2 = loja.pdvs.length - on;
           return `<div class="kpi-pdv-loja">
-            <div class="kpi-pdv-loja-nome">${loja.nome}</div>
+            <div class="kpi-pdv-loja-nome">${_escHtml(loja.nome)}</div>
             <div class="kpi-pdv-loja-stats">
               <span class="kpi-pdv-loja-on">● ${on} online</span>
               <span class="kpi-pdv-loja-off">● ${of2} offline</span>

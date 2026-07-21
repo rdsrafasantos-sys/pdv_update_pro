@@ -3,6 +3,7 @@ import os
 import threading
 import time
 from functools import wraps
+from urllib.parse import urlparse
 
 import requests
 from flask import Flask, Response, jsonify, redirect, render_template, request, send_file, url_for
@@ -102,6 +103,21 @@ def injetar_usuario():
 
 def _ip():
     return request.headers.get("X-Forwarded-For", request.remote_addr or "")
+
+
+def _requisicao_mesma_origem():
+    """Verifica Origin/Referer contra o host desta requisicao. Mitigacao
+    leve de CSRF para rotas GET que disparam acao sensivel e precisam
+    continuar em GET (EventSource nativo do navegador nao suporta POST) --
+    o projeto nao tem protecao CSRF baseada em token. Origin/Referer
+    ausentes sao tratados como suspeitos (fail closed)."""
+    origin = request.headers.get("Origin", "")
+    if origin:
+        return urlparse(origin).netloc == request.host
+    referer = request.headers.get("Referer", "")
+    if referer:
+        return urlparse(referer).netloc == request.host
+    return False
 
 
 def com_rede(view):
@@ -270,7 +286,7 @@ def api_extrair_documentos_log(contexto, loja_id, pdv_id, nome):
 
 @app.route("/api/<int:rede_id>/pdv/<loja_id>/<pdv_id>/venda/reenviar", methods=["POST"])
 @com_rede
-@exigir_permissao("pode_replic_verificar")
+@exigir_permissao("pode_reenviar_documentos")
 def api_reenviar_venda(contexto, loja_id, pdv_id):
     pdv = encontrar_pdv(contexto, loja_id, pdv_id)
     if not pdv:
@@ -289,7 +305,7 @@ def api_reenviar_venda(contexto, loja_id, pdv_id):
 
 @app.route("/api/<int:rede_id>/pdv/<loja_id>/<pdv_id>/nfce/reenviar", methods=["POST"])
 @com_rede
-@exigir_permissao("pode_replic_verificar")
+@exigir_permissao("pode_reenviar_documentos")
 def api_reenviar_nfce(contexto, loja_id, pdv_id):
     pdv = encontrar_pdv(contexto, loja_id, pdv_id)
     if not pdv:
@@ -451,16 +467,17 @@ def api_setup_info():
     })
 
 
-@app.route("/api/pdv/config-arquivo", methods=["GET"])
-@login_required
-def api_config_arquivo_pdv():
-    """Gera pdv_config.ini com token e auth key para importar no instalador PDVAgent_Setup.exe."""
+@app.route("/api/<int:rede_id>/pdv/config-arquivo", methods=["GET"])
+@com_rede
+def api_config_arquivo_pdv(contexto):
+    """Gera pdv_config.ini com o token DESTA rede e a auth key, para importar
+    no instalador PDVAgent_Setup.exe. Escopado por rede -- nunca usar um token
+    compartilhado entre clientes, quebraria o isolamento multi-tenant."""
     from pdv_server import pdv_auth_key
-    from pdv_server.config import TOKEN_SEGURANCA
 
     conteudo = (
         "[PDVAgent]\n"
-        f"TOKEN={TOKEN_SEGURANCA}\n"
+        f"TOKEN={contexto.token}\n"
         f"AUTHKEY={pdv_auth_key.ler()['key']}\n"
         "HOSTNAME=\n"
     )
@@ -470,15 +487,6 @@ def api_config_arquivo_pdv():
         mimetype="text/plain; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="pdv_config.ini"'},
     )
-
-
-@app.route("/api/token-agente", methods=["GET"])
-@login_required
-def api_token_agente():
-    """Retorna o token de acesso dos agentes PDV (PDV_SERVER_TOKEN).
-    Usado pelo painel de Instalação para exibir o valor ao técnico."""
-    from pdv_server.config import TOKEN_SEGURANCA
-    return jsonify({"token": TOKEN_SEGURANCA})
 
 
 @app.route("/api/tailscale/auth-key-pdv", methods=["GET"])
@@ -887,6 +895,8 @@ def api_integrador_versao_atual(contexto):
 @com_rede
 @exigir_permissao("pode_atu_integrador")
 def api_integrador_atualizar_stream(contexto):
+    if not _requisicao_mesma_origem():
+        return jsonify({"erro": "Requisição bloqueada (verificação de origem)"}), 403
     nova_versao = request.args.get("versao", "").strip()
     if not nova_versao:
         return jsonify({"erro": "Parâmetro 'versao' obrigatório"}), 400

@@ -1,11 +1,14 @@
 import datetime
 import json
+import logging
 import os
 import threading
 import time
 
 from pdv_server.config import PDV_LOCAL_MONGO_PORTA, REPLICACAO_DB
 from pdv_server.discovery import endereco_alcancavel, get_lojas
+
+log = logging.getLogger(__name__)
 
 COLECOES = [
     "pessoas",
@@ -393,6 +396,7 @@ def loop_automatico():
                 try:
                     contexto = obter_contexto(resumo["id"])
                 except Exception:
+                    log.exception("loop_automatico: falha ao carregar contexto da rede %s", resumo["id"])
                     continue
 
                 cfg = carregar_config_auto(contexto)
@@ -410,5 +414,5 @@ def loop_automatico():
                 if deve_rodar:
                     _executar_verificacao_automatica(contexto)
         except Exception:
-            pass
+            log.exception("loop_automatico: falha inesperada no ciclo de verificacao automatica")
         time.sleep(30)

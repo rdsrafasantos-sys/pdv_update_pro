@@ -86,6 +86,9 @@ class Perfil(Base):
     # Configurações
     pode_config_banco = Column(Boolean, default=False)
     pode_config_integrador = Column(Boolean, default=False)
+    # Reenvio de venda/NFC-e ao Service Manager -- ação com efeito fiscal/financeiro
+    # real, separada de pode_replic_verificar (que é só diagnóstico de replicação).
+    pode_reenviar_documentos = Column(Boolean, default=False)
 
     criado_em = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -220,6 +223,7 @@ def _migrar_colunas_novas():
             "pode_replic_config": "BOOLEAN DEFAULT 0",
             "pode_config_banco": "BOOLEAN DEFAULT 0",
             "pode_config_integrador": "BOOLEAN DEFAULT 0",
+            "pode_reenviar_documentos": "BOOLEAN DEFAULT 0",
         },
         "redes": {
             "cnpj": "VARCHAR(14)",

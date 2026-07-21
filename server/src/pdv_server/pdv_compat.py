@@ -5,6 +5,7 @@ Busca e parseia a página de notas do PDVPro para extrair a versão mínima
 do integrador exigida por cada versão. Cache local com TTL de 24h.
 """
 import json
+import logging
 import os
 import re
 import threading
@@ -13,6 +14,8 @@ import time
 import requests
 
 from pdv_server.versioning import versao_para_tupla
+
+log = logging.getLogger(__name__)
 
 URL_NOTAS_PDVPRO = (
     "https://docs.vrsoft.com.br/vrsuper/outros/vrpdvpro/notas-de-versao-vrpdvpro"
@@ -68,7 +71,7 @@ def _salvar_cache(cache_dir: str, tabela: dict):
         with open(_cache_path(cache_dir), "w", encoding="utf-8") as f:
             json.dump({"ts": time.time(), "tabela": tabela}, f)
     except Exception:
-        pass
+        log.exception("Falha ao salvar cache de compatibilidade em %s", cache_dir)
 
 
 def _parsear_tabela(html: str) -> dict:

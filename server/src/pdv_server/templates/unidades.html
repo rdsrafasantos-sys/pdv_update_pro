@@ -117,6 +117,10 @@
 </div>
 
 <script>
+function _esc(str) {
+  return String(str ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
 async function carregarUnidades() {
   const r = await fetch('/api/unidades');
   const unidades = await r.json();
@@ -127,7 +131,7 @@ async function carregarUnidades() {
   }
   tbody.innerHTML = unidades.map(u => `
     <tr>
-      <td class="strong">${u.nome}</td>
+      <td class="strong">${_esc(u.nome)}</td>
       <td>${u.total_redes}</td>
       <td style="text-align:right;">
         <button class="btn btn-ghost btn-sm" onclick="editarUnidade(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">Editar</button>

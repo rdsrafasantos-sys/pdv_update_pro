@@ -1,6 +1,7 @@
 import hashlib
 import hmac as _hmac_mod
 import json
+import logging
 import os
 import re
 import threading
@@ -10,6 +11,8 @@ from urllib.parse import urlparse
 import requests
 
 from pdv_server.discovery import endereco_alcancavel
+
+log = logging.getLogger(__name__)
 
 SERVICE_MANAGER_PORTA = 27571
 SERVICE_MANAGER_PREFIXO = "/api"
@@ -105,7 +108,7 @@ def enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo, caminho_status=Non
                                 timeout=60
                             )
                     except Exception:
-                        pass
+                        log.exception("Falha ao enviar status_pdv.exe para o PDV %s (%s)", pdv["id"], endereco)
                 resultados[pdv["id"]] = {"ok": ok, "msg": msg}
                 return
             except Exception as e:

@@ -311,6 +311,7 @@
     <div style="border-top:1px solid var(--border);margin:10px 0 4px;padding-top:10px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;">🔄 Replicações</div>
     <div class="checkbox-row"><input type="checkbox" id="campoPodeReplicVerificar"><label style="margin:0;">Disparar verificação manual</label></div>
     <div class="checkbox-row"><input type="checkbox" id="campoPodeReplicConfig"><label style="margin:0;">Configurar verificação automática</label></div>
+    <div class="checkbox-row"><input type="checkbox" id="campoPodeReenviarDocumentos"><label style="margin:0;">Reenviar venda/NFC-e ao Service Manager</label></div>
     <div style="border-top:1px solid var(--border);margin:10px 0 4px;padding-top:10px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;">⚙️ Configurações</div>
     <div class="checkbox-row"><input type="checkbox" id="campoPodeConfigBanco"><label style="margin:0;">Aba Banco de Dados (ERP)</label></div>
     <div class="checkbox-row"><input type="checkbox" id="campoPodeConfigIntegrador"><label style="margin:0;">Aba Integrador + SSH</label></div>
@@ -352,6 +353,10 @@
 const EU_ID = {{ usuario_atual.id }};
 const EU_SUPER = {{ 'true' if usuario_atual.is_super_admin else 'false' }};
 
+function _esc(str) {
+  return String(str ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
 let unidadesCache = [];
 let redesCache = [];
 let perfisCache = [];
@@ -370,7 +375,7 @@ function _renderCheckList(id, itens, selecionados = []) {
     <label class="check-list-item">
       <input type="checkbox" value="${item.id}"
         ${selecionados.includes(item.id) ? 'checked' : ''}>
-      ${item.nome}
+      ${_esc(item.nome)}
     </label>
   `).join('');
 }
@@ -458,7 +463,7 @@ async function carregarTudo() {
 
   const selPerfil = document.getElementById('campoPerfilUsuario');
   selPerfil.innerHTML = '<option value="">Sem perfil (sem permissões)</option>' +
-    perfis.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
+    perfis.map(p => `<option value="${p.id}">${_esc(p.nome)}</option>`).join('');
 
   _renderCheckList('campoUnidadesUsuario', unidades);
   _renderCheckList('campoRedesUsuario', redes);
@@ -476,21 +481,21 @@ function renderUsuarios(usuarios) {
   tbody.innerHTML = usuarios.map(u => {
     const acesso = u.is_super_admin || u.acesso_total
       ? 'Todas as unidades/redes'
-      : ([...u.unidades_nomes, ...u.redes_nomes].join(', ') || 'Nenhum acesso configurado');
+      : (_esc([...u.unidades_nomes, ...u.redes_nomes].join(', ')) || 'Nenhum acesso configurado');
     return `
     <tr>
       <td>
         <div style="display:flex; gap:10px; align-items:center;">
-          <div class="avatar" style="width:28px;height:28px;font-size:11px;">${u.nome.slice(0,2).toUpperCase()}</div>
+          <div class="avatar" style="width:28px;height:28px;font-size:11px;">${_esc(u.nome.slice(0,2).toUpperCase())}</div>
           <div>
-            <div class="strong" style="color:var(--text);">${u.nome}</div>
-            <div style="font-size:11.5px; color:var(--text-faint);">${u.email}</div>
+            <div class="strong" style="color:var(--text);">${_esc(u.nome)}</div>
+            <div style="font-size:11.5px; color:var(--text-faint);">${_esc(u.email)}</div>
           </div>
         </div>
       </td>
       <td>${u.is_super_admin
         ? '<span class="badge badge-gray">Super-admin</span>'
-        : (u.perfil_nome ? `<span class="badge badge-gray">${u.perfil_nome}</span>` : '<span class="text-muted">—</span>')}</td>
+        : (u.perfil_nome ? `<span class="badge badge-gray">${_esc(u.perfil_nome)}</span>` : '<span class="text-muted">—</span>')}</td>
       <td style="color:var(--text-faint); font-size:12px;">${acesso}</td>
       <td>${u.totp_habilitado
         ? '<span class="badge badge-green"><span class="badge-dot"></span>Ativo</span>'
@@ -518,7 +523,7 @@ function renderPerfis(perfis) {
   }
   grid.innerHTML = perfis.map(p => `
     <div class="card">
-      <div style="font-weight:650;">${p.nome}</div>
+      <div style="font-weight:650;">${_esc(p.nome)}</div>
       <div style="font-size:11.5px; color:var(--text-faint); margin:4px 0 12px;">${p.total_usuarios} usuário(s)</div>
       <div style="display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--text-dim); margin-bottom:12px;">
         <div>${p.pode_gerenciar_redes ? '✔' : '✕'} Gerenciar redes</div>
@@ -528,7 +533,7 @@ function renderPerfis(perfis) {
         <div style="border-top:1px solid var(--border);padding-top:4px;margin-top:2px;font-size:11px;opacity:.7;">⚡ Atualizações</div>
         <div style="padding-left:8px;">${p.pode_atu_agente ? '✔' : '✕'} Agente &nbsp;${p.pode_atu_pdv_upload ? '✔' : '✕'} ZIP &nbsp;${p.pode_atu_pdv_disparar ? '✔' : '✕'} Disparar &nbsp;${p.pode_atu_pdv_limpar ? '✔' : '✕'} Limpar &nbsp;${p.pode_atu_integrador ? '✔' : '✕'} Integ.</div>
         <div style="font-size:11px;opacity:.7;">🔄 Replicações</div>
-        <div style="padding-left:8px;">${p.pode_replic_verificar ? '✔' : '✕'} Verificar &nbsp;${p.pode_replic_config ? '✔' : '✕'} Config</div>
+        <div style="padding-left:8px;">${p.pode_replic_verificar ? '✔' : '✕'} Verificar &nbsp;${p.pode_replic_config ? '✔' : '✕'} Config &nbsp;${p.pode_reenviar_documentos ? '✔' : '✕'} Reenviar venda/NFC-e</div>
         <div style="font-size:11px;opacity:.7;">⚙️ Configurações</div>
         <div style="padding-left:8px;">${p.pode_config_banco ? '✔' : '✕'} Banco &nbsp;${p.pode_config_integrador ? '✔' : '✕'} Integrador</div>
       </div>
@@ -741,6 +746,7 @@ function abrirModalNovoPerfil() {
   document.getElementById('campoPodeAtuIntegrador').checked = false;
   document.getElementById('campoPodeReplicVerificar').checked = false;
   document.getElementById('campoPodeReplicConfig').checked = false;
+  document.getElementById('campoPodeReenviarDocumentos').checked = false;
   document.getElementById('campoPodeConfigBanco').checked = false;
   document.getElementById('campoPodeConfigIntegrador').checked = false;
   document.getElementById('erroPerfil').style.display = 'none';
@@ -765,6 +771,7 @@ function editarPerfil(id) {
   document.getElementById('campoPodeAtuIntegrador').checked = p.pode_atu_integrador;
   document.getElementById('campoPodeReplicVerificar').checked = p.pode_replic_verificar;
   document.getElementById('campoPodeReplicConfig').checked = p.pode_replic_config;
+  document.getElementById('campoPodeReenviarDocumentos').checked = p.pode_reenviar_documentos;
   document.getElementById('campoPodeConfigBanco').checked = p.pode_config_banco;
   document.getElementById('campoPodeConfigIntegrador').checked = p.pode_config_integrador;
   document.getElementById('erroPerfil').style.display = 'none';
@@ -791,6 +798,7 @@ async function salvarPerfil() {
     pode_atu_integrador:     document.getElementById('campoPodeAtuIntegrador').checked,
     pode_replic_verificar:   document.getElementById('campoPodeReplicVerificar').checked,
     pode_replic_config:      document.getElementById('campoPodeReplicConfig').checked,
+    pode_reenviar_documentos: document.getElementById('campoPodeReenviarDocumentos').checked,
     pode_config_banco:       document.getElementById('campoPodeConfigBanco').checked,
     pode_config_integrador:  document.getElementById('campoPodeConfigIntegrador').checked,
   };
