@@ -123,46 +123,40 @@ def enviar_agente_para_pdvs(contexto, caminho_exe, pdvs_alvo, caminho_status=Non
     return resultados
 
 
-def reiniciar_mongo_pdv(contexto, pdv):
+def _chamar_pdv_agente(metodo, contexto, pdv, caminho, **kwargs):
+    """Chama um endpoint simples do agente do PDV (GET ou POST que devolve um
+    JSON pronto), com o tratamento de erro de rede padronizado. kwargs extras
+    (params, timeout, etc.) sao repassados direto para requests.<metodo>."""
     ip = pdv["ip"]
     endereco = endereco_alcancavel(ip, contexto.tailscale_site_id)
+    headers = kwargs.pop("headers", {})
+    headers.setdefault("X-Agent-Token", contexto.token)
     try:
-        r = requests.post(
-            f"http://{endereco}:5000/reiniciar_mongo",
-            headers={"X-Agent-Token": contexto.token},
-            timeout=40
+        r = getattr(requests, metodo)(
+            f"http://{endereco}:5000{caminho}",
+            headers=headers,
+            **kwargs,
         )
         dados = r.json()
         dados["ok"] = r.status_code == 200
         return dados
     except requests.exceptions.ConnectionError:
-        return {"ok": False, "erro": f"PDV {pdv['ip']} não acessível."}
+        return {"ok": False, "erro": f"PDV {ip} não acessível."}
     except Exception as e:
         return {"ok": False, "erro": str(e)}
 
 
+def reiniciar_mongo_pdv(contexto, pdv):
+    return _chamar_pdv_agente("post", contexto, pdv, "/reiniciar_mongo", timeout=40)
+
+
 def listar_logs_pdv(contexto, pdv, desde=None, ate=None):
-    ip = pdv["ip"]
-    endereco = endereco_alcancavel(ip, contexto.tailscale_site_id)
     params = {}
     if desde:
         params["desde"] = desde
     if ate:
         params["ate"] = ate
-    try:
-        r = requests.get(
-            f"http://{endereco}:5000/logs",
-            headers={"X-Agent-Token": contexto.token},
-            params=params,
-            timeout=15
-        )
-        dados = r.json()
-        dados["ok"] = r.status_code == 200
-        return dados
-    except requests.exceptions.ConnectionError:
-        return {"ok": False, "erro": f"PDV {pdv['ip']} não acessível."}
-    except Exception as e:
-        return {"ok": False, "erro": str(e)}
+    return _chamar_pdv_agente("get", contexto, pdv, "/logs", params=params, timeout=15)
 
 
 def baixar_log_pdv(contexto, pdv, nome_arquivo):

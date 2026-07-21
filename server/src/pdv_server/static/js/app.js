@@ -336,7 +336,37 @@ async function verificarAgenteDisponivel() {
   }
 }
 
-function uploadAgente(input) {
+/**
+ * Envia um FormData via XHR (fetch nao expoe progresso de upload), atualizando
+ * uma barra de progresso real conforme os bytes vao sendo enviados. Usado por
+ * todo upload de arquivo do painel (agente.exe, status_pdv.exe, .zip de
+ * atualizacao) para nao repetir a mesma plumbing de XHR em cada um.
+ * Retorna { status, dados } quando a requisicao termina (dados = JSON
+ * parseado da resposta, ou {} se nao for JSON valido).
+ */
+function _uploadComProgresso(url, formData, { barEl, progressWrapEl } = {}) {
+  if (progressWrapEl) progressWrapEl.style.display = "block";
+  if (barEl) barEl.style.width = "0%";
+
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable && barEl) {
+        barEl.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
+      }
+    });
+    xhr.addEventListener("loadend", () => {
+      if (progressWrapEl) progressWrapEl.style.display = "none";
+      let dados = {};
+      try { dados = JSON.parse(xhr.responseText); } catch (e) {}
+      resolve({ status: xhr.status, dados });
+    });
+    xhr.open("POST", url);
+    xhr.send(formData);
+  });
+}
+
+async function uploadAgente(input) {
   const arquivo = input.files[0];
   if (!arquivo) return;
   const btn = document.getElementById("btnUploadAgente");
@@ -348,31 +378,19 @@ function uploadAgente(input) {
   if (btn) { btn.disabled = true; btn.textContent = `⏳ Enviando ${(arquivo.size / 1048576).toFixed(1)} MB...`; }
   if (info) info.textContent = "Enviando agente.exe para o servidor...";
   if (badge) { badge.className = "agente-badge enviando"; badge.textContent = "⏳ aguarde..."; }
-  if (progressWrap) progressWrap.style.display = "block";
-  if (bar) bar.style.width = "0%";
 
   const fd = new FormData();
   fd.append("arquivo", arquivo);
+  await _uploadComProgresso(API("/upload_agente"), fd, { barEl: bar, progressWrapEl: progressWrap });
 
-  const xhr = new XMLHttpRequest();
-  xhr.upload.addEventListener("progress", (e) => {
-    if (e.lengthComputable && bar) {
-      bar.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
-    }
-  });
-  xhr.addEventListener("loadend", async () => {
-    input.value = "";
-    if (btn) { btn.disabled = false; btn.textContent = "Enviar novo agente.exe"; }
-    if (progressWrap) progressWrap.style.display = "none";
-    if (info) info.textContent = "Verificando envio...";
-    await verificarAgenteDisponivel();
-  });
-  xhr.open("POST", API("/upload_agente"));
-  xhr.send(fd);
+  input.value = "";
+  if (btn) { btn.disabled = false; btn.textContent = "Enviar novo agente.exe"; }
+  if (info) info.textContent = "Verificando envio...";
+  await verificarAgenteDisponivel();
 }
 window.uploadAgente = uploadAgente;
 
-function uploadStatusPdv(input) {
+async function uploadStatusPdv(input) {
   const arquivo = input.files[0];
   if (!arquivo) return;
   const btn = document.getElementById("btnUploadStatusPdv");
@@ -382,28 +400,14 @@ function uploadStatusPdv(input) {
 
   if (btn) { btn.disabled = true; btn.textContent = `⏳ Enviando ${(arquivo.size / 1048576).toFixed(1)} MB...`; }
   if (info) info.textContent = "Enviando status_pdv.exe...";
-  if (progressWrap) progressWrap.style.display = "block";
-  if (bar) bar.style.width = "0%";
 
   const fd = new FormData();
   fd.append("arquivo", arquivo);
+  const { dados } = await _uploadComProgresso(API("/upload_agente"), fd, { barEl: bar, progressWrapEl: progressWrap });
 
-  const xhr = new XMLHttpRequest();
-  xhr.upload.addEventListener("progress", (e) => {
-    if (e.lengthComputable && bar) {
-      bar.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
-    }
-  });
-  xhr.addEventListener("loadend", () => {
-    input.value = "";
-    if (btn) { btn.disabled = false; btn.textContent = "Enviar novo status_pdv.exe"; }
-    if (progressWrap) progressWrap.style.display = "none";
-    let dados = {};
-    try { dados = JSON.parse(xhr.responseText); } catch (e) {}
-    if (info) info.textContent = dados.mensagem || dados.erro || "Concluido";
-  });
-  xhr.open("POST", API("/upload_agente"));
-  xhr.send(fd);
+  input.value = "";
+  if (btn) { btn.disabled = false; btn.textContent = "Enviar novo status_pdv.exe"; }
+  if (info) info.textContent = dados.mensagem || dados.erro || "Concluido";
 }
 window.uploadStatusPdv = uploadStatusPdv;
 
@@ -437,29 +441,14 @@ window.iniciarAtualizacaoAgente = iniciarAtualizacaoAgente;
 // ──────────────────────────────────────────────
 // ATUALIZACAO DE PDV (view "pdv") — upload de .zip + envio
 // ──────────────────────────────────────────────
-function fazerUpload(file) {
+async function fazerUpload(file) {
   const fd = new FormData();
   fd.append("arquivo", file);
   const progEl = document.getElementById("uploadProgress");
   const bar = document.getElementById("uploadBar");
-  if (progEl) progEl.style.display = "block";
-  if (bar) bar.style.width = "0%";
 
-  return new Promise((resolve) => {
-    const xhr = new XMLHttpRequest();
-    xhr.upload.addEventListener("progress", (e) => {
-      if (e.lengthComputable && bar) {
-        bar.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
-      }
-    });
-    xhr.addEventListener("loadend", async () => {
-      if (progEl) progEl.style.display = "none";
-      await carregarArquivos();
-      resolve();
-    });
-    xhr.open("POST", API("/upload"));
-    xhr.send(fd);
-  });
+  await _uploadComProgresso(API("/upload"), fd, { barEl: bar, progressWrapEl: progEl });
+  await carregarArquivos();
 }
 
 async function carregarArquivos() {

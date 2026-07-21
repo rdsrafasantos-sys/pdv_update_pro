@@ -6,7 +6,7 @@ import threading
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from pdv_server.app import app
-from pdv_server.auth.gestao import repor_pool_background
+from pdv_server.auth.gestao_instalacao import repor_pool_background
 from pdv_server.config import PORTA_SERVIDOR
 from pdv_server.replication import loop_automatico
 

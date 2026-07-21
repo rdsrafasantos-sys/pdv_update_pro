@@ -3,14 +3,17 @@ from flask_login import current_user, login_required
 
 from pdv_server.auth.audit import registrar_auditoria
 from pdv_server.auth.gestao import (
-    alternar_ativa_rede, criar_perfil, criar_rede, criar_rede_da_instalacao,
+    alternar_ativa_rede, criar_perfil, criar_rede,
     criar_unidade, criar_usuario, editar_perfil, editar_rede, editar_unidade,
     editar_usuario, excluir_perfil, excluir_unidade, excluir_usuario,
-    gerar_proximo_site_id, gerar_script_instalacao, instalacoes_visiveis_para,
-    listar_perfis, listar_redes, listar_site_ids_instalacao, listar_unidades,
-    listar_usuarios, obter_instalacao, obter_rede, obter_usuario,
-    processar_callback_instalacao, redes_visiveis_para, status_pool,
-    usuario_pode_acessar_instalacao, usuario_pode_acessar_rede,
+    listar_perfis, listar_redes, listar_unidades,
+    listar_usuarios, obter_rede, obter_usuario,
+    redes_visiveis_para, usuario_pode_acessar_rede,
+)
+from pdv_server.auth.gestao_instalacao import (
+    criar_rede_da_instalacao, gerar_proximo_site_id, gerar_script_instalacao,
+    instalacoes_visiveis_para, listar_site_ids_instalacao, obter_instalacao,
+    processar_callback_instalacao, status_pool, usuario_pode_acessar_instalacao,
 )
 from pdv_server.auth.routes import exigir_permissao, exigir_super_admin, limiter
 

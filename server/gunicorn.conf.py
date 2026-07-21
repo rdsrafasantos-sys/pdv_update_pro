@@ -24,7 +24,7 @@ keepalive = 5
 def post_fork(server, worker):
     """Inicia as threads de background após o fork do worker gevent."""
     import threading
-    from pdv_server.auth.gestao import repor_pool_background
+    from pdv_server.auth.gestao_instalacao import repor_pool_background
     from pdv_server.replication import loop_automatico
 
     threading.Thread(target=loop_automatico, daemon=True).start()
