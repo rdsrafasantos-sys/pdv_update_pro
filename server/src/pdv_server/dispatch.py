@@ -193,16 +193,15 @@ def ler_conteudo_log_pdv(contexto, pdv, nome_arquivo):
 
 
 def extrair_payloads_de_log(texto):
-    """Extrai os payloads (venda ou NFC-e) de um log_api, delimitados por
+    """Extrai os documentos (venda/NFC-e -- o mesmo JSON serve para reenviar
+    em qualquer um dos dois endpoints, a escolha de qual usar e do operador,
+    nao da pra inferir pelo conteudo) de um log_api, delimitados por
     "--------- JSON ---------" ... "--------- FIM JSON ---------". Cada linha
     do log (inclusive as do corpo do JSON) vem prefixada com
     "YYYY/MM/DD HH:MM:SS " -- precisa remover antes do json.loads.
 
-    Os dois tipos usam o mesmo delimitador -- a classificacao e feita pelo
-    formato do conteudo: presenca de "chaveNFCe"/"emissaoNotaFiscalEmitente"
-    ou "xml"/"chaveacesso" indica NFC-e, presenca de "numeroCupom" sem esses
-    campos indica venda comum. Blocos que nao forem JSON valido ou nao
-    baterem com nenhum dos dois formatos sao ignorados silenciosamente -- o
+    Blocos que nao forem JSON valido ou nao tiverem "numeroCupom" (nao
+    parecem um documento de venda/NFC-e) sao ignorados silenciosamente -- o
     log pode conter outros tipos de payload."""
     itens = []
     for m in _BLOCO_VENDA_JSON_RE.finditer(texto):
@@ -211,39 +210,24 @@ def extrair_payloads_de_log(texto):
             obj = json.loads(bruto)
         except (json.JSONDecodeError, ValueError):
             continue
-        if not isinstance(obj, dict):
+        if not isinstance(obj, dict) or "numeroCupom" not in obj:
             continue
 
-        eh_nfce = any(k in obj for k in ("xml", "chaveacesso", "chaveNFCe", "emissaoNotaFiscalEmitente"))
-        if eh_nfce:
-            emitente = obj.get("emissaoNotaFiscalEmitente") or {}
-            itens.append({
-                "tipo": "nfce",
-                "resumo": {
-                    "numeroCupom": obj.get("numeroCupom"),
-                    "pdv": obj.get("numeroPDV", obj.get("pdv")),
-                    "idLoja": emitente.get("idLoja", obj.get("idLoja")),
-                    "situacao": obj.get("situacao"),
-                    "motivorejeicao": obj.get("motivorejeicao"),
-                    "chaveNFCe": obj.get("chaveNFCe"),
-                    "datahoraemissao": obj.get("dataHoraEmissao", obj.get("datahoraemissao")),
-                    "valor": obj.get("valorNfe"),
-                },
-                "payload": obj,
-            })
-        elif "numeroCupom" in obj:
-            itens.append({
-                "tipo": "venda",
-                "resumo": {
-                    "numeroCupom": obj.get("numeroCupom"),
-                    "pdv": obj.get("pdv"),
-                    "idLoja": obj.get("idLoja"),
-                    "total": obj.get("total"),
-                    "dataHoraInicio": obj.get("dataHoraInicio"),
-                    "cancelado": obj.get("cancelado", False),
-                },
-                "payload": obj,
-            })
+        emitente = obj.get("emissaoNotaFiscalEmitente") or {}
+        itens.append({
+            "resumo": {
+                "numeroCupom": obj.get("numeroCupom"),
+                "pdv": obj.get("numeroPDV", obj.get("pdv")),
+                "idLoja": emitente.get("idLoja", obj.get("idLoja")),
+                "valor": obj.get("valorNfe", obj.get("total")),
+                "data": obj.get("dataHoraEmissao", obj.get("dataHoraVenda", obj.get("dataHoraInicio"))),
+                "chaveNFCe": obj.get("chaveNFCe"),
+                "situacao": obj.get("situacao"),
+                "motivorejeicao": obj.get("motivorejeicao"),
+                "cancelado": obj.get("cancelado", False),
+            },
+            "payload": obj,
+        })
     return itens
 
 

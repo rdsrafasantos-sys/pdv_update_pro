@@ -885,18 +885,12 @@ let _documentosCache = {};
 
 function _resumoDocumento(item) {
   const s = item.resumo;
-  if (item.tipo === "nfce") {
-    return `
-      🧾 NFC-e · Cupom <strong>${s.numeroCupom ?? "—"}</strong> · PDV ${s.pdv ?? "—"} · Loja ${s.idLoja ?? "—"}
-      ${s.valor != null ? `· R$ ${Number(s.valor).toFixed(2)} ` : ""}· ${s.datahoraemissao ?? "—"}
-      ${s.chaveNFCe ? ` · <span class="text-muted" style="font-size:10.5px;">chave ${s.chaveNFCe}</span>` : ""}
-      ${s.situacao ? ` · situação ${s.situacao}` : ""}
-      ${s.motivorejeicao ? ` · <span style="color:var(--red);">${s.motivorejeicao}</span>` : ""}
-    `;
-  }
   return `
-    🛒 Venda · Cupom <strong>${s.numeroCupom ?? "—"}</strong> · PDV ${s.pdv ?? "—"} · Loja ${s.idLoja ?? "—"}
-    · R$ ${s.total != null ? Number(s.total).toFixed(2) : "—"} · ${s.dataHoraInicio ?? "—"}
+    Cupom <strong>${s.numeroCupom ?? "—"}</strong> · PDV ${s.pdv ?? "—"} · Loja ${s.idLoja ?? "—"}
+    ${s.valor != null ? `· R$ ${Number(s.valor).toFixed(2)} ` : ""}· ${s.data ?? "—"}
+    ${s.chaveNFCe ? ` · <span class="text-muted" style="font-size:10.5px;">chave ${s.chaveNFCe}</span>` : ""}
+    ${s.situacao ? ` · situação ${s.situacao}` : ""}
+    ${s.motivorejeicao ? ` · <span style="color:var(--red);">${s.motivorejeicao}</span>` : ""}
     ${s.cancelado ? ' <span style="color:var(--amber);">(cancelada)</span>' : ""}
   `;
 }
@@ -927,9 +921,12 @@ async function verDocumentosLog(loja_id, pdvId, nomeArquivo, painelId) {
       const chave = `${painelId}-${i}`;
       _documentosCache[chave] = item;
       return `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:6px;background:var(--bg-elevated);margin-top:4px;font-size:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:6px;background:var(--bg-elevated);margin-top:4px;font-size:12px;gap:10px;">
           <div>${_resumoDocumento(item)}</div>
-          <button class="btn-verify" id="reenviar-${chave}" onclick="reenviarDocumento('${loja_id}','${pdvId}','${chave}')">📤 Reenviar</button>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button class="btn-verify" id="reenviar-${chave}-venda" onclick="reenviarDocumento('${loja_id}','${pdvId}','${chave}','venda')">🛒 Reenviar Venda</button>
+            <button class="btn-verify" id="reenviar-${chave}-nfce" onclick="reenviarDocumento('${loja_id}','${pdvId}','${chave}','nfce')">🧾 Reenviar NFC-e</button>
+          </div>
         </div>`;
     }).join("");
   } catch (e) {
@@ -938,15 +935,17 @@ async function verDocumentosLog(loja_id, pdvId, nomeArquivo, painelId) {
 }
 window.verDocumentosLog = verDocumentosLog;
 
-async function reenviarDocumento(loja_id, pdvId, chave) {
+async function reenviarDocumento(loja_id, pdvId, chave, tipoAlvo) {
   const item = _documentosCache[chave];
-  const btn = document.getElementById(`reenviar-${chave}`);
+  const btn = document.getElementById(`reenviar-${chave}-${tipoAlvo}`);
+  const outroBtn = document.getElementById(`reenviar-${chave}-${tipoAlvo === "nfce" ? "venda" : "nfce"}`);
   if (!item || !btn) return;
-  const rotulo = item.tipo === "nfce" ? "NFC-e" : "venda";
-  if (!confirm(`Reenviar a ${rotulo} — Cupom ${item.payload.numeroCupom} — para o Service Manager?`)) return;
+  const rotulo = tipoAlvo === "nfce" ? "NFC-e" : "venda";
+  if (!confirm(`Reenviar como ${rotulo} — Cupom ${item.payload.numeroCupom} — para o Service Manager?`)) return;
 
-  const endpoint = item.tipo === "nfce" ? "nfce/reenviar" : "venda/reenviar";
+  const endpoint = tipoAlvo === "nfce" ? "nfce/reenviar" : "venda/reenviar";
   btn.disabled = true;
+  if (outroBtn) outroBtn.disabled = true;
   const textoOriginal = btn.textContent;
   btn.textContent = "⏳ Enviando...";
 
@@ -959,13 +958,16 @@ async function reenviarDocumento(loja_id, pdvId, chave) {
     if (dados.ok) {
       btn.textContent = "✅ Reenviado";
       btn.style.color = "var(--green)";
+      if (outroBtn) outroBtn.style.display = "none";
     } else {
       btn.disabled = false;
+      if (outroBtn) outroBtn.disabled = false;
       btn.textContent = textoOriginal;
       alert(`Falha ao reenviar: ${dados.erro || JSON.stringify(dados.resposta || {})}`);
     }
   } catch (e) {
     btn.disabled = false;
+    if (outroBtn) outroBtn.disabled = false;
     btn.textContent = textoOriginal;
     alert(`Falha ao contatar o servidor: ${e}`);
   }
