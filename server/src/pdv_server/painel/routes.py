@@ -6,11 +6,11 @@ from pdv_server.auth.gestao import (
     alternar_ativa_rede, criar_perfil, criar_rede, criar_rede_da_instalacao,
     criar_unidade, criar_usuario, editar_perfil, editar_rede, editar_unidade,
     editar_usuario, excluir_perfil, excluir_unidade, excluir_usuario,
-    gerar_proximo_site_id, gerar_script_instalacao, listar_perfis,
-    listar_redes, listar_site_ids_instalacao, listar_unidades,
+    gerar_proximo_site_id, gerar_script_instalacao, instalacoes_visiveis_para,
+    listar_perfis, listar_redes, listar_site_ids_instalacao, listar_unidades,
     listar_usuarios, obter_instalacao, obter_rede, obter_usuario,
     processar_callback_instalacao, redes_visiveis_para, status_pool,
-    usuario_pode_acessar_rede,
+    usuario_pode_acessar_instalacao, usuario_pode_acessar_rede,
 )
 from pdv_server.auth.routes import exigir_permissao, exigir_super_admin, limiter
 
@@ -18,7 +18,11 @@ painel_bp = Blueprint("painel", __name__)
 
 
 def _ip():
-    return request.headers.get("X-Forwarded-For", request.remote_addr or "")
+    # request.remote_addr ja vem correto -- ProxyFix (app.py) so reescreve
+    # a partir de X-Forwarded-For em producao, onde ha proxy reverso
+    # confiavel na frente. Ler o cabecalho aqui direto voltaria a confiar
+    # num valor que qualquer cliente pode forjar.
+    return request.remote_addr or ""
 
 
 @painel_bp.route("/redes")
@@ -173,7 +177,7 @@ def api_alternar_rede(rede_id):
 @painel_bp.route("/api/instalacao/site-ids", methods=["GET"])
 @exigir_permissao("pode_gerenciar_redes")
 def api_listar_site_ids():
-    return jsonify(listar_site_ids_instalacao())
+    return jsonify(instalacoes_visiveis_para(int(current_user.id)))
 
 
 @painel_bp.route("/api/instalacao/site-ids", methods=["POST"])
@@ -194,6 +198,8 @@ def api_gerar_site_id():
 @painel_bp.route("/api/instalacao/<int:instalacao_id>", methods=["GET"])
 @exigir_permissao("pode_gerenciar_redes")
 def api_obter_instalacao(instalacao_id):
+    if not usuario_pode_acessar_instalacao(int(current_user.id), instalacao_id):
+        return jsonify({"erro": "Sem acesso a esta instalação"}), 403
     try:
         return jsonify(obter_instalacao(instalacao_id))
     except ValueError as e:
@@ -203,6 +209,8 @@ def api_obter_instalacao(instalacao_id):
 @painel_bp.route("/api/instalacao/<int:instalacao_id>/script", methods=["POST"])
 @exigir_permissao("pode_gerenciar_redes")
 def api_gerar_script_instalacao(instalacao_id):
+    if not usuario_pode_acessar_instalacao(int(current_user.id), instalacao_id):
+        return jsonify({"erro": "Sem acesso a esta instalação"}), 403
     dados = request.json or {}
     try:
         script = gerar_script_instalacao(instalacao_id, erp_ip=dados.get("erp_ip", ""))
@@ -218,6 +226,8 @@ def api_gerar_script_instalacao(instalacao_id):
 @painel_bp.route("/api/instalacao/<int:instalacao_id>/criar-rede", methods=["POST"])
 @exigir_permissao("pode_gerenciar_redes")
 def api_criar_rede_da_instalacao(instalacao_id):
+    if not usuario_pode_acessar_instalacao(int(current_user.id), instalacao_id):
+        return jsonify({"erro": "Sem acesso a esta instalação"}), 403
     dados = request.json or {}
     unidade_id = dados.get("unidade_id")
     if not current_user.acesso_total and unidade_id not in current_user.unidade_ids:

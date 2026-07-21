@@ -72,9 +72,22 @@ AUTH_DATA_DIR = os.environ.get("PDV_AUTH_DATA_DIR", "/opt/pdv-server/auth")
 # Chave mestra usada para criptografar segredos em repouso (token/Mongo URI
 # de cada rede) com Fernet. OBRIGATORIA em producao — gere uma com:
 #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# Sem ela definida, o processo nao sobe (ver app.py). Nunca commitar este
-# valor — fica so no .env de cada instalacao.
+# Nunca commitar este valor — fica so no .env de cada instalacao.
 MASTER_KEY = os.environ.get("PDV_MASTER_KEY", "")
+if not MASTER_KEY:
+    raise RuntimeError(
+        "PDV_MASTER_KEY nao configurada. Gere uma com: "
+        "python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+    )
+try:
+    from cryptography.fernet import Fernet as _Fernet
+    _Fernet(MASTER_KEY.encode())
+except Exception:
+    raise RuntimeError(
+        "PDV_MASTER_KEY tem formato invalido (precisa ser uma chave Fernet valida). "
+        "Gere uma com: python -c \"from cryptography.fernet import Fernet; "
+        "print(Fernet.generate_key().decode())\""
+    ) from None
 
 # Chave de sessao do Flask (assinatura do cookie). Tambem obrigatoria em
 # producao, gere com: python -c "import secrets; print(secrets.token_hex(32))"

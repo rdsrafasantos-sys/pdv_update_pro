@@ -1,3 +1,4 @@
+import hmac
 import json
 import os
 import threading
@@ -8,12 +9,13 @@ from urllib.parse import urlparse
 import requests
 from flask import Flask, Response, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
 from pdv_server.auth.gestao import usuario_pode_acessar_rede
 from pdv_server.auth.models import init_db
 from pdv_server.auth.routes import auth_bp, exigir_permissao, limiter, login_manager
-from pdv_server.config import INTEGRADOR_DATA_DIR, MASTER_KEY, SECRET_KEY
+from pdv_server.config import INTEGRADOR_DATA_DIR, SECRET_KEY
 from pdv_server.contexto import RedeInativa, RedeNaoEncontrada, obter_contexto
 from pdv_server.painel.routes import painel_bp
 from pdv_server.dispatch import (
@@ -35,11 +37,8 @@ if not SECRET_KEY:
         "PDV_SECRET_KEY nao configurada. Gere uma com: "
         "python -c \"import secrets; print(secrets.token_hex(32))\""
     )
-if not MASTER_KEY:
-    raise RuntimeError(
-        "PDV_MASTER_KEY nao configurada. Gere uma com: "
-        "python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
-    )
+# MASTER_KEY (presenca + formato Fernet) ja e validada em config.py na
+# importacao -- se chegou ate aqui, esta ok.
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
@@ -49,6 +48,14 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 # Secure flag ativo apenas em produção (HTTPS); staging roda em HTTP
 _em_producao = os.environ.get("PDV_AMBIENTE", "prod").lower() not in ("staging", "dev")
 app.config["SESSION_COOKIE_SECURE"] = _em_producao
+
+# So confia em X-Forwarded-For/Proto quando ha de fato um proxy reverso na
+# frente reescrevendo esse cabecalho (nginx em producao, terminando TLS).
+# Em staging o gunicorn fica exposto direto na tailnet -- sem proxy, esse
+# cabecalho e forjavel por qualquer peer que alcance a porta, entao NAO
+# confiamos nele la (x_for=0 deixa request.remote_addr como veio da conexao).
+if _em_producao:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
 
 @app.after_request
@@ -102,7 +109,11 @@ def injetar_usuario():
 
 
 def _ip():
-    return request.headers.get("X-Forwarded-For", request.remote_addr or "")
+    # request.remote_addr ja vem correto: ProxyFix (acima) reescreve a
+    # partir de X-Forwarded-For somente em producao, onde ha um proxy
+    # reverso confiavel na frente. Nao ler o cabecalho manualmente aqui --
+    # isso ignoraria essa checagem e voltaria a confiar num valor forjavel.
+    return request.remote_addr or ""
 
 
 def _requisicao_mesma_origem():
@@ -390,6 +401,7 @@ def api_limpar_arquivos(contexto):
 
 
 @app.route("/download/agente.exe")
+@limiter.limit("20 per minute")
 def download_agente_publico():
     """Download publico do agente.exe — sem autenticacao, para instalacao inicial em PDVs."""
     import glob
@@ -399,6 +411,7 @@ def download_agente_publico():
 
 
 @app.route("/download/status_pdv.exe")
+@limiter.limit("20 per minute")
 def download_status_pdv_publico():
     """Download publico do status_pdv.exe — sem autenticacao, para instalacao inicial em PDVs."""
     import glob
@@ -411,6 +424,7 @@ _SETUP_PATH = "/opt/pdv-server/setup/PDVAgent_Setup.exe"
 
 
 @app.route("/download/PDVAgent_Setup.exe")
+@limiter.limit("20 per minute")
 def download_setup_publico():
     """Download público do instalador completo — sem autenticação."""
     if os.path.exists(_SETUP_PATH):
@@ -424,7 +438,7 @@ def _autenticar_setup_upload():
         return True
     token = os.environ.get("PDV_SETUP_UPLOAD_TOKEN", "")
     auth = request.headers.get("Authorization", "")
-    return token and auth == f"Bearer {token}"
+    return bool(token) and hmac.compare_digest(auth, f"Bearer {token}")
 
 
 @app.route("/api/setup/upload", methods=["POST"])

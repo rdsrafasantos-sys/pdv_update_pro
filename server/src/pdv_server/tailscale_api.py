@@ -5,6 +5,7 @@ router -- sem precisar entrar manualmente no admin console a cada cliente
 novo. Credencial (OAuth client) configurada via PDV_TAILSCALE_OAUTH_CLIENT_ID/
 SECRET, ver config.py. Sem ela configurada, AutomacaoIndisponivel e levantada
 e quem chamou decide o fallback (mostrar comando manual, por exemplo)."""
+import subprocess
 import time
 
 import requests
@@ -141,3 +142,25 @@ def aprovar_rotas(device_id, rotas):
 
 def callback_url_disponivel():
     return bool(PAINEL_CALLBACK_URL)
+
+
+def prefixo_esperado(site_id, faixa):
+    """Recalcula localmente (via CLI do Tailscale instalado neste servidor)
+    o prefixo 4via6 esperado para este site_id e faixa. Usado para validar
+    o que o script do service manager reporta pelo callback -- esse
+    callback so e autenticado por um token de uso unico (sem sessao de
+    usuario por tras), entao sem essa checagem um payload malicioso
+    poderia reportar prefixos de OUTRO site_id e o servidor aprovaria
+    rotas/ACL para o cliente errado. Retorna None se o CLI nao estiver
+    disponivel ou o calculo falhar -- quem chama decide o fallback."""
+    try:
+        resultado = subprocess.run(
+            ["tailscale", "debug", "via", str(site_id), faixa],
+            capture_output=True, text=True, timeout=10,
+        )
+        if resultado.returncode != 0:
+            return None
+        linhas = [l.strip() for l in resultado.stdout.strip().splitlines() if l.strip()]
+        return linhas[-1] if linhas else None
+    except Exception:
+        return None

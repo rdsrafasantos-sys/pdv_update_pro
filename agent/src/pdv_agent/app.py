@@ -22,7 +22,7 @@ app = Flask(__name__)
 
 
 def verificar_token(req):
-    return req.headers.get("X-Agent-Token", "") == TOKEN_SEGURANCA
+    return _hmac_mod.compare_digest(req.headers.get("X-Agent-Token", ""), TOKEN_SEGURANCA)
 
 
 def _verificar_hmac(dados: bytes, hmac_recebido: str) -> bool:

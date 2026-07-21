@@ -33,7 +33,11 @@ auth_bp = Blueprint("auth", __name__)
 
 
 def _ip_cliente():
-    return request.headers.get("X-Forwarded-For", request.remote_addr or "")
+    # request.remote_addr ja vem correto -- ProxyFix (app.py) so reescreve
+    # a partir de X-Forwarded-For em producao, onde ha proxy reverso
+    # confiavel na frente. Ler o cabecalho aqui direto voltaria a confiar
+    # num valor que qualquer cliente pode forjar.
+    return request.remote_addr or ""
 
 
 def exigir_super_admin(view):

@@ -628,11 +628,37 @@ def _finalizar_automacao_instalacao(registro):
     ACL via API do Tailscale. So roda se a credencial estiver configurada
     -- senao, deixa status 'concluido_manual' com os prefixos visiveis pra
     quem administra colar manualmente no admin console."""
+    faixas = [f for f in (registro.faixas_detectadas or "").split(",") if f]
     prefixos = [p for p in (registro.prefixos_ipv6 or "").split(",") if p]
     if not prefixos:
         registro.status = "erro"
         registro.erro_mensagem = "Script concluiu mas nao reportou nenhum prefixo IPv6."
         return
+
+    # O callback que populou faixas/prefixos so e autenticado por um token
+    # de uso unico (sem sessao de usuario) -- recalcula localmente o
+    # prefixo esperado para o site_id desta instalacao e compara antes de
+    # confiar no valor reportado para tocar no ACL. Qualquer divergencia
+    # (ou impossibilidade de validar) cai no fallback manual em vez de
+    # aplicar automaticamente algo que nao foi verificado.
+    if len(faixas) != len(prefixos):
+        registro.status = "concluido_pendente_acl"
+        registro.erro_mensagem = (
+            "Numero de faixas e prefixos reportados nao bate -- aprove a rota e "
+            "acrescente os prefixos manualmente apos conferir."
+        )
+        return
+    for faixa, prefixo_reportado in zip(faixas, prefixos):
+        esperado = tailscale_api.prefixo_esperado(registro.site_id, faixa)
+        if esperado is not None and esperado.strip().lower() != prefixo_reportado.strip().lower():
+            registro.status = "concluido_pendente_acl"
+            registro.erro_mensagem = (
+                f"O prefixo reportado para a faixa {faixa} nao corresponde ao "
+                f"esperado para o site_id {registro.site_id} -- aplicação automática "
+                f"do ACL bloqueada por segurança. Confira manualmente antes de "
+                f"aprovar a rota."
+            )
+            return
 
     if not tailscale_api.automacao_disponivel():
         registro.status = "concluido_manual"
@@ -991,3 +1017,39 @@ def usuario_pode_acessar_rede(usuario_id, rede_id):
     except ValueError:
         return False
     return rede["unidade_id"] in perm["unidade_ids"]
+
+
+def instalacoes_visiveis_para(usuario_id):
+    """Lista as instalacoes (site-ids) que esse usuario pode ver. Antes da
+    Rede ser criada (Passo 3 do wizard) o registro nao tem unidade_id --
+    entao quem nao tem acesso_total so ve as instalacoes que ele mesmo
+    criou (usuario_email), para nao vazar CNPJ/IP/status de clientes de
+    outra unidade/tecnico."""
+    perm = carregar_permissoes(usuario_id)
+    if not perm:
+        return []
+    todas = listar_site_ids_instalacao()
+    if perm["acesso_total"]:
+        return todas
+    db = SessionLocal()
+    try:
+        usuario = db.get(Usuario, usuario_id)
+        email = usuario.email if usuario else None
+    finally:
+        db.close()
+    return [r for r in todas if email and r["usuario_email"] == email]
+
+
+def usuario_pode_acessar_instalacao(usuario_id, instalacao_id):
+    perm = carregar_permissoes(usuario_id)
+    if not perm:
+        return False
+    if perm["acesso_total"]:
+        return True
+    db = SessionLocal()
+    try:
+        usuario = db.get(Usuario, usuario_id)
+        registro = db.get(InstalacaoSiteId, instalacao_id)
+        return bool(usuario and registro and registro.usuario_email == usuario.email)
+    finally:
+        db.close()
