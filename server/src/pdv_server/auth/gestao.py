@@ -405,7 +405,7 @@ def _usuario_para_dict(usuario):
         "unidade_ids": [u.id for u in usuario.unidades],
         "rede_ids": [r.id for r in usuario.redes],
         "unidades_nomes": [u.nome for u in usuario.unidades],
-        "redes_nomes": [r.nome for r in usuario.redes],
+        "redes_nomes": [r.nome_fantasia for r in usuario.redes],
         "ultimo_login_em": usuario.ultimo_login_em.strftime("%Y-%m-%d %H:%M") if usuario.ultimo_login_em else None,
         "criado_em": usuario.criado_em.strftime("%Y-%m-%d %H:%M") if usuario.criado_em else None,
     }
