@@ -97,7 +97,7 @@
     border: 1px solid var(--green); border-radius: var(--radius-sm);
     padding: 12px 14px; font-size: 12.5px; color: var(--green); margin-bottom: 12px;
   }
-  #modalUsuario .modal-card { width: 500px; max-height: none; overflow-y: visible; }
+  #modalUsuario .modal-card, #modalPerfil .modal-card { width: 500px; max-height: none; overflow-y: visible; }
   .qr-wrap { display: flex; justify-content: center; margin: 14px 0 10px; }
   .qr-wrap svg { width: 180px !important; height: 180px !important; }
   .secret-code {
@@ -294,31 +294,64 @@
 <!-- ── Modal Perfil ── -->
 <div class="modal-overlay" id="modalPerfil">
   <div class="modal-card">
+    <div class="wz-progress">
+      <div class="wz-step ativo" id="pw-s1"><div class="wz-dot">1</div><div class="wz-step-label">Dados</div></div>
+      <div class="wz-line" id="pw-l1"></div>
+      <div class="wz-step" id="pw-s2"><div class="wz-dot">2</div><div class="wz-step-label">Geral</div></div>
+      <div class="wz-line" id="pw-l2"></div>
+      <div class="wz-step" id="pw-s3"><div class="wz-dot">3</div><div class="wz-step-label">Atualiz.</div></div>
+      <div class="wz-line" id="pw-l3"></div>
+      <div class="wz-step" id="pw-s4"><div class="wz-dot">4</div><div class="wz-step-label">Replic.</div></div>
+      <div class="wz-line" id="pw-l4"></div>
+      <div class="wz-step" id="pw-s5"><div class="wz-dot">5</div><div class="wz-step-label">Config.</div></div>
+    </div>
     <div class="modal-title" id="modalPerfilTitulo">Novo perfil</div>
     <input type="hidden" id="perfilId">
-    <div class="field"><label>Nome</label><input id="campoNomePerfil" placeholder="Ex: Operador"></div>
-    <div class="field"><label>Descrição</label><input id="campoDescPerfil" placeholder="Opcional"></div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeRedes"><label style="margin:0;">Pode cadastrar/editar redes</label></div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeUsuarios"><label style="margin:0;">Pode gerenciar usuários e perfis</label></div>
-    <div class="checkbox-row"><input type="checkbox" id="campoSomenteLeitura"><label style="margin:0;">Somente leitura (não pode disparar ações)</label></div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeVerFiscal"><label style="margin:0;">📋 Pendências Fiscais</label></div>
-    <div style="border-top:1px solid var(--border);margin:10px 0 4px;padding-top:10px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;">⚡ Atualizações</div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuAgente"><label style="margin:0;">Aba Agente — upload + disparar agente.exe</label></div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuPdvUpload"><label style="margin:0;">Aba PDV — subir arquivo ZIP</label></div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuPdvDisparar"><label style="margin:0;">Aba PDV — disparar atualização nos PDVs</label></div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuPdvLimpar"><label style="margin:0;">Aba PDV — deletar / limpar arquivos ZIP</label></div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuIntegrador"><label style="margin:0;">Aba Integrador — disparar atualização SSH</label></div>
-    <div style="border-top:1px solid var(--border);margin:10px 0 4px;padding-top:10px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;">🔄 Replicações</div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeReplicVerificar"><label style="margin:0;">Disparar verificação manual</label></div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeReplicConfig"><label style="margin:0;">Configurar verificação automática</label></div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeReenviarDocumentos"><label style="margin:0;">Reenviar venda/NFC-e ao Service Manager</label></div>
-    <div style="border-top:1px solid var(--border);margin:10px 0 4px;padding-top:10px;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;">⚙️ Configurações</div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeConfigBanco"><label style="margin:0;">Aba Banco de Dados (ERP)</label></div>
-    <div class="checkbox-row"><input type="checkbox" id="campoPodeConfigIntegrador"><label style="margin:0;">Aba Integrador + SSH</label></div>
+
+    <!-- Passo 1: Dados -->
+    <div class="step-panel ativo" id="pw-p1">
+      <div class="field"><label>Nome</label><input id="campoNomePerfil" placeholder="Ex: Operador"></div>
+      <div class="field"><label>Descrição</label><input id="campoDescPerfil" placeholder="Opcional"></div>
+    </div>
+
+    <!-- Passo 2: Geral -->
+    <div class="step-panel" id="pw-p2">
+      <div class="checkbox-row"><input type="checkbox" id="campoPodeRedes"><label style="margin:0;">Pode cadastrar/editar redes</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="campoPodeUsuarios"><label style="margin:0;">Pode gerenciar usuários e perfis</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="campoSomenteLeitura"><label style="margin:0;">Somente leitura (não pode disparar ações)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="campoPodeVerFiscal"><label style="margin:0;">📋 Pendências Fiscais</label></div>
+    </div>
+
+    <!-- Passo 3: Atualizações -->
+    <div class="step-panel" id="pw-p3">
+      <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuAgente"><label style="margin:0;">Aba Agente — upload + disparar agente.exe</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuPdvUpload"><label style="margin:0;">Aba PDV — subir arquivo ZIP</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuPdvDisparar"><label style="margin:0;">Aba PDV — disparar atualização nos PDVs</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuPdvLimpar"><label style="margin:0;">Aba PDV — deletar / limpar arquivos ZIP</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="campoPodeAtuIntegrador"><label style="margin:0;">Aba Integrador — disparar atualização SSH</label></div>
+    </div>
+
+    <!-- Passo 4: Replicações -->
+    <div class="step-panel" id="pw-p4">
+      <div class="checkbox-row"><input type="checkbox" id="campoPodeReplicVerificar"><label style="margin:0;">Disparar verificação manual</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="campoPodeReplicConfig"><label style="margin:0;">Configurar verificação automática</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="campoPodeReenviarDocumentos"><label style="margin:0;">Reenviar venda/NFC-e ao Service Manager</label></div>
+    </div>
+
+    <!-- Passo 5: Configurações -->
+    <div class="step-panel" id="pw-p5">
+      <div class="checkbox-row"><input type="checkbox" id="campoPodeConfigBanco"><label style="margin:0;">Aba Banco de Dados (ERP)</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="campoPodeConfigIntegrador"><label style="margin:0;">Aba Integrador + SSH</label></div>
+    </div>
+
     <div class="erro-msg" id="erroPerfil"></div>
-    <div class="modal-actions">
+    <div class="wz-nav">
       <button class="btn btn-ghost" onclick="fecharModalPerfil()">Cancelar</button>
-      <button class="btn btn-primary" onclick="salvarPerfil()">Salvar</button>
+      <div class="wz-nav-r">
+        <button class="btn btn-ghost" id="pw-ant" onclick="anteriorPerfil()" style="display:none;">← Anterior</button>
+        <button class="btn btn-primary" id="pw-prox" onclick="proximoPerfil()">Próximo →</button>
+        <button class="btn btn-primary" id="pw-salvar" onclick="salvarPerfil()" style="display:none;">Salvar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -729,7 +762,37 @@ async function redefinir2FA(id, nome) {
   carregarTudo();
 }
 
-// ── Perfil: modal ──
+// ── Perfil: modal (wizard de 5 passos) ──
+let _perfilStep = 1;
+const PERFIL_STEPS = 5;
+
+function _goPerfilStep(n) {
+  for (let i = 1; i <= PERFIL_STEPS; i++) {
+    document.getElementById(`pw-s${i}`).className = `wz-step${i === n ? ' ativo' : i < n ? ' ok' : ''}`;
+    document.getElementById(`pw-p${i}`).classList.toggle('ativo', i === n);
+  }
+  for (let i = 1; i < PERFIL_STEPS; i++) {
+    document.getElementById(`pw-l${i}`).classList.toggle('ok', n > i);
+  }
+  document.getElementById('pw-ant').style.display    = n > 1 ? '' : 'none';
+  document.getElementById('pw-prox').style.display   = n < PERFIL_STEPS ? '' : 'none';
+  document.getElementById('pw-salvar').style.display = n === PERFIL_STEPS ? '' : 'none';
+  document.getElementById('erroPerfil').style.display = 'none';
+  _perfilStep = n;
+}
+
+function _validarPerfilStep(step) {
+  const err = document.getElementById('erroPerfil');
+  err.style.display = 'none';
+  if (step === 1 && !document.getElementById('campoNomePerfil').value.trim()) {
+    err.textContent = 'Nome é obrigatório.'; err.style.display = 'block'; return false;
+  }
+  return true;
+}
+
+function proximoPerfil()  { if (_validarPerfilStep(_perfilStep)) _goPerfilStep(_perfilStep + 1); }
+function anteriorPerfil() { _goPerfilStep(_perfilStep - 1); }
+
 function abrirModalNovoPerfil() {
   document.getElementById('modalPerfilTitulo').textContent = 'Novo perfil';
   document.getElementById('perfilId').value = '';
@@ -749,7 +812,7 @@ function abrirModalNovoPerfil() {
   document.getElementById('campoPodeReenviarDocumentos').checked = false;
   document.getElementById('campoPodeConfigBanco').checked = false;
   document.getElementById('campoPodeConfigIntegrador').checked = false;
-  document.getElementById('erroPerfil').style.display = 'none';
+  _goPerfilStep(1);
   document.getElementById('modalPerfil').classList.add('aberto');
 }
 
@@ -774,7 +837,7 @@ function editarPerfil(id) {
   document.getElementById('campoPodeReenviarDocumentos').checked = p.pode_reenviar_documentos;
   document.getElementById('campoPodeConfigBanco').checked = p.pode_config_banco;
   document.getElementById('campoPodeConfigIntegrador').checked = p.pode_config_integrador;
-  document.getElementById('erroPerfil').style.display = 'none';
+  _goPerfilStep(1);
   document.getElementById('modalPerfil').classList.add('aberto');
 }
 
