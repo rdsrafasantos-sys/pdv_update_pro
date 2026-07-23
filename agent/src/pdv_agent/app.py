@@ -101,9 +101,15 @@ def sysinfo():
 @app.route("/info")
 def info():
     dados = dict(get_info_pdv() or {})
-    versao_vrpdv = ler_versao_vrpdv()
-    if versao_vrpdv:
-        dados["versao_vrpdv"] = versao_vrpdv
+    # Nunca ler o vrcheckout.exe (pefile faz memory-map dele) enquanto uma
+    # atualizacao esta em andamento -- descompactar() pode estar sobrescrevendo
+    # esse mesmo arquivo nesse instante (ver vrpdv_version.py).
+    with lock:
+        atualizando = estado["status"] == "updating"
+    if not atualizando:
+        versao_vrpdv = ler_versao_vrpdv()
+        if versao_vrpdv:
+            dados["versao_vrpdv"] = versao_vrpdv
     return jsonify(dados)
 
 
@@ -129,6 +135,7 @@ def atualizar_agente():
         atual = os.path.join(pasta, "agente.exe")
         nssm = os.path.join(pasta, "nssm.exe")
         bat = os.path.join(pasta, "atualizar_agente.bat")
+        log_atualizacao = os.path.join(pasta, "atualizacao_agente.log")
 
         dados = arq.read()
         if not _verificar_hmac(dados, request.headers.get("X-File-Hmac", "")):
@@ -148,8 +155,17 @@ def atualizar_agente():
         # Script .bat completamente independente (roda via Task Scheduler / SYSTEM)
         # Usa sc.exe (sempre disponivel) em vez de nssm para stop/start.
         # Loop :aguarda garante que agente.exe esta realmente morto antes de copiar.
+        #
+        # sc.exe start nao garante que o servico realmente ficou de pe -- sem
+        # verificacao, uma falha transitoria (arquivo ainda "seguro" por
+        # antivirus, SCM ocupado, etc.) deixava o agente parado ate alguem
+        # notar e reiniciar manualmente. Agora confere o estado depois do
+        # start, tenta de novo uma vez se preciso, e grava o resultado em
+        # atualizacao_agente.log pra dar pra conferir depois mesmo sem estar
+        # olhando no momento.
         linhas = [
             "@echo off",
+            f'echo [%date% %time%] Iniciando atualizacao > "{log_atualizacao}"',
             "ping 127.0.0.1 -n 4 > nul",
             "sc.exe stop PDVAgent",
             "ping 127.0.0.1 -n 4 > nul",
@@ -159,8 +175,19 @@ def atualizar_agente():
             f'copy /Y "{novo}" "{atual}"',
             f'del /F /Q "{novo}"',
             "sc.exe start PDVAgent",
-            # Aguarda o agente subir antes de iniciar os servicos Mongo
             "ping 127.0.0.1 -n 5 > nul",
+            'sc query PDVAgent | find "RUNNING" >nul',
+            "if errorlevel 1 ("
+            f'  echo [%date% %time%] Primeira tentativa nao subiu, tentando de novo >> "{log_atualizacao}"'
+            " & sc.exe start PDVAgent"
+            " & ping 127.0.0.1 -n 5 > nul"
+            ")",
+            'sc query PDVAgent | find "RUNNING" >nul',
+            "if errorlevel 1 ("
+            f'  echo [%date% %time%] FALHOU: PDVAgent nao ficou RUNNING apos 2 tentativas >> "{log_atualizacao}"'
+            ") else ("
+            f'  echo [%date% %time%] OK: PDVAgent RUNNING >> "{log_atualizacao}"'
+            ")",
         ] + linhas_mongo + [
             'schtasks /delete /tn "PDVAgentUpdate" /f',
             f'del /F /Q "{bat}"',

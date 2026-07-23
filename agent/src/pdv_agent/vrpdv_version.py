@@ -22,18 +22,25 @@ def ler_versao_vrpdv():
     try:
         import pefile
         pe = pefile.PE(VRCHECKOUT_EXE, fast_load=True)
-        pe.parse_data_directories(
-            directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_RESOURCE"]]
-        )
-        for fileinfo in getattr(pe, "FileInfo", []):
-            for entry in fileinfo:
-                if entry.Key != b"StringFileInfo":
-                    continue
-                for tabela in entry.StringTable:
-                    for chave, valor in tabela.entries.items():
-                        if chave == b"FileVersion":
-                            return valor.decode(errors="replace").strip()
-        return None
+        try:
+            pe.parse_data_directories(
+                directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_RESOURCE"]]
+            )
+            for fileinfo in getattr(pe, "FileInfo", []):
+                for entry in fileinfo:
+                    if entry.Key != b"StringFileInfo":
+                        continue
+                    for tabela in entry.StringTable:
+                        for chave, valor in tabela.entries.items():
+                            if chave == b"FileVersion":
+                                return valor.decode(errors="replace").strip()
+            return None
+        finally:
+            # pefile faz memory-map do arquivo no Windows (mmap.mmap) -- sem
+            # fechar explicitamente, o mapeamento pode ficar aberto tempo
+            # suficiente pra colidir com uma atualizacao concorrente tentando
+            # sobrescrever o mesmo vrcheckout.exe (OSError Errno 22).
+            pe.close()
     except Exception as e:
         log.warning(f"Nao foi possivel ler versao do vrcheckout.exe: {e}")
         return None
