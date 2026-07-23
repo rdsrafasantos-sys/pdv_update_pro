@@ -176,13 +176,19 @@ def atualizar_agente():
             f'del /F /Q "{novo}"',
             "sc.exe start PDVAgent",
             "ping 127.0.0.1 -n 5 > nul",
-            'sc query PDVAgent | find "RUNNING" >nul',
+            # "sc query | find RUNNING" nao funciona em Windows com idioma
+            # diferente de ingles (o texto do estado vem localizado, ex:
+            # "EM EXECUCAO" em pt-BR) -- usa o PowerShell, cujo enum
+            # ServiceControllerStatus.Running nunca e traduzido.
+            "powershell -NoProfile -Command "
+            "\"exit [int]((Get-Service PDVAgent).Status -ne 'Running')\"",
             "if errorlevel 1 ("
             f'  echo [%date% %time%] Primeira tentativa nao subiu, tentando de novo >> "{log_atualizacao}"'
             " & sc.exe start PDVAgent"
             " & ping 127.0.0.1 -n 5 > nul"
             ")",
-            'sc query PDVAgent | find "RUNNING" >nul',
+            "powershell -NoProfile -Command "
+            "\"exit [int]((Get-Service PDVAgent).Status -ne 'Running')\"",
             "if errorlevel 1 ("
             f'  echo [%date% %time%] FALHOU: PDVAgent nao ficou RUNNING apos 2 tentativas >> "{log_atualizacao}"'
             ") else ("
