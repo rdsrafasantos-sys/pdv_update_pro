@@ -143,10 +143,17 @@ def fazer_backup():
 
 def descompactar():
     set_estado("updating", "Descompactando", 55)
-    with zipfile.ZipFile(TEMP_ZIP, "r") as z:
-        z.extractall(VRPDV_DIR)
-    os.remove(TEMP_ZIP)
-    restaurar_banco()
+    try:
+        with zipfile.ZipFile(TEMP_ZIP, "r") as z:
+            z.extractall(VRPDV_DIR)
+        os.remove(TEMP_ZIP)
+    finally:
+        # restaurar_banco() TEM que rodar mesmo se a extracao falhar no meio
+        # -- sem isso, um erro em qualquer arquivo do zip (ex: vrcheckout.exe
+        # bloqueado por outro processo) deixa o banco "preso" em
+        # DB_TEMP_DIR pra sempre, e o PDV fica sem banco ate alguem notar e
+        # restaurar manualmente (ja aconteceu em producao de teste).
+        restaurar_banco()
     invalidar_cache_info_pdv()
     log.info("Descompactacao OK.")
 
