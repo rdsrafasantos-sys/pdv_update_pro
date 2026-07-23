@@ -1980,10 +1980,27 @@ function _sugerirProximaVersao(versao) {
   return `v${m[1]}.${m[2]}.${parseInt(m[3]) + 1}`;
 }
 
+// Máscara do campo "Versão alvo" -- o "v" é obrigatório (tags reais no
+// registry sempre têm o prefixo), mas o usuário pode digitar sem ele:
+// normalizamos ao sair do campo em vez de forçar o "v" a cada tecla.
+const _VERSAO_INTEGRADOR_RE = /^v\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+
+function _normalizarVersaoIntegrador(v) {
+  v = (v || "").trim();
+  if (!v) return v;
+  if (!/^v/i.test(v)) v = "v" + v;
+  return "v" + v.slice(1);
+}
+
 function intUpdIniciar() {
   const input = document.getElementById("intUpdNovaVersao");
-  const nova = input?.value.trim();
+  const nova = _normalizarVersaoIntegrador(input?.value);
+  if (input) input.value = nova;
   if (!nova) { alert("Informe a versão alvo."); return; }
+  if (!_VERSAO_INTEGRADOR_RE.test(nova)) {
+    alert(`Versão inválida: "${nova}". Use o formato vX.Y.Z (ex: v2.3.0).`);
+    return;
+  }
 
   // Fechar stream anterior se existir
   if (_intUpdStream) { _intUpdStream.close(); _intUpdStream = null; }

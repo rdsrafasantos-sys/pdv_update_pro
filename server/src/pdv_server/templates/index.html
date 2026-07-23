@@ -326,7 +326,10 @@
               <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
                 <label class="form-field" style="flex:1;min-width:180px;max-width:260px;">
                   Versão alvo
-                  <input type="text" id="intUpdNovaVersao" placeholder="ex: v2.3.0" style="font-family:monospace;">
+                  <input type="text" id="intUpdNovaVersao" placeholder="ex: v2.3.0" style="font-family:monospace;"
+                         maxlength="16"
+                         oninput="this.value = this.value.replace(/[^0-9vV.]/g, '')"
+                         onblur="this.value = _normalizarVersaoIntegrador(this.value)">
                 </label>
                 <button class="btn-update" id="btnIntUpd" onclick="intUpdIniciar()" style="margin-top:18px;white-space:nowrap;" disabled>
                   🚀 Atualizar Integrador

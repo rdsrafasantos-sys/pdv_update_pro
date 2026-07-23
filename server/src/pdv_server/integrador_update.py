@@ -75,7 +75,10 @@ def atualizar_stream(cfg: dict, nova_versao: str):
     # exceção para newline final) para nao aceitar nada alem de "vX.Y.Z".
     # Sem essa ancora, nova_versao poderia conter uma quebra de linha e escapar
     # do heredoc usado mais abaixo para gravar o docker-compose remoto.
-    if not re.match(r'^v?\d+\.\d+\.\d+\Z', nova_versao):
+    # O "v" e obrigatorio (nao "v?") -- as tags reais no registry sempre tem o
+    # prefixo (ex: vrsoftbr/vrintegradormaster:v3.3.3); sem ele o pull falha
+    # com "manifest unknown" depois de ja ter parado os containers antigos.
+    if not re.match(r'^v\d{1,3}\.\d{1,3}\.\d{1,3}\Z', nova_versao):
         yield erro(f"Versão inválida: '{nova_versao}'. Use o formato v2.3.0")
         yield {"tipo": "fim", "sucesso": False}
         return
