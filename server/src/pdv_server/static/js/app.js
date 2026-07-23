@@ -871,6 +871,8 @@ async function listarLogsSelecionados() {
 window.listarLogsSelecionados = listarLogsSelecionados;
 
 let _documentosCache = {};
+let _documentosPorPainel = {};
+const DOCUMENTOS_POR_PAGINA = 10;
 
 function _resumoDocumento(item) {
   const s = item.resumo;
@@ -906,24 +908,61 @@ async function verDocumentosLog(loja_id, pdvId, nomeArquivo, painelId) {
       painel.innerHTML = '<div class="empty" style="padding:10px;">Nenhuma venda ou NFC-e encontrada nesse arquivo.</div>';
       return;
     }
-    painel.innerHTML = dados.documentos.map((item, i) => {
-      const chave = `${painelId}-${i}`;
-      _documentosCache[chave] = item;
-      const botoesReenvio = window.PERMS?.pode_reenviar_documentos
-        ? `<button class="btn-verify" id="reenviar-${chave}-venda" onclick="reenviarDocumento('${loja_id}','${pdvId}','${chave}','venda')">🛒 Reenviar Venda</button>
-           <button class="btn-verify" id="reenviar-${chave}-nfce" onclick="reenviarDocumento('${loja_id}','${pdvId}','${chave}','nfce')">🧾 Reenviar NFC-e</button>`
-        : '';
-      return `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:6px;background:var(--bg-elevated);margin-top:4px;font-size:12px;gap:10px;">
-          <div>${_resumoDocumento(item)}</div>
-          <div style="display:flex;gap:6px;flex-shrink:0;">${botoesReenvio}</div>
-        </div>`;
-    }).join("");
+    _documentosPorPainel[painelId] = { documentos: dados.documentos, loja_id, pdvId, pagina: 0 };
+    _renderPaginaDocumentos(painelId);
   } catch (e) {
     painel.innerHTML = `<span style="color:#dc2626;">⛔ Falha ao contatar o servidor: ${e}</span>`;
   }
 }
 window.verDocumentosLog = verDocumentosLog;
+
+function _renderPaginaDocumentos(painelId) {
+  const painel = document.getElementById(painelId);
+  const estado = _documentosPorPainel[painelId];
+  if (!painel || !estado) return;
+  const { documentos, loja_id, pdvId, pagina } = estado;
+
+  const totalPaginas = Math.max(1, Math.ceil(documentos.length / DOCUMENTOS_POR_PAGINA));
+  const inicio = pagina * DOCUMENTOS_POR_PAGINA;
+  const fatia = documentos.slice(inicio, inicio + DOCUMENTOS_POR_PAGINA);
+
+  const linhas = fatia.map((item, iFatia) => {
+    const i = inicio + iFatia;
+    const chave = `${painelId}-${i}`;
+    _documentosCache[chave] = item;
+    const botoesReenvio = window.PERMS?.pode_reenviar_documentos
+      ? `<button class="btn-verify" id="reenviar-${chave}-venda" onclick="reenviarDocumento('${loja_id}','${pdvId}','${chave}','venda')">🛒 Reenviar Venda</button>
+         <button class="btn-verify" id="reenviar-${chave}-nfce" onclick="reenviarDocumento('${loja_id}','${pdvId}','${chave}','nfce')">🧾 Reenviar NFC-e</button>`
+      : '';
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:6px;background:var(--bg-elevated);margin-top:4px;font-size:12px;gap:10px;">
+        <div>${_resumoDocumento(item)}</div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">${botoesReenvio}</div>
+      </div>`;
+  }).join("");
+
+  const paginacao = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:11.5px;color:var(--text-faint);">
+      <span>${documentos.length} documento(s) · página ${pagina + 1} de ${totalPaginas}</span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-verify" style="padding:5px 10px;font-size:11.5px;${pagina === 0 ? "opacity:.4;cursor:not-allowed;" : ""}"
+                ${pagina === 0 ? "disabled" : ""} onclick="_mudarPaginaDocumentos('${painelId}',-1)">← Anterior</button>
+        <button class="btn-verify" style="padding:5px 10px;font-size:11.5px;${pagina >= totalPaginas - 1 ? "opacity:.4;cursor:not-allowed;" : ""}"
+                ${pagina >= totalPaginas - 1 ? "disabled" : ""} onclick="_mudarPaginaDocumentos('${painelId}',1)">Próxima →</button>
+      </div>
+    </div>`;
+
+  painel.innerHTML = linhas + paginacao;
+}
+
+function _mudarPaginaDocumentos(painelId, delta) {
+  const estado = _documentosPorPainel[painelId];
+  if (!estado) return;
+  const totalPaginas = Math.max(1, Math.ceil(estado.documentos.length / DOCUMENTOS_POR_PAGINA));
+  estado.pagina = Math.min(Math.max(estado.pagina + delta, 0), totalPaginas - 1);
+  _renderPaginaDocumentos(painelId);
+}
+window._mudarPaginaDocumentos = _mudarPaginaDocumentos;
 
 async function reenviarDocumento(loja_id, pdvId, chave, tipoAlvo) {
   const item = _documentosCache[chave];
