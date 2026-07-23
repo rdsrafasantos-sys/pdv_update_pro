@@ -11,7 +11,10 @@ def extrair_versao(nome_arquivo):
 
 
 def versao_para_tupla(versao):
-    return tuple(int(p) for p in str(versao).lstrip("vV").split("."))
+    # FileVersion do vrcheckout.exe vem como "8.3.0+95" -- o "+build" nao
+    # entra na comparacao de major.minor.patch.
+    versao = str(versao).lstrip("vV").split("+")[0]
+    return tuple(int(p) for p in versao.split("."))
 
 
 def comparar_versoes(v1, v2):

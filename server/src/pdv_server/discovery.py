@@ -140,11 +140,18 @@ def descobrir_pdvs_via_replicaset(contexto):
                     "pdvs": []
                 }
 
+            # Preferir a versao que o proprio agente le do vrcheckout.exe (ao
+            # vivo, sempre correta) -- o campo do Mongo (pdv_db) e escrito
+            # pelo VRPdvPro so em alguma acao administrativa esporadica e na
+            # pratica fica meses desatualizado mesmo apos atualizacoes reais.
+            # Fallback pro Mongo cobre agentes antigos que ainda nao reportam.
+            versao = info_agente.get("versao_vrpdv") or pdv_db.get("versao", "")
+
             lojas_resultado[loja_id]["pdvs"].append({
                 "id": f"PDV-{numero_pdv}",
                 "nome": pdv_db.get("descricao", f"ECF {numero_pdv}"),
                 "ip": ip,
-                "versao": pdv_db.get("versao", "")
+                "versao": versao,
             })
 
         for loja in lojas_resultado.values():

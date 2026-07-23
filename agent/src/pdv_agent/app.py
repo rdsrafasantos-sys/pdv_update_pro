@@ -15,6 +15,7 @@ LOGS_DIR = os.path.join(VRPDV_DIR, "logs")
 from pdv_agent.lmdb_reader import get_info_pdv
 from pdv_agent.service_control import detectar_servicos, reiniciar_servico
 from pdv_agent.update_flow import estado, executar_atualizacao, lock
+from pdv_agent.vrpdv_version import ler_versao_vrpdv
 
 log = logging.getLogger("pdv_agent")
 
@@ -99,7 +100,11 @@ def sysinfo():
 
 @app.route("/info")
 def info():
-    return jsonify(get_info_pdv() or {})
+    dados = dict(get_info_pdv() or {})
+    versao_vrpdv = ler_versao_vrpdv()
+    if versao_vrpdv:
+        dados["versao_vrpdv"] = versao_vrpdv
+    return jsonify(dados)
 
 
 @app.route("/status")
