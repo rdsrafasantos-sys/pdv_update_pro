@@ -169,9 +169,22 @@ def atualizar_agente():
             "ping 127.0.0.1 -n 4 > nul",
             "sc.exe stop PDVAgent",
             "ping 127.0.0.1 -n 4 > nul",
+            # Loop sem limite e perigoso -- se agente.exe nunca morrer (maquina
+            # sob carga, processo travado, etc.) o .bat fica preso pra sempre
+            # e a atualizacao nunca progride nem loga nada. Teto de 20 voltas
+            # (~60s) -- depois disso tenta o copy assim mesmo (vai falhar com
+            # erro claro se o arquivo ainda estiver bloqueado, em vez de travar
+            # silenciosamente).
+            "set CONTADOR_AGUARDA=0",
             ":aguarda",
+            "set /a CONTADOR_AGUARDA+=1",
+            "if %CONTADOR_AGUARDA% GTR 20 ("
+            f'  echo [%date% %time%] agente.exe nao encerrou apos 60s, seguindo assim mesmo >> "{log_atualizacao}"'
+            " & goto copia"
+            ")",
             'tasklist /FI "IMAGENAME eq agente.exe" /FO CSV 2>nul | find /I "agente.exe" >nul',
             "if not errorlevel 1 (ping 127.0.0.1 -n 3 > nul & goto aguarda)",
+            ":copia",
             f'copy /Y "{novo}" "{atual}"',
             f'del /F /Q "{novo}"',
             "sc.exe start PDVAgent",
