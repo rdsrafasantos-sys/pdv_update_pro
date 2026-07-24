@@ -169,12 +169,23 @@ def atualizar_agente():
             "ping 127.0.0.1 -n 4 > nul",
             "sc.exe stop PDVAgent",
             "ping 127.0.0.1 -n 4 > nul",
+            # sc.exe stop nem sempre mata o processo de fato -- o SCM as vezes
+            # marca o servico como parado com o agente.exe ainda vivo,
+            # respondendo requisicoes normalmente (foi exatamente o que
+            # aconteceu ao vivo: copy falhava silenciosamente por causa do
+            # arquivo bloqueado, e ninguem percebia porque o processo antigo
+            # nunca parava de responder). Forca com taskkill se ainda estiver
+            # rodando depois do stop.
+            'tasklist /FI "IMAGENAME eq agente.exe" /FO CSV 2>nul | find /I "agente.exe" >nul',
+            "if not errorlevel 1 ("
+            f'  echo [%date% %time%] Processo ainda vivo apos sc.exe stop, forcando com taskkill >> "{log_atualizacao}"'
+            " & taskkill /F /IM agente.exe"
+            " & ping 127.0.0.1 -n 2 > nul"
+            ")",
             # Loop sem limite e perigoso -- se agente.exe nunca morrer (maquina
             # sob carga, processo travado, etc.) o .bat fica preso pra sempre
             # e a atualizacao nunca progride nem loga nada. Teto de 20 voltas
-            # (~60s) -- depois disso tenta o copy assim mesmo (vai falhar com
-            # erro claro se o arquivo ainda estiver bloqueado, em vez de travar
-            # silenciosamente).
+            # (~60s) -- depois disso tenta o copy assim mesmo.
             "set CONTADOR_AGUARDA=0",
             ":aguarda",
             "set /a CONTADOR_AGUARDA+=1",
@@ -186,6 +197,16 @@ def atualizar_agente():
             "if not errorlevel 1 (ping 127.0.0.1 -n 3 > nul & goto aguarda)",
             ":copia",
             f'copy /Y "{novo}" "{atual}"',
+            # copy /Y NAO retorna erro de forma confiavel quando o destino
+            # esta bloqueado -- confere se o arquivo de destino realmente
+            # ficou do tamanho do novo antes de seguir, em vez de confiar no
+            # errorlevel do copy.
+            f'for %%F in ("{novo}") do set TAMANHO_NOVO=%%~zF',
+            f'for %%F in ("{atual}") do set TAMANHO_ATUAL=%%~zF',
+            "if not %TAMANHO_NOVO%==%TAMANHO_ATUAL% ("
+            f'  echo [%date% %time%] ERRO: copy nao aplicou (destino ainda bloqueado?) -- abortando sem apagar o novo >> "{log_atualizacao}"'
+            " & goto fim"
+            ")",
             f'del /F /Q "{novo}"',
             "sc.exe start PDVAgent",
             "ping 127.0.0.1 -n 5 > nul",
@@ -207,6 +228,7 @@ def atualizar_agente():
             ") else ("
             f'  echo [%date% %time%] OK: PDVAgent RUNNING >> "{log_atualizacao}"'
             ")",
+            ":fim",
         ] + linhas_mongo + [
             'schtasks /delete /tn "PDVAgentUpdate" /f',
             f'del /F /Q "{bat}"',
