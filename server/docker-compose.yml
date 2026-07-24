@@ -34,8 +34,15 @@ services:
       - PDV_TAILSCALE_OAUTH_CLIENT_ID=${PDV_TAILSCALE_OAUTH_CLIENT_ID:-}
       - PDV_TAILSCALE_OAUTH_CLIENT_SECRET=${PDV_TAILSCALE_OAUTH_CLIENT_SECRET:-}
       - PDV_TAILSCALE_TAILNET=${PDV_TAILSCALE_TAILNET:--}
+      - PDV_TAILSCALE_AUTH_KEY_PDV=${PDV_TAILSCALE_AUTH_KEY_PDV:-}
+      - PDV_TAILSCALE_AUTH_KEY_PDV_ID=${PDV_TAILSCALE_AUTH_KEY_PDV_ID:-}
       - PDV_PAINEL_CALLBACK_URL=${PDV_PAINEL_CALLBACK_URL:-}
       - PDV_SETUP_UPLOAD_TOKEN=${PDV_SETUP_UPLOAD_TOKEN:-}
+      # E-mail (reset de senha) -- ver README/.env.example. Sem RESEND_API_KEY,
+      # o botao "esqueci minha senha" so registra o pedido, sem enviar nada.
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - EMAIL_REMETENTE=${EMAIL_REMETENTE:-}
+      - PDV_PAINEL_URL_PUBLICA=${PDV_PAINEL_URL_PUBLICA:-}
     volumes:
       - ./data/uploads:/opt/pdv-server/uploads
       - ./data/replicacao:/opt/pdv-server/replicacao
