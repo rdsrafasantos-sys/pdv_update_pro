@@ -122,7 +122,7 @@ pip3 install psutil --quiet 2>/dev/null || pip install psutil --quiet 2>/dev/nul
 mkdir -p /opt/pdv-sysinfo
 cat > /opt/pdv-sysinfo/sysinfo.py << 'SYSINFO_EOF'
 #!/usr/bin/env python3
-"""PDV Sysinfo Agent -- expoe metricas do host na porta 5001."""
+'''PDV Sysinfo Agent -- expoe metricas do host na porta 5001.'''
 import json, time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 try:
