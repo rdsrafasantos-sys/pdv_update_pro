@@ -136,6 +136,12 @@ def atualizar_agente():
         nssm = os.path.join(pasta, "nssm.exe")
         bat = os.path.join(pasta, "atualizar_agente.bat")
         log_atualizacao = os.path.join(pasta, "atualizacao_agente.log")
+        # Nome unico por tentativa -- se um .bat travar e nunca sinalizar
+        # conclusao pro Task Scheduler, reusar o mesmo nome de tarefa faz a
+        # PROXIMA tentativa ficar "Queued" pra sempre (Windows nao inicia
+        # nova instancia de uma tarefa que ele acha que ainda esta rodando).
+        # Aconteceu ao vivo: schtasks /run retornava rc=0 mas nada executava.
+        tarefa_nome = f"PDVAgentUpdate_{int(time.time())}"
 
         dados = arq.read()
         if not _verificar_hmac(dados, request.headers.get("X-File-Hmac", "")):
@@ -230,26 +236,30 @@ def atualizar_agente():
             ")",
             ":fim",
         ] + linhas_mongo + [
-            'schtasks /delete /tn "PDVAgentUpdate" /f',
+            f'schtasks /delete /tn "{tarefa_nome}" /f',
             f'del /F /Q "{bat}"',
         ]
         with open(bat, "w", encoding="ascii") as f:
             f.write("\r\n".join(linhas))
 
+        # Limpeza best-effort de uma tarefa antiga travada com o nome fixo
+        # de versoes anteriores -- nao é fatal se nao existir.
+        subprocess.run(["schtasks", "/delete", "/tn", "PDVAgentUpdate", "/f"], capture_output=True)
+
         # Dispara via Agendador de Tarefas do Windows.
         # A tarefa roda sob o Task Scheduler (fora da arvore de processos
         # do servico), entao sobrevive ao kill tree do NSSM no stop.
         subprocess.run(
-            ["schtasks", "/create", "/tn", "PDVAgentUpdate",
+            ["schtasks", "/create", "/tn", tarefa_nome,
              "/tr", bat, "/sc", "once", "/st", "00:00",
              "/ru", "SYSTEM", "/f"],
             capture_output=True
         )
         r = subprocess.run(
-            ["schtasks", "/run", "/tn", "PDVAgentUpdate"],
+            ["schtasks", "/run", "/tn", tarefa_nome],
             capture_output=True, text=True
         )
-        log.info(f"Tarefa agendada de atualizacao disparada (rc={r.returncode}).")
+        log.info(f"Tarefa agendada '{tarefa_nome}' disparada (rc={r.returncode}).")
         return jsonify({"mensagem": "Atualizacao do agente iniciada."}), 200
 
     except Exception as e:
