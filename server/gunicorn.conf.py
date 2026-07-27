@@ -1,13 +1,16 @@
 """Configuração do Gunicorn para o PDV Server."""
-# Monkey-patch do gevent tem que ser a PRIMEIRA coisa a rodar no processo,
-# antes de "requests"/"urllib3" (e, por tabela, "ssl") serem importados por
-# qualquer coisa -- gunicorn faz o patch sozinho ao carregar o worker "gevent",
-# mas tarde demais nesse setup, deixando ssl parcialmente remendado. Sintoma:
+# monkey.patch_all() com ssl=True (padrao) nessa combinacao de versoes
+# (gevent 26.5.0 + Python 3.12) quebra qualquer chamada HTTPS de saida com
 # "RecursionError: maximum recursion depth exceeded" dentro de
-# ssl.SSLContext.minimum_version toda vez que o app faz uma chamada HTTPS de
-# saida (API do Tailscale, Resend) atraves do worker gevent real.
+# ssl.SSLContext.minimum_version -- reproduzido tanto com o patch feito cedo
+# quanto tarde, entao nao e um problema de ORDEM de import, e sim do proprio
+# patch de ssl nessa versao. Fix: deixa o gevent remendar sockets/threads
+# (necessario pros endpoints SSE -- status_stream, atualizar_stream) mas NAO
+# o modulo ssl -- chamadas HTTPS de saida (API do Tailscale, Resend) ficam
+# bloqueantes em vez de cooperativas, o que e aceitavel pra acoes raras/
+# administrativas como essas (nao sao o caminho quente da aplicacao).
 from gevent import monkey
-monkey.patch_all()
+monkey.patch_all(ssl=False)
 
 import os
 import sys
