@@ -10,15 +10,14 @@ services:
     # Com host networking, "localhost" dentro do container passa a ser o
     # proprio host (isso muda o default do PDV_SERVER_MONGO_URI abaixo).
     network_mode: host
-    dns:
-      # Docker reescreve /etc/resolv.conf do container mesmo em
-      # network_mode: host -- sem isto, ele usa 8.8.8.8/1.1.1.1 e nao
-      # resolve nomes "*-via-<site>" do MagicDNS do Tailscale.
-      # 1.1.1.1 primeiro: dominios externos (api.tailscale.com, Docker Hub)
-      # resolvem sem esperar o timeout do MagicDNS. 100.100.100.100 como
-      # fallback para nomes "*-via-<site>" que so o Tailscale conhece.
-      - 1.1.1.1
-      - 100.100.100.100
+    # Docker sempre gera seu PROPRIO /etc/resolv.conf dentro do container,
+    # mesmo em network_mode: host -- um "dns:" com [1.1.1.1, 100.100.100.100]
+    # nao resolveu nomes "*-via-<site>" do MagicDNS na pratica (glibc nao
+    # cai pro segundo nameserver de forma confiavel quando o primeiro so
+    # devolve NXDOMAIN). O resolv.conf do HOST, gerenciado ao vivo pelo
+    # proprio tailscaled, funciona perfeitamente (testado: resolve tanto
+    # nomes normais quanto "*-via-<site>") -- monta ele direto, sem deixar
+    # o Docker gerar o seu.
     environment:
       - PDV_SERVER_PORTA=8888
       - "PDV_SERVER_TOKEN=${PDV_SERVER_TOKEN:?PDV_SERVER_TOKEN nao configurado - defina no .env}"
@@ -44,6 +43,7 @@ services:
       - EMAIL_REMETENTE=${EMAIL_REMETENTE:-}
       - PDV_PAINEL_URL_PUBLICA=${PDV_PAINEL_URL_PUBLICA:-}
     volumes:
+      - /etc/resolv.conf:/etc/resolv.conf:ro
       - ./data/uploads:/opt/pdv-server/uploads
       - ./data/replicacao:/opt/pdv-server/replicacao
       - ./data/erp_db:/opt/pdv-server/erp_db
