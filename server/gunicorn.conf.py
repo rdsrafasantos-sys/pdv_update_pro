@@ -24,6 +24,8 @@ def _corrigir_ssl_gevent():
     original. PROTOCOL_TLS_CLIENT ja exige TLS 1.2+ por padrao no OpenSSL
     moderno, entao a postura de seguranca efetiva nao muda."""
     import ssl as _ssl
+    import urllib3.connection as _ssl_conn
+    import urllib3.util as _ssl_pkg
     import urllib3.util.ssl_ as _ssl_util
 
     def _create_urllib3_context(
@@ -48,7 +50,12 @@ def _corrigir_ssl_gevent():
             context.verify_mode = cert_reqs
         return context
 
+    # "from ... import create_urllib3_context" em connection.py e util/__init__.py
+    # ja copiou a referencia da funcao ORIGINAL pro namespace deles -- trocar so
+    # o atributo em ssl_ nao afeta essas copias. Troca nos 3 lugares.
     _ssl_util.create_urllib3_context = _create_urllib3_context
+    _ssl_conn.create_urllib3_context = _create_urllib3_context
+    _ssl_pkg.create_urllib3_context = _create_urllib3_context
 
 
 _corrigir_ssl_gevent()
