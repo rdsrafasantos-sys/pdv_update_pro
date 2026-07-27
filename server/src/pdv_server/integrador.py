@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 
 from pdv_server.auth.crypto import cifrar, decifrar
 from pdv_server.config import REPLICACAO_DB
-from pdv_server.replication import COLECOES
 
 CONFIG_PADRAO = {"ip": "", "porta": 0, "mongo_ip": "", "mongo_porta": 27016,
                  "ssh_ip": "", "ssh_porta": 22, "ssh_usuario": "", "ssh_senha": ""}
@@ -19,11 +18,13 @@ _CAMPOS_CIFRADOS = ("ssh_senha",)
 # que o processo e o Mongo estejam online).
 HORAS_LIMITE_SEM_ATIVIDADE = 24
 
-# So "produtos" e dado mestre que deve sempre existir desde o dia 1. As demais
-# colecoes de COLECOES (pessoas, promocoes*) so recebem o primeiro documento
-# quando o cliente de fato usa aquele recurso na loja (ex: cadastra uma
-# promocao) -- vazias nao indica problema nenhum, entao nao devem reprovar o
-# status do integrador.
+# So "produtos" e dado mestre que deve sempre existir desde o dia 1 -- as
+# outras colecoes que o integrador tambem replica (pessoas, promocoes*) so
+# recebem o primeiro documento quando o cliente de fato usa aquele recurso na
+# loja (ex: cadastra uma promocao), entao vazias nao indica problema nenhum.
+# So consultamos essa lista mesmo (nao a COLECOES inteira de replication.py):
+# cada nome aqui = 2 idas ao Mongo do cliente (count + find_one), que sob
+# concorrencia real do dashboard já estourou o timeout de 8s do front-end.
 COLECOES_OBRIGATORIAS = ("produtos",)
 
 
@@ -119,7 +120,12 @@ def testar_status(contexto):
         cliente.admin.command("ping")
         mongo_online = True
         db = cliente[REPLICACAO_DB]
-        for nome in COLECOES:
+        # So consulta as colecoes obrigatorias (hoje so "produtos") -- consultar
+        # as 8 do COLECOES inteiro custava ate 16 idas sequenciais ao Mongo do
+        # cliente (~3s isolado, ~6-7s sob concorrencia real com as outras
+        # chamadas do dashboard no mesmo worker gevent), estourando o timeout
+        # de 8s do front-end e aparecendo como "Falha." mesmo com tudo ok.
+        for nome in COLECOES_OBRIGATORIAS:
             col = db[nome]
             total = col.estimated_document_count()
             ultimo = col.find_one(sort=[("_id", -1)])
