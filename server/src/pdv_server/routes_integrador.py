@@ -2,6 +2,7 @@
 de compatibilidade integrador x PDVPro -- extraido de app.py (Fase 4,
 divisao por dominio)."""
 import json as _json
+import time
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user
@@ -33,17 +34,26 @@ def api_integrador_config_set(contexto):
 @integrador_bp.route("/api/<int:rede_id>/integrador/status", methods=["GET"])
 @com_rede
 def api_integrador_status(contexto):
-    return jsonify(integrador.testar_status(contexto))
+    forcar = request.args.get("forcar") == "1"
+    return jsonify(integrador.testar_status(contexto, forcar=forcar))
 
 
 @integrador_bp.route("/api/<int:rede_id>/integrador/versao_atual", methods=["GET"])
 @com_rede
 @exigir_permissao("pode_atu_integrador")
 def api_integrador_versao_atual(contexto):
+    forcar = request.args.get("forcar") == "1"
+    if not forcar:
+        cache = integrador.versao_cache_obter(contexto.rede_id)
+        if cache is not None:
+            return jsonify(cache)
     cfg = integrador.carregar_config(contexto)
     if not integrador_update.config_ssh_completa(cfg):
         return jsonify({"erro": "SSH não configurado", "versao": None})
-    return jsonify(integrador_update.versao_atual(cfg))
+    resultado = integrador_update.versao_atual(cfg)
+    resultado["verificado_em"] = time.time()
+    integrador.versao_cache_salvar(contexto.rede_id, resultado)
+    return jsonify(resultado)
 
 
 @integrador_bp.route("/api/<int:rede_id>/integrador/atualizar_stream", methods=["GET"])
@@ -58,6 +68,11 @@ def api_integrador_atualizar_stream(contexto):
     cfg = integrador.carregar_config(contexto)
     if not integrador_update.config_ssh_completa(cfg):
         return jsonify({"erro": "SSH não configurado"}), 400
+
+    # A versao esta prestes a mudar -- invalida o cache pra proxima consulta
+    # (manual ou no proximo carregamento do dashboard) refletir a nova versao
+    # em vez de servir a antiga por ate 15min.
+    integrador.invalidar_cache(contexto.rede_id)
 
     def gerar():
         for evento in integrador_update.atualizar_stream(cfg, nova_versao):

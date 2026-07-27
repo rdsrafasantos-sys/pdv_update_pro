@@ -1,6 +1,8 @@
 import json
 import os
 import socket
+import threading
+import time
 from datetime import datetime, timezone
 
 from pdv_server.auth.crypto import cifrar, decifrar
@@ -26,6 +28,48 @@ HORAS_LIMITE_SEM_ATIVIDADE = 24
 # cada nome aqui = 2 idas ao Mongo do cliente (count + find_one), que sob
 # concorrencia real do dashboard já estourou o timeout de 8s do front-end.
 COLECOES_OBRIGATORIAS = ("produtos",)
+
+# testar_status() e a versao via SSH sao caras (Mongo do cliente via Tailscale
+# e handshake SSH, respectivamente) e disparam a cada carregamento do
+# dashboard, concorrendo pelo unico worker gevent do servidor -- cachear
+# evita bater nessas duas toda vez que a pagina carrega. TTL curto pro status
+# (pode indicar problema real) e mais longo pra versao (so muda quando alguem
+# roda uma atualizacao, e nesse caso o cache e invalidado na hora).
+_CACHE_STATUS_TTL = 180  # 3 minutos
+_CACHE_VERSAO_TTL = 900  # 15 minutos
+_cache_status = {}  # rede_id -> {"dados": {...}, "ts": float}
+_cache_versao = {}  # rede_id -> {"dados": {...}, "ts": float}
+_cache_lock = threading.Lock()
+
+
+def _cache_obter(cache, rede_id, ttl):
+    with _cache_lock:
+        entrada = cache.get(rede_id)
+    if entrada and time.time() - entrada["ts"] < ttl:
+        return entrada["dados"]
+    return None
+
+
+def _cache_salvar(cache, rede_id, dados):
+    with _cache_lock:
+        cache[rede_id] = {"dados": dados, "ts": time.time()}
+
+
+def invalidar_cache(rede_id):
+    """Chamar sempre que a config do integrador mudar ou uma atualizacao via
+    SSH for disparada -- evita servir um resultado cacheado que nao reflete
+    mais a config/versao atual."""
+    with _cache_lock:
+        _cache_status.pop(rede_id, None)
+        _cache_versao.pop(rede_id, None)
+
+
+def versao_cache_obter(rede_id):
+    return _cache_obter(_cache_versao, rede_id, _CACHE_VERSAO_TTL)
+
+
+def versao_cache_salvar(rede_id, dados):
+    _cache_salvar(_cache_versao, rede_id, dados)
 
 
 def _arquivo_config(contexto):
@@ -65,6 +109,7 @@ def salvar_config(contexto, alteracoes):
             para_salvar[campo] = cifrar(para_salvar[campo])
     with open(_arquivo_config(contexto), "w", encoding="utf-8") as f:
         json.dump(para_salvar, f, ensure_ascii=False)
+    invalidar_cache(contexto.rede_id)
     return atual  # retorna com valores decifrados
 
 
@@ -76,12 +121,26 @@ def _porta_aberta(ip, porta, timeout=3):
         return False
 
 
-def testar_status(contexto):
+def testar_status(contexto, forcar=False):
     """Verifica se o integrador desta rede esta de fato funcionando: nao
     basta a porta responder (processo pode estar startado e travado) --
     confere tambem se as colecoes que ele alimenta no MongoDB tem dados e
     seguem recebendo insercoes recentes (usa o timestamp embutido no
-    ObjectId)."""
+    ObjectId).
+
+    Resultado fica em cache por _CACHE_STATUS_TTL -- forcar=True (duplo
+    clique no card do dashboard) ignora o cache e verifica na hora."""
+    if not forcar:
+        cache = _cache_obter(_cache_status, contexto.rede_id, _CACHE_STATUS_TTL)
+        if cache is not None:
+            return cache
+    resultado = _testar_status_agora(contexto)
+    resultado["verificado_em"] = time.time()
+    _cache_salvar(_cache_status, contexto.rede_id, resultado)
+    return resultado
+
+
+def _testar_status_agora(contexto):
     cfg = carregar_config(contexto)
     if not cfg.get("ip") or not cfg.get("porta") or not cfg.get("mongo_ip"):
         return {

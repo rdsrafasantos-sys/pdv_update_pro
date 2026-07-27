@@ -1270,7 +1270,9 @@ async function testarStatusIntegrador() {
   const el = document.getElementById("integradorResultado");
   const colEl = document.getElementById("integradorColecoes");
   if (el) { el.textContent = "Verificando..."; el.style.color = ""; }
-  const dados = await fetch(API("/integrador/status")).then(r => r.json());
+  // forcar=1: botao "Testar status" e uma acao manual explicita, deve
+  // sempre ir ao vivo -- nunca servir o cache de ate 3min do dashboard.
+  const dados = await fetch(API("/integrador/status?forcar=1")).then(r => r.json());
   if (el) { el.textContent = textoStatusIntegrador(dados); el.style.color = corStatusIntegrador(dados.status); }
   if (colEl) {
     const linhas = Object.entries(dados.colecoes || {});
@@ -1595,23 +1597,8 @@ function _dashFase2(lojasList, historico) {
     atualizarKpiErpDb(d || { online: false });
     _atualizarBannerAlertas();
   });
-  // 15s (nao os 8s padrao): faz ate 2 idas ao Mongo do cliente via Tailscale,
-  // e sob concorrencia real com as outras chamadas deste mesmo Promise.all
-  // (principalmente /integrador/versao_atual, que faz SSH de verdade) ja foi
-  // medido levando ~4.5-5s -- 8s deixava pouca margem antes de cair no
-  // "Falha." generico mesmo com o integrador saudavel.
-  _f(API("/integrador/status"), 15000).then(d => {
-    atualizarKpiIntegrador(d || { status: "erro", erro: "Falha." });
-    _atualizarBannerAlertas();
-  });
-  // Versão do integrador via SSH — chamada separada pois pode ser lenta
-  fetch(API("/integrador/versao_atual")).then(r => r.json()).catch(() => null).then(d => {
-    const el = document.getElementById("kpiIntegradorVersao");
-    if (!el) return;
-    if (d?.versao) {
-      el.innerHTML = `<div class="kpi-integrador-versao">🏷 ${d.versao}</div>`;
-    }
-  });
+  _carregarStatusIntegrador(false);
+  _carregarVersaoIntegrador(false);
   _f(API("/sysinfo")).then(d => {
     const el = document.getElementById("kpiSysinfo");
     if (el && d) {
@@ -1718,7 +1705,70 @@ function atualizarKpiIntegrador(dados) {
     else if (dados.status === "atencao") card.classList.add("kpi-card--warning");
     else if (dados.status !== "nao_configurado") card.classList.add("kpi-card--error");
   }
+  const hint = document.getElementById("kpiIntegradorHint");
+  if (hint) {
+    const relativo = dados.verificado_em ? _relativoDesde(dados.verificado_em) + " · " : "";
+    hint.textContent = `${relativo}duplo clique para verificar agora`;
+  }
 }
+
+// Xs/Xmin desde um timestamp unix (segundos) vindo do backend -- usado pra
+// deixar claro que o card mostra um resultado em cache, nao ao vivo.
+function _relativoDesde(tsSegundos) {
+  if (!tsSegundos) return "";
+  const diffSeg = Math.max(0, Math.round(Date.now() / 1000 - tsSegundos));
+  if (diffSeg < 5) return "verificado agora";
+  if (diffSeg < 60) return `verificado há ${diffSeg}s`;
+  return `verificado há ${Math.round(diffSeg / 60)}min`;
+}
+
+// Timeout proprio (independente do _f() de dentro de _dashFase2) porque
+// tambem e chamado pelo duplo clique no card, fora daquele escopo.
+function _fetchComTimeout(url, ms) {
+  const c = new AbortController();
+  setTimeout(() => c.abort(), ms || 15000);
+  return fetch(url, { signal: c.signal }).then(r => r.json()).catch(() => null);
+}
+
+function _carregarStatusIntegrador(forcar) {
+  // 15s (nao os 8s padrao): faz ate 2 idas ao Mongo do cliente via Tailscale,
+  // e sob concorrencia real com as outras chamadas do dashboard (sobretudo
+  // /integrador/versao_atual, que faz SSH de verdade) ja foi medido levando
+  // ~4.5-5s -- 8s deixava pouca margem antes de cair no "Falha." generico
+  // mesmo com o integrador saudavel.
+  const url = API("/integrador/status") + (forcar ? "?forcar=1" : "");
+  return _fetchComTimeout(url, 15000).then(d => {
+    atualizarKpiIntegrador(d || { status: "erro", erro: "Falha." });
+    _atualizarBannerAlertas();
+  });
+}
+
+function _carregarVersaoIntegrador(forcar) {
+  const url = API("/integrador/versao_atual") + (forcar ? "?forcar=1" : "");
+  return fetch(url).then(r => r.json()).catch(() => null).then(d => {
+    const el = document.getElementById("kpiIntegradorVersao");
+    if (!el) return;
+    if (d?.versao) {
+      el.innerHTML = `<div class="kpi-integrador-versao">🏷 ${d.versao}</div>`;
+    }
+  });
+}
+
+// Duplo clique no card "Integrador" -- ignora o cache (status: 3min, versao:
+// 15min) e forca uma verificacao ao vivo, pra quem quer confirmar na hora
+// sem esperar o proximo carregamento natural do dashboard.
+async function forcarVerificacaoIntegrador() {
+  const el = document.getElementById("kpiIntegrador");
+  const hint = document.getElementById("kpiIntegradorHint");
+  if (el) el.textContent = "⏳ Verificando...";
+  if (hint) hint.textContent = "verificando agora...";
+  await Promise.all([
+    _carregarStatusIntegrador(true),
+    _carregarVersaoIntegrador(true),
+  ]);
+}
+window.forcarVerificacaoIntegrador = forcarVerificacaoIntegrador;
+
 function _atualizarBannerAlertas() {
   const dashAlertas = document.getElementById("dashAlertas");
   if (!dashAlertas) return;
