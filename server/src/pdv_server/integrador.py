@@ -107,6 +107,7 @@ def testar_status(contexto):
         cliente = MongoClient(
             f"mongodb://{cfg['mongo_ip']}:{int(cfg.get('mongo_porta') or 27016)}",
             serverSelectionTimeoutMS=8000,
+            directConnection=True,
         )
         cliente.admin.command("ping")
         mongo_online = True

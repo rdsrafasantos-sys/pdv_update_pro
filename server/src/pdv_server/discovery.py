@@ -55,7 +55,13 @@ def endereco_alcancavel(ip, tailscale_site_id=""):
 
 def _get_mongo(contexto):
     from pymongo import MongoClient
-    return MongoClient(contexto.mongo_uri, serverSelectionTimeoutMS=3000)
+    # directConnection=True: sem isso, o pymongo descobre o replica set
+    # inteiro e tenta alcancar os OUTROS membros pelos IPs internos brutos
+    # configurados no rs.conf() do cliente (ex: 192.168.x.x) -- enderecos
+    # que so sao alcancaveis via a traducao "*-via-<site>" do 4via6, que o
+    # pymongo nao tem como saber usar sozinho. So precisamos do no que ja
+    # resolvemos explicitamente.
+    return MongoClient(contexto.mongo_uri, serverSelectionTimeoutMS=3000, directConnection=True)
 
 
 def descobrir_pdvs_via_replicaset(contexto):

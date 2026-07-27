@@ -176,7 +176,9 @@ def comparar_pdv(contexto, pdv_ip, callback=None, colecoes_filtro=None):
     from pymongo.errors import PyMongoError
 
     try:
-        cliente_integradora = MongoClient(contexto.mongo_uri, serverSelectionTimeoutMS=5000)
+        cliente_integradora = MongoClient(
+            contexto.mongo_uri, serverSelectionTimeoutMS=5000, directConnection=True
+        )
         cliente_integradora.admin.command("ping")
     except PyMongoError as e:
         return {"ok": False, "erro": f"Sem conexao com a integradora: {e}"}
@@ -185,7 +187,8 @@ def comparar_pdv(contexto, pdv_ip, callback=None, colecoes_filtro=None):
     try:
         cliente_pdv = MongoClient(
             f"mongodb://{endereco_pdv}:{PDV_LOCAL_MONGO_PORTA}",
-            serverSelectionTimeoutMS=5000
+            serverSelectionTimeoutMS=5000,
+            directConnection=True,
         )
         cliente_pdv.admin.command("ping")
     except PyMongoError as e:
