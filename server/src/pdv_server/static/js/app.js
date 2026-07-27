@@ -1595,7 +1595,12 @@ function _dashFase2(lojasList, historico) {
     atualizarKpiErpDb(d || { online: false });
     _atualizarBannerAlertas();
   });
-  _f(API("/integrador/status")).then(d => {
+  // 15s (nao os 8s padrao): faz ate 2 idas ao Mongo do cliente via Tailscale,
+  // e sob concorrencia real com as outras chamadas deste mesmo Promise.all
+  // (principalmente /integrador/versao_atual, que faz SSH de verdade) ja foi
+  // medido levando ~4.5-5s -- 8s deixava pouca margem antes de cair no
+  // "Falha." generico mesmo com o integrador saudavel.
+  _f(API("/integrador/status"), 15000).then(d => {
     atualizarKpiIntegrador(d || { status: "erro", erro: "Falha." });
     _atualizarBannerAlertas();
   });
