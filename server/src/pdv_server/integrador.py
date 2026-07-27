@@ -19,6 +19,13 @@ _CAMPOS_CIFRADOS = ("ssh_senha",)
 # que o processo e o Mongo estejam online).
 HORAS_LIMITE_SEM_ATIVIDADE = 24
 
+# So "produtos" e dado mestre que deve sempre existir desde o dia 1. As demais
+# colecoes de COLECOES (pessoas, promocoes*) so recebem o primeiro documento
+# quando o cliente de fato usa aquele recurso na loja (ex: cadastra uma
+# promocao) -- vazias nao indica problema nenhum, entao nao devem reprovar o
+# status do integrador.
+COLECOES_OBRIGATORIAS = ("produtos",)
+
 
 def _arquivo_config(contexto):
     return os.path.join(contexto.integrador_dir, "config.json")
@@ -139,7 +146,10 @@ def testar_status(contexto):
     elif not mongo_online:
         status = "erro"
     else:
-        vazias = [nome for nome, info in colecoes_info.items() if info["total"] == 0]
+        vazias = [
+            nome for nome in COLECOES_OBRIGATORIAS
+            if colecoes_info.get(nome, {}).get("total") == 0
+        ]
         if vazias:
             status = "erro"
             erro = f"Colecao(oes) sem nenhum dado: {', '.join(vazias)}"

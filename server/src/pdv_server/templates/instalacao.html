@@ -269,6 +269,13 @@
             <div class="field"><label>IP do MongoDB</label><input id="p4IntMongoIp" placeholder="100.x.x.x"></div>
             <div class="field"><label>Porta do MongoDB</label><input id="p4IntMongoPorta" type="number" placeholder="27016" value="27016"></div>
           </div>
+          <div class="text-muted" style="font-size:11.5px; margin:12px 0 6px;">
+            🔐 Acesso SSH ao host do integrador <span class="text-muted">(opcional — usado depois para atualizar o Integrador remotamente pelo painel; IP e porta reaproveitam os valores acima e a 22)</span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:600px;">
+            <div class="field"><label>Usuário SSH</label><input id="p4IntSshUsuario" placeholder="ubuntu"></div>
+            <div class="field"><label>Senha SSH</label><input id="p4IntSshSenha" type="password"></div>
+          </div>
           <div style="display:flex; gap:8px; margin-top:8px;">
             <button class="btn btn-ghost btn-sm" onclick="testarIntegrador()">🔌 Testar</button>
             <button class="btn btn-primary btn-sm" onclick="salvarIntegrador()">💾 Salvar e testar</button>
@@ -686,6 +693,10 @@ async function salvarIntegrador() {
       porta: parseInt(document.getElementById('p4IntPorta').value) || 8080,
       mongo_ip: document.getElementById('p4IntMongoIp').value,
       mongo_porta: parseInt(document.getElementById('p4IntMongoPorta').value) || 27016,
+      ssh_ip: document.getElementById('p4IntIp').value,
+      ssh_porta: 22,
+      ssh_usuario: document.getElementById('p4IntSshUsuario').value,
+      ssh_senha: document.getElementById('p4IntSshSenha').value,
     }),
   });
   const d = await res.json();
