@@ -10,7 +10,6 @@ from pdv_server.auth.models import init_db
 from pdv_server.auth.routes import auth_bp, limiter, login_manager
 from pdv_server.config import INTEGRADOR_DATA_DIR, SECRET_KEY
 from pdv_server.painel.routes import painel_bp
-from pdv_server.discovery import endereco_alcancavel
 from pdv_server import VERSION, pdv_compat
 from pdv_server.rotas_comuns import com_rede
 from pdv_server.routes_agente import agente_bp
@@ -130,12 +129,19 @@ def painel_rede(contexto):
 @com_rede
 def api_sysinfo(contexto):
     """Consulta o agente de monitoramento do service manager (porta 5001).
-    O agente é instalado pelo script de instalação da rede."""
+    O agente é instalado pelo script de instalação da rede.
+
+    O host do Mongo URI já é o IP Tailscale direto do service manager
+    (atribuído quando ele entra na tailnet durante a instalação) -- não um IP
+    de LAN cru atrás do subnet router, então NÃO deve passar por
+    endereco_alcancavel()/tradução "via" (isso gera um hostname "*-via-<site>"
+    que nunca existiu e só resulta em timeout). Mesmo motivo por que
+    discovery._get_mongo() e integrador.testar_status() também usam os
+    IPs de contexto/config direto, sem tradução."""
     parsed = urlparse(contexto.mongo_uri)
-    host_raw = parsed.hostname or ""
-    if not host_raw:
+    host = parsed.hostname or ""
+    if not host:
         return jsonify({"erro": "Mongo URI não configurado."})
-    host = endereco_alcancavel(host_raw, contexto.tailscale_site_id)
     try:
         r = requests.get(f"http://{host}:5001/sysinfo", timeout=3)
         return jsonify(r.json())
