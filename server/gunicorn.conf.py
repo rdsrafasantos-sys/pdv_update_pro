@@ -1,4 +1,14 @@
 """Configuração do Gunicorn para o PDV Server."""
+# Monkey-patch do gevent tem que ser a PRIMEIRA coisa a rodar no processo,
+# antes de "requests"/"urllib3" (e, por tabela, "ssl") serem importados por
+# qualquer coisa -- gunicorn faz o patch sozinho ao carregar o worker "gevent",
+# mas tarde demais nesse setup, deixando ssl parcialmente remendado. Sintoma:
+# "RecursionError: maximum recursion depth exceeded" dentro de
+# ssl.SSLContext.minimum_version toda vez que o app faz uma chamada HTTPS de
+# saida (API do Tailscale, Resend) atraves do worker gevent real.
+from gevent import monkey
+monkey.patch_all()
+
 import os
 import sys
 
