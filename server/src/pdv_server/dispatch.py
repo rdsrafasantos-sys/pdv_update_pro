@@ -234,14 +234,19 @@ def _service_manager_host(contexto):
 
 def _post_service_manager(contexto, path, payload):
     """POST generico para a API REST do Service Manager (VRIntegradorMaster),
-    no mesmo host usado no mongo_uri da rede, so que na porta da API REST."""
+    no mesmo host usado no mongo_uri da rede, so que na porta da API REST.
+
+    O host do Mongo URI ja e o IP Tailscale direto do service manager (nao um
+    IP de LAN cru atras do subnet router) -- NAO passa por
+    endereco_alcancavel()/traducao "via" pelo mesmo motivo de
+    discovery._get_mongo(), integrador.testar_status() e app.py:api_sysinfo:
+    gerava um hostname "*-via-<site>" que nunca existiu, so timeout."""
     host = _service_manager_host(contexto)
     if not host:
         return {"ok": False, "erro": "Nao foi possivel determinar o host do Service Manager."}
-    endereco = endereco_alcancavel(host, contexto.tailscale_site_id)
     try:
         r = requests.post(
-            f"http://{endereco}:{SERVICE_MANAGER_PORTA}{SERVICE_MANAGER_PREFIXO}{path}",
+            f"http://{host}:{SERVICE_MANAGER_PORTA}{SERVICE_MANAGER_PREFIXO}{path}",
             json=payload,
             timeout=20,
         )
