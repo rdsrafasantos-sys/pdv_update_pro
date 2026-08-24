@@ -582,6 +582,18 @@ def redes_visiveis_para(usuario_id):
     ]
 
 
+def unidades_visiveis_para(usuario_id):
+    """Lista as unidades que esse usuario pode ver -- acesso_total ve todas,
+    senao so as unidades atribuidas diretamente a ele (usuario.unidades)."""
+    perm = carregar_permissoes(usuario_id)
+    if not perm:
+        return []
+    todas = listar_unidades()
+    if perm["acesso_total"]:
+        return todas
+    return [u for u in todas if u["id"] in perm["unidade_ids"]]
+
+
 def usuario_pode_acessar_rede(usuario_id, rede_id):
     perm = carregar_permissoes(usuario_id)
     if not perm:

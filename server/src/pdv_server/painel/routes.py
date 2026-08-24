@@ -8,7 +8,7 @@ from pdv_server.auth.gestao import (
     editar_usuario, excluir_perfil, excluir_unidade, excluir_usuario,
     listar_perfis, listar_redes, listar_unidades,
     listar_usuarios, obter_rede, obter_usuario,
-    redes_visiveis_para, usuario_pode_acessar_rede,
+    redes_visiveis_para, unidades_visiveis_para, usuario_pode_acessar_rede,
 )
 from pdv_server.auth.gestao_instalacao import (
     criar_rede_da_instalacao, gerar_proximo_site_id, gerar_script_instalacao,
@@ -52,12 +52,13 @@ def instalacao_pagina():
     return render_template("instalacao.html")
 
 
-# ── API: Unidades (gestao da VR -- so super-admin) ─────────────
+# ── API: Unidades (listar e visivel a qualquer usuario, escopado pelo
+# acesso dele -- criar/editar/excluir continua so super-admin) ──────────
 
 @painel_bp.route("/api/unidades", methods=["GET"])
-@exigir_super_admin
+@login_required
 def api_listar_unidades():
-    return jsonify(listar_unidades())
+    return jsonify(unidades_visiveis_para(int(current_user.id)))
 
 
 @painel_bp.route("/api/unidades", methods=["POST"])
