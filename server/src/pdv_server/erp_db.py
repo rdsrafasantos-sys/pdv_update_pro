@@ -90,11 +90,17 @@ def pendencias_fiscais(contexto):
         conn = _conectar(cfg, contexto.tailscale_site_id)
         try:
             with conn.cursor() as cur:
-                # Dia sem consistência finalizada = tem vendas naquele dia
-                # mas NÃO existe registro em pdv.consistencia com calculovendamedia=true.
-                # Isso captura: (a) dias com linha calculovendamedia=false
-                #               (b) dias sem linha alguma na tabela (ex: 28/29 jan)
-                # Qualquer movimentação (venda ou cancelamento) sem consistência finalizada
+                # Dia sem consistência finalizada = tem vendas naquele dia mas NÃO
+                # existe registro em pdv.consistencia pra essa (data, id_loja) --
+                # a existência da linha é o "Finalizado" (confirmado com o usuário
+                # direto na tela "Consulta de Consistência PDV" do ERP: a mesma
+                # query "select * from pdv.consistencia where data > X" é o que
+                # popula aquele grid, e o checkbox "Finalizado" reflete só a
+                # linha existir, independente de calculovendamedia). Esse campo
+                # calculovendamedia é outra coisa (calculo de venda media) e não
+                # tem relação com o dia estar fechado ou não -- clientes com o
+                # módulo de "venda média" desligado no ERP ficam com ele sempre
+                # false mesmo em dias normalmente finalizados.
                 PENDENTE_SQL = """
                     SELECT DISTINCT v.data, l.descricao AS loja
                     FROM pdv.venda v
@@ -105,7 +111,6 @@ def pendencias_fiscais(contexto):
                           SELECT 1 FROM pdv.consistencia c
                           WHERE c.data = v.data
                             AND c.id_loja = v.id_loja
-                            AND c.calculovendamedia = true
                       )
                     ORDER BY v.data DESC, l.descricao
                 """
